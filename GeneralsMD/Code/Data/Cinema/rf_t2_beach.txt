@@ -1,0 +1,21 @@
+# Trailer 2, shots 8 to 10: Scenarios/rf_t2_beach.txt on Bombardment Beach (command line there).
+# Zoom is relative to the observer's opening view, which measured 1.28 absolute on this map.
+#
+# 3 s: hero_loop_03's view from the north-east, the two lines coming at each other across the grass
+#   with the rock ridge behind. At relative 2.1 and pitch 12 the 2560x1440 take of 2026-10-10 had
+#   the top fifth black over the ridge (16 had been worse in the probe), so it is closer and steeper.
+# 6.5 s, frames 195 to 285: beside the Chinese armour at 2050,1560, close, looking east.
+# 9.5 s, frames 285 to 360: the first view again, the lines meeting.
+# 12 s, frames 360 to 530: from the east against the ridge, the fight under the rock face.
+# 18 s, frames 540 to 650: the Comanches low over the Chinese armour, rockets going out.
+# 22 s, frames 660 to 780: the ridge wider, China's carpet bomb going off along the American line;
+#   a thin black strip along the top, which the edit crops.
+
+3.0   cut     1946 1376 1.7 135 2
+3.5   shot
+6.5   cut     2050 1560 0.7 -90 6
+9.5   cut     1946 1376 1.7 135 2
+10.0  shot
+12.0  cut     1850 1300 1.0 90 10
+18.0  cut     2050 1540 0.9 -60 6
+22.0  cut     1850 1300 1.4 90 12

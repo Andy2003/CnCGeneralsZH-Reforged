@@ -1,0 +1,12 @@
+# Trailer 2, shot 5: Scenarios/rf_t2_bitter.txt on Bitter Winter (command line there). Zoom is
+# relative to the observer's opening view, which measured 1.27 absolute on this map.
+#
+# Frames 180 to 330, looking east-north-east past the gun line on the frozen lake's shore: the Nuke
+# Cannons and Inferno Cannons close, muzzle flashes from frame 180. Frames 450 to 600, the receiving
+# end: from the American column looking west back at the guns, the shells landing in the foreground
+# as fireballs that fill the bottom third, the guns firing on the lake shore behind.
+
+3.0   cut     1000 1750 0.7 -60 8
+3.5   shot
+14.0  cut     1250 1750 1.4 90 6
+14.5  shot

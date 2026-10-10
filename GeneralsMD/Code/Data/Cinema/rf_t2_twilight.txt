@@ -1,0 +1,19 @@
+# Trailer 2, shots 16 and 18: Scenarios/rf_t2_twilight.txt on Twilight Flame (command line there).
+# Zoom is relative to the observer's opening view, which measured 1.23 absolute on this map, so
+# swpair_nuke's 1.6 and swpair_scud's 1.0, written against an older base, do not carry over: at
+# relative 4.0 (4.92 absolute) the frame was black, and at 2.5 with pitch -16 the top 40% was black,
+# the far ground being past the draw distance. Every view here is tilted down to -20 or steeper.
+#
+# 3 s, frames 230 to 450: the ring town from the south-west, the nuke (landing on frame 263) rising
+#   as a column and a fireball over it.
+# 25 s, frames 750 to 900: closer over the pools from the south, the Chinese column driving into
+#   them from frame about 780. The pools are expensive to draw: at 1280x720 this stretch rendered at
+#   about 7 pictures a second, and a low view over them (pitch +6) at one picture every 1.5 to 5.4 s.
+# 35 s, frames 1050 to 1250: the Scud Storm's block round 950,3850, the first Scud landing on 1107.
+
+3.0   cut     1500 3450 2.5 -45 -24
+3.5   shot
+25.0  cut     1460 3420 1.8 0 -26
+25.5  shot
+35.0  cut     950 3850 2.2 -45 -22
+35.5  shot

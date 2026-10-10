@@ -1,0 +1,54 @@
+# Trailer 2, the climax, shots 19 to 23 on Dark Night: one attack on the central village square
+# (2000,1750) seen from five places. sp_night.txt's two armies (America from 1500,1250, China with
+# Dragons and Inferno Cannons from 2500,2250) and its A-10, carpet bomb and Spectre, a second wave a
+# side, then the superweapons in the order the edit wants them: the particle beam on the square, a
+# second carpet bomb through the village, and the nuke last, so its flash covers nothing that is
+# still to come. The beam lands about 75 frames after its call, the nuke 164.
+#
+#   generals.exe -win -xres 2560 -yres 1440 -msaa 0 -quickstart -noshellmap -multiInstance
+#     -particlecap 5000 -map "Maps\Dark Night\Dark Night.map" -autoskirmish 2 -takeover
+#     -observer -side 0 FactionAmerica -side 1 FactionChina -seed 7 -scenario rf_t2_night
+#     -cinema rf_t2_night -video <from> <to> rt_t2_night -recordfps 60
+
+# --- the superweapons, at the starts, out of frame ------------------------------------------------
+10    spawn      0  AmericaCommandCenter            1   start0:260:0
+10    spawn      0  AmericaParticleCannonUplink     1   start0:0:260
+10    spawn      0  AmericaPowerPlant               4   start0:-240:40    90
+10    spawn      1  ChinaCommandCenter              1   start1:-260:0
+10    spawn      1  ChinaNuclearMissileLauncher     1   start1:0:260
+10    spawn      1  ChinaPowerPlant                 3   start1:240:40     90
+
+# --- sp_night.txt's armies -----------------------------------------------------------------------
+30    spawn      0  AmericaTankCrusader             12  1500 1250  36
+30    spawn      0  AmericaTankPaladin              6   1400 1350  40
+30    spawn      0  AmericaVehicleTomahawk          6   1350 1200  40
+30    spawn      0  AmericaInfantryRanger           16  1550 1350  18
+30    spawn      0  AmericaVehicleComanche          6   1400 1100  60
+30    spawn      1  ChinaTankOverlord               4   2500 2250  50
+30    spawn      1  ChinaTankBattleMaster           8   2600 2200  40
+30    spawn      1  ChinaTankDragon                 8   2450 2150  36
+30    spawn      1  ChinaVehicleInfernoCannon       6   2600 2350  40
+30    spawn      1  ChinaInfantryRedguard           16  2400 2250  18
+30    spawn      1  ChinaVehicleHelix               3   2650 2400  60
+60    attackmove 0  *  2000 1750
+60    attackmove 1  *  2000 1750
+
+# --- a second wave a side, so the square is still full at the climax ------------------------------
+560   spawn      0  AmericaTankCrusader             10  1500 1250  36
+560   spawn      0  AmericaTankPaladin              4   1400 1350  40
+560   spawn      0  AmericaInfantryRanger           12  1550 1350  18
+560   spawn      1  ChinaTankBattleMaster           8   2600 2200  40
+560   spawn      1  ChinaTankOverlord               3   2500 2250  50
+560   spawn      1  ChinaInfantryRedguard           12  2400 2250  18
+580   attackmove 0  *  2000 1750
+580   attackmove 1  *  2000 1750
+
+# --- sp_night.txt's powers -----------------------------------------------------------------------
+250   power      0  AmericaCommandCenter  2100 1900  SuperweaponA10ThunderboltMissileStrike
+320   power      1  ChinaCommandCenter    1900 1650  Early_SuperweaponChinaCarpetBomb
+400   power      0  AmericaCommandCenter  2000 1750  SuperweaponSpectreGunship
+
+# --- the climax ----------------------------------------------------------------------------------
+900   power      0  AmericaParticleCannonUplink  2000 1750
+730   power      1  ChinaCommandCenter    2050 1800  Early_SuperweaponChinaCarpetBomb
+1100  power      1  ChinaNuclearMissileLauncher  1980 1740

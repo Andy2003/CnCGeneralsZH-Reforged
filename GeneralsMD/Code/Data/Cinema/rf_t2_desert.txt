@@ -1,0 +1,17 @@
+# Trailer 2, timeline.t2.js rows 07 and 06: Scenarios/rf_t2_desert.txt on Tournament Desert (command
+# line there). Zoom is relative to the observer's opening view, about 1.28 absolute on this build.
+#
+# Row 07, frames 285 to 360: the shop the GLA holds at 880,1180 from the east, the Tunnel Defenders'
+# tracers going out of its windows into the American armour on the right and hitting it. The first
+# take of 2026-10-10 framed it from the north-east at relative 0.25, which put the shop's blank
+# corner across the frame and the firing windows on the far side. It falls at about frame 570.
+# Before 285 the same shop from the south, rockets leaving its far side.
+# Row 06, frames 690 to 840: the crossroads from above, heading -45, the anthrax bomb called on frame
+# 300 covering it purple from frame 720 while the armour burns.
+
+3.0   cut     880 1160 0.45 180 14
+3.5   shot
+9.5   cut     880 1160 0.6 -90 18
+10.0  shot
+19.0  cut     1020 1350 0.75 -45 -20
+19.5  shot

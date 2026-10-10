@@ -1,0 +1,26 @@
+# Trailer 2, shot 5 on Bitter Winter: a Chinese artillery line on the open snow west of the town,
+# four Nuke Cannons and three Inferno Cannons in a row along x 1050, firing east at an American
+# column parked on 1430,1750. forceground keeps every gun firing whatever is left standing.
+#
+#   generals.exe -win -xres 2560 -yres 1440 -msaa 0 -quickstart -noshellmap -multiInstance
+#     -particlecap 5000 -map "Maps\Bitter Winter\Bitter Winter.map" -autoskirmish 2 -takeover
+#     -observer -side 0 FactionAmerica -side 1 FactionChina -seed 7 -scenario rf_t2_bitter
+#     -cinema rf_t2_bitter -video <from> <to> rt_t2_bitter -recordfps 60
+
+10    spawn      0  AmericaCommandCenter            1   start0:240:60
+10    spawn      1  ChinaCommandCenter              1   start1:-260:0
+
+20    spawn      1  ChinaVehicleNukeLauncher        1   1050 1600
+20    spawn      1  ChinaVehicleInfernoCannon       1   1055 1660
+20    spawn      1  ChinaVehicleNukeLauncher        1   1050 1720
+20    spawn      1  ChinaVehicleInfernoCannon       1   1055 1780
+20    spawn      1  ChinaVehicleNukeLauncher        1   1050 1840
+20    spawn      1  ChinaVehicleInfernoCannon       1   1055 1900
+20    spawn      1  ChinaVehicleNukeLauncher        1   1050 1960
+
+20    spawn      0  AmericaTankCrusader             8   1430 1750  45
+20    spawn      0  AmericaTankPaladin              4   1500 1700  45
+20    spawn      0  AmericaVehicleHumvee            4   1500 1820  40
+
+60    forceground 1  ChinaVehicleNukeLauncher            1430 1750
+60    forceground 1  ChinaVehicleInfernoCannon           1450 1730

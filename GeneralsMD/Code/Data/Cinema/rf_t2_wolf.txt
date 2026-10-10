@@ -1,0 +1,12 @@
+# Trailer 2, shots 3 and 4: Scenarios/rf_t2_wolf.txt on Winter Wolf (command line there).
+# Zoom is relative to the observer's opening view, which on this build is about 1.17 absolute, so
+# 0.45 is 0.52 and 0.6 is 0.70; the first trailer's lists were written against a base of about 4.
+#
+# Shot 3, frames 120 to 300: on the road at 1100,960 looking south, six Overlords drive up it onto
+# the camera. Shot 4, frames 330 to 510: rf_snow's fight from the north-east, heading 135, the A-10
+# strike (called on frame 300) going off in it from about frame 330.
+
+3.0   cut     1100 960 0.45 180 18
+3.5   shot
+9.0   cut     1100 1120 0.6 135 12
+9.5   shot

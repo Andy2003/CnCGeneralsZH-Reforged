@@ -1,0 +1,20 @@
+# Trailer 2, the morning: Scenarios/rf_t2_heart.txt (sp_village's fight) on Heartland Shield, command
+# line there. Not probed yet: these cuts are UI-MAP's verified Heartland Shield views (written against
+# a base of about 4.1) converted to this build's base of 1.28, and the frames are the ones the social
+# preview and the gallery set found for the same fight (A-10 over the fight at 855 to 877).
+# Pitch is kept at 4 or below on the wide view: at 2.8 relative and pitch 10 the probe's top half was
+# black past the draw distance.
+#
+# 3 s: the village wide from the south, looking north up the stream.
+# 27 s, frames 810 to 930: low from the west at street level, the A-10 over the street.
+# 31 s, frames 930 to 1050: from the south-east, the carpet bomb and the burning houses.
+# 35 s, frames 1050 to 1170: the village wide again, the Spectre's fire over it.
+
+3.0   cut     950 1950 1.95 0 4
+3.5   shot
+27.0  cut     950 1950 0.95 -90 12
+27.5  shot
+31.0  cut     950 1950 1.4 45 6
+31.5  shot
+35.0  cut     950 1950 1.95 0 -6
+35.5  shot

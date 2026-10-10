@@ -1,0 +1,16 @@
+# Trailer 2, shots 13 and 14: Scenarios/rf_t2_alpine.txt on Alpine Assault (command line there).
+# Zoom is relative to the observer's opening view, which measured 1.27 absolute on this map, so the
+# spectre_reaim list's 2.6 is 3.31 here and its top quarter is black past the map edge.
+#
+# 3 s, frames 300 to 410: over the town's roofs from the south-east (absolute 1.14), the gunship
+#   crossing low above the houses from frame 330.
+# 14 s, frames 420 to 510: the same point turned round, the shells bursting between the houses on
+#   the Battlemasters at 1190,1210 (re-aimed there on frame 360).
+# 17 s, frames 510 to 600: the whole orbit from high up, tilted further down than spectre_reaim's -8
+#   to keep the black band off the top; the gunship at the top of its circle.
+
+3.0   cut     1200 1215 0.9 45 10
+3.5   shot
+14.0  cut     1200 1215 0.9 -135 10
+17.0  cut     1300 1290 2.4 -45 -16
+17.5  shot
