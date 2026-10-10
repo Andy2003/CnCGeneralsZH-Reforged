@@ -49,6 +49,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/ControlBar.h"	// COMMAND_FIRED_BY_SCRIPT, the flag every script-fired power carries
 #include "GameClient/ParticleSys.h"
+#include "GameClient/TerrainVisual.h"	// removeAllBibs, after the build check lights them
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Weapon.h"
@@ -780,6 +781,28 @@ static Bool executeSpawn( const ScenarioAction &action, Player *player, const Co
 		pos.x = centre.x + (i % columns) * action.spacing - halfWidth;
 		pos.y = centre.y + (i / columns) * action.spacing - halfHeight;
 		pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
+
+		// a structure goes only where a player could put it: on flat buildable ground, clear of other
+		// buildings.  The check is logic state only; the bibs it lights are client feedback, so off again.
+		// A new object reaches the partition cells only on the partition's next update, so that runs
+		// first, the way the starting units are placed, or a block of structures stacks on itself
+		if (tmpl->isKindOf( KINDOF_STRUCTURE ))
+		{
+			ThePartitionManager->update();
+			const LegalBuildCode code = TheBuildAssistant->isLocationLegalToBuild( &pos, tmpl, 0.0f,
+																					BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP,
+																					NULL, player );
+			TheTerrainVisual->removeAllBibs();
+			if (code != LBC_OK)
+			{
+				static const char *const codeNames[] = { "OK", "RESTRICTED_TERRAIN", "NOT_FLAT_ENOUGH",
+					"OBJECTS_IN_THE_WAY", "NO_CLEAR_PATH", "SHROUD", "TOO_CLOSE_TO_SUPPLIES", "GENERIC_FAILURE",
+					"TOO_CLOSE_TO_ENEMY", "TOO_MANY_DERRICK_DEFENSES" };
+				DEBUG_LOG(("SCENARIO: frame %d spawn slot %d '%s' refused at (%.0f,%.0f): LBC_%s, no structure may be built there\n",
+									 action.frame, action.slot, action.selector.str(), pos.x, pos.y, codeNames[code]));
+				continue;
+			}
+		}
 
 		if (spawnOne( tmpl, team, &pos ))
 			++made;
