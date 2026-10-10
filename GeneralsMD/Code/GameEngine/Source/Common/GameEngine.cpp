@@ -2609,6 +2609,10 @@ static void updateHeadlessRun( void )
 		// the exchange in money, on a line of its own so the PLAYER line's readers keep matching it
 		DEBUG_LOG(("HEADLESS VALUE %d: units worth %d lost, %d killed\n", i,
 							 score->getUnitValueLost(), score->getUnitValueDestroyed()));
+		// the bank as it stands.  Starting money plus earned minus spent is not it: the score keeper's
+		// spent counts buildings and upgrades and never a unit, and that sum read a Hard AI ending on
+		// under 2,000 as one sitting on 52,000
+		DEBUG_LOG(("HEADLESS BANK %d: %d in the bank\n", i, p->getMoney()->countMoney()));
 	}
 
 	if (scouting)

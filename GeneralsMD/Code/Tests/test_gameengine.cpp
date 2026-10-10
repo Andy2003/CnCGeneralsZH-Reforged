@@ -11777,6 +11777,105 @@ TEST(the_purchase_queue_saves_for_the_best_thing_it_cannot_afford)
 }
 
 
+/** The spend rule and the upgrades: a bank of so many seconds of income, factories enough to spend the
+	 income, and the upgrade the army gets the most out of for its price.  Each rung has its own values,
+	 and the ladder has to climb: Hard keeps the smallest bank and buys upgrades soonest and cheapest. */
+TEST(the_bank_target_and_the_upgrade_the_army_pays_for)
+{
+	// seconds of income, never under the floor; nothing earned yet is the floor alone
+	CHECK_EQ( 4000, aiBankTarget( 0.0f, 30.0f, 4000 ) );
+	CHECK_EQ( 4000, aiBankTarget( 100.0f, 30.0f, 4000 ) );
+	CHECK_EQ( 6000, aiBankTarget( 200.0f, 30.0f, 4000 ) );
+	CHECK_EQ( 12000, aiBankTarget( 200.0f, 60.0f, 4000 ) );
+
+	// another factory only when the bank is over target and has not come down over the window, and the
+	// rung's cap is not reached: the first cut sized it from income and a Hard AI earning 93 a second
+	// never added one to the two it had
+	CHECK( aiWantsMoreProduction( 56700, 56000, 4000, 2, 8, 0.0f ) );					// over target and still rising
+	CHECK( aiWantsMoreProduction( 9000, 9000, 4000, 2, 8, 0.0f ) );						// over target and flat
+	CHECK( !aiWantsMoreProduction( 9000, 12000, 4000, 2, 8, 0.0f ) );					// coming down: what stands spends it
+	CHECK( !aiWantsMoreProduction( 3000, 1000, 4000, 2, 8, 2.0f ) );					// under target
+	CHECK( !aiWantsMoreProduction( 56700, 56000, 4000, 8, 8, 2.0f ) );				// at the cap
+	CHECK( !aiWantsMoreProduction( 56700, 56000, 4000, 3, 3, 2.0f ) );
+	// a busy Hard AI's bank swings, so past twice the target it adds one whatever the trend
+	CHECK( aiWantsMoreProduction( 52200, 60000, 4000, 4, 8, 2.0f ) );
+	CHECK( !aiWantsMoreProduction( 8000, 9000, 4000, 4, 8, 2.0f ) );					// at twice, not past it
+	CHECK( !aiWantsMoreProduction( 52200, 60000, 4000, 4, 8, 0.0f ) );				// a rung without the multiple
+
+	// the surplus budget: the rung's share of thirty seconds' income, never past the excess
+	CHECK_EQ( 0, aiSurplusBudget( 3000, 4000, 100.0f, 1.0f ) );					// under target, nothing
+	CHECK_EQ( 3000, aiSurplusBudget( 60000, 4000, 100.0f, 1.0f ) );				// Hard: a window's income a pass
+	CHECK_EQ( 300, aiSurplusBudget( 60000, 4000, 100.0f, 0.1f ) );				// Medium
+	CHECK_EQ( 150, aiSurplusBudget( 60000, 4000, 100.0f, 0.05f ) );				// Easy
+	CHECK_EQ( 500, aiSurplusBudget( 4500, 4000, 100.0f, 1.0f ) );				// the excess, when that is less
+	CHECK_EQ( 0, aiSurplusBudget( 60000, 4000, 0.0f, 1.0f ) );					// nothing earned, nothing extra
+
+	// what counts toward an upgrade: a fighting unit at its fit, anything else at the rung's small weight,
+	// so a base worth 20,000 is 1,000 of reason to fortify it and a 10,000 army is 10,000 of reason to arm it
+	CHECK_NEAR( 1.5f, aiUpgradeWeight( TRUE, 1.5f, 0.05f ), 0.0001f );
+	CHECK_NEAR( 0.05f, aiUpgradeWeight( FALSE, 1.5f, 0.05f ), 0.0001f );
+	const Real fortifyOrArm[ 2 ] = { 20000.0f * aiUpgradeWeight( FALSE, 1.0f, 0.05f ), 10000.0f * aiUpgradeWeight( TRUE, 1.0f, 0.05f ) };
+	const Int fortifyOrArmCost[ 2 ] = { 1000, 2000 };
+	CHECK_EQ( 1, aiPickUpgrade( fortifyOrArm, fortifyOrArmCost, 2, 1.5f, FALSE ) );
+
+	// how a unit counts: as it is when the rung does not counter or the trade is even, double when it
+	// wins every trade and nothing when it loses every one
+	CHECK_NEAR( 1.0f, aiCounterFit( 0.9f, 0.0f ), 0.0001f );
+	CHECK_NEAR( 1.0f, aiCounterFit( 0.5f, 1.0f ), 0.0001f );
+	CHECK_NEAR( 2.0f, aiCounterFit( 1.0f, 1.0f ), 0.0001f );
+	CHECK_NEAR( 0.0f, aiCounterFit( 0.0f, 1.0f ), 0.0001f );
+	CHECK_NEAR( 1.25f, aiCounterFit( 1.0f, 0.25f ), 0.0001f );
+
+	// the most army for the money wins, if it clears the payoff
+	const Real covered[ 4 ] = { 3000.0f, 9000.0f, 0.0f, 2400.0f };
+	const Int cost[ 4 ] = { 1000, 2000, 500, 800 };
+	CHECK_EQ( 1, aiPickUpgrade( covered, cost, 4, 1.5f, FALSE ) );			// 4.5 times its price beats 3
+	CHECK_EQ( -1, aiPickUpgrade( covered, cost, 4, 5.0f, FALSE ) );			// nothing pays five times over ...
+	CHECK_EQ( 1, aiPickUpgrade( covered, cost, 4, 9.0f, TRUE ) );				// ... and past the target half the payoff will do
+	CHECK_EQ( -1, aiPickUpgrade( covered, cost, 4, 9.5f, TRUE ) );
+
+	// an upgrade that improves nothing we own is never bought, however cheap
+	const Real nothing[ 1 ] = { 0.0f };
+	const Int cheap[ 1 ] = { 1 };
+	CHECK_EQ( -1, aiPickUpgrade( nothing, cheap, 1, 0.0f, TRUE ) );
+
+	// two that pay the same: the first, so the order is the buttons' and the same on every machine
+	const Real even[ 2 ] = { 4000.0f, 2000.0f };
+	const Int evenCost[ 2 ] = { 2000, 1000 };
+	CHECK_EQ( 0, aiPickUpgrade( even, evenCost, 2, 1.0f, FALSE ) );
+
+	// every rung has the queue and the rule, and each step up keeps a smaller bank and buys sooner
+	TAiData data;
+	for( Int i = 0; i < AISKILL_COUNT; ++i )
+	{
+		CHECK( data.m_skill[ i ].m_bankTargetSeconds > 0.0f );
+		CHECK( data.m_skill[ i ].m_bankTargetFloor > 0 );
+		CHECK( data.m_skill[ i ].m_upgradePayoff > 0.0f );
+		CHECK( data.m_skill[ i ].m_upgradeNonCombatWeight < 0.5f );
+		CHECK( data.m_skill[ i ].m_surplusShare > 0.0f && data.m_skill[ i ].m_surplusShare <= 1.0f );
+	}
+	CHECK_EQ( 1.0f, data.m_skill[ AISKILL_BRUTAL ].m_surplusShare );		// Hard spends all of it
+	for( Int i = 1; i < AISKILL_COUNT; ++i )
+	{
+		const AIDifficultyProfile &lower = data.m_skill[ i - 1 ];
+		const AIDifficultyProfile &upper = data.m_skill[ i ];
+		CHECK( upper.m_bankTargetSeconds < lower.m_bankTargetSeconds );
+		CHECK( upper.m_bankTargetFloor <= lower.m_bankTargetFloor );
+		CHECK( upper.m_upgradePayoff < lower.m_upgradePayoff );
+		CHECK( upper.m_upgradeStartSeconds < lower.m_upgradeStartSeconds );
+		CHECK( upper.m_surplusShare > lower.m_surplusShare );
+		CHECK( upper.m_maxProduction >= lower.m_maxProduction );
+	}
+	// Hard alone builds past its plan, and with a bank past twice its target; Medium out-armies Easy and
+	// Hard out-armies Medium, which an equal share and cap for the two lower rungs had undone
+	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_maxProduction > data.m_skill[ AISKILL_MEDIUM ].m_maxProduction );
+	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_factoryBankMultiple > 0.0f );
+	CHECK_EQ( 0.0f, data.m_skill[ AISKILL_MEDIUM ].m_factoryBankMultiple );
+	CHECK_EQ( 0.0f, data.m_skill[ AISKILL_EASY ].m_factoryBankMultiple );
+	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_surplusShare >= 5.0f * data.m_skill[ AISKILL_MEDIUM ].m_surplusShare );
+}
+
+
 /** B4, second attempt.  The cash map aimed at the enemy's money and walked past his army, 7-9; this
 	 one counts the guns the AI knows about along each approach and takes the quietest. */
 TEST(an_attack_takes_the_least_defended_lane)

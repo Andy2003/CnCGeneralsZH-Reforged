@@ -380,6 +380,10 @@ m_role(AIROLE_AGGRESSIVE)
 		m_ambulance[ slot ].spot.zero();
 	}
 	m_ambulanceLost = 0;
+	m_incomeMark = 0;
+	m_incomeMarkFrame = 0;
+	m_bankMark = 0;
+	m_incomePerSecond = 0.0f;
 	m_healerSeconds = 0;
 	m_healerClearSeconds = 0;
 	m_captureTimer = 1;
@@ -4792,6 +4796,7 @@ void AIPlayer::update( void )
 	AI_PHASE( AIP_CAPTURE, doCapture() );						// ... and the money that is standing around.
 	AI_PHASE( AIP_CAPTURE, doHijack() );						// Take the enemy's tanks rather than shoot them.
 	AI_PHASE( AIP_ECONOMY, doEconomy() );						// ... and the money sitting in the bank.
+	AI_PHASE( AIP_ECONOMY, doSpending() );					// Upgrades for the army, and whatever is over the bank target.
 	AI_PHASE( AIP_POWER,   doPower() );							// Keep the lights on, and out of reach.
 	AI_PHASE( AIP_ECONOMY, doSuperweapons() );			// The big guns, as soon as they can be bought.
 	AI_PHASE( AIP_WAVE,    rememberEnemies() );			// Write down the enemy army in sight.
@@ -6272,12 +6277,18 @@ void AIPlayer::doSuperweapons( void )
 }
 
 //----------------------------------------------------------------------------------------------------------
-/** The purchase queue.  Hard skirmish only, the rung that already spends on its own economy; Easy and
-	* Medium, and every campaign AI, buy exactly as they did. */
+/** The purchase queue.  Every skirmish rung with a bank target, each saving below its own target; every
+	* campaign AI buys exactly as it did. */
 //----------------------------------------------------------------------------------------------------------
 Bool AIPlayer::purchaseQueueOn( void )
 {
-	return isSkirmishAI() && getSkillProfile()->m_economyBuildings && getSkillProfile()->m_cashHoardThreshold > 0;
+	return isSkirmishAI() && getSkillProfile()->m_bankTargetSeconds > 0.0f;
+}
+
+Int AIPlayer::bankTarget( void )
+{
+	const AIDifficultyProfile *profile = getSkillProfile();
+	return aiBankTarget( m_incomePerSecond, profile->m_bankTargetSeconds, profile->m_bankTargetFloor );
 }
 
 AIPurchaseKind AIPlayer::purchaseKindOf( const ThingTemplate *tmpl )
@@ -6313,13 +6324,13 @@ Bool AIPlayer::purchaseAllowed( Int key, Int cost, AIPurchaseKind kind, Bool sta
 			held, money));
 
 	const Int score = aiPurchaseScore( kind, now < AI_PURCHASE_EARLY_FRAMES );
-	const AIPurchaseQueue::Verdict verdict = m_purchases.ask( key, cost, score, startable, money,
-		getSkillProfile()->m_cashHoardThreshold, now );
+	const Int target = bankTarget();
+	const AIPurchaseQueue::Verdict verdict = m_purchases.ask( key, cost, score, startable, money, target, now );
 	if( verdict == AIPurchaseQueue::RESERVED )
 	{
 		m_purchaseSavingFor = what;
-		DEBUG_LOG(("AI QUEUE frame %d player %d saves for '%s', %d of %d in the bank, score %d\n", now,
-			m_player->getPlayerIndex(), what.str(), money, cost, score));
+		DEBUG_LOG(("AI QUEUE frame %d player %d saves for '%s', %d of %d in the bank, score %d, bank target %d\n", now,
+			m_player->getPlayerIndex(), what.str(), money, cost, score, target));
 	}
 	return verdict == AIPurchaseQueue::BUY;
 }
@@ -7187,6 +7198,313 @@ void AIPlayer::answerArmy( void )
 		DEBUG_LOG(("AI ANSWER frame %d player %d trains '%s' at '%s' against '%s', %.0f of %.0f unanswered, score %.2f, %d in the bank\n",
 			TheGameLogic->getFrame(), m_player->getPlayerIndex(), unit->getName().str(), (*f)->getTemplate()->getName().str(),
 			army[ kind ].m_template->getName().str(), gap, army[ kind ].m_weight, score, m_player->getMoney()->countMoney()));
+	}
+}
+
+/** How a unit of ours trades with the enemy army this AI remembers, money for money: the value-weighted
+	* mean of aiMatchupScore over every kind in it, 0.5 with nothing remembered. */
+static Real armyMatchup( const ThingTemplate *tmpl, const Player *owner, const std::vector<AIVisibleEnemy> &army )
+{
+	const Real cost = INT_TO_REAL( tmpl->calcCostToBuild( owner ) );
+	Real weighed = 0.0f;
+	Real scored = 0.0f;
+	for( size_t k = 0; k < army.size(); ++k )
+	{
+		weighed += army[ k ].m_weight;
+		scored += army[ k ].m_weight * aiMatchupScore( templateFramesToKill( tmpl, army[ k ].m_template ),
+			templateFramesToKill( army[ k ].m_template, tmpl ), cost, army[ k ].m_cost );
+	}
+	return weighed > 0.0f ? scored / weighed : 0.5f;
+}
+
+/** The fighting unit off this factory's buttons a bank over its target goes on: the best trade against
+	* the remembered enemy army as far as the rung counters at all (aiCounterFit), and the dearer of two
+	* that score the same, so a rung that never counters buys the heaviest thing the factory makes.  Not a
+	* worker, a gatherer, a hacker or a jet; a helicopter stays with the army, so it may. */
+static const ThingTemplate *surplusUnit( Object *factory, const Player *owner, const std::vector<AIVisibleEnemy> &army, Real weight )
+{
+	const CommandSet *commandSet = TheControlBar->findCommandSet( factory->getCommandSetString() );
+	if( commandSet == NULL )
+		return NULL;
+
+	const ThingTemplate *best = NULL;
+	Real bestFit = 0.0f;
+	Int bestCost = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		const CommandButton *button = commandSet->getCommandButton( i );
+		if( button == NULL || button->getCommandType() != GUI_COMMAND_UNIT_BUILD )
+			continue;
+		const ThingTemplate *tmpl = button->getThingTemplate();
+		if( tmpl == NULL || !tmpl->canPossiblyHaveAnyWeapon() || tmpl->isKindOf( KINDOF_DOZER ) || tmpl->isKindOf( KINDOF_HARVESTER ) ||
+				tmpl->isKindOf( KINDOF_MONEY_HACKER ) || (tmpl->isKindOf( KINDOF_AIRCRAFT ) && !tmpl->isKindOf( KINDOF_PRODUCED_AT_HELIPAD )) ||
+				TheBuildAssistant->canMakeUnit( factory, tmpl ) != CANMAKE_OK )
+			continue;
+		const Int cost = tmpl->calcCostToBuild( owner );
+		const Real fit = aiCounterFit( armyMatchup( tmpl, owner, army ), weight );
+		if( best == NULL || fit > bestFit || (fit == bestFit && cost > bestCost) )
+		{
+			best = tmpl;
+			bestFit = fit;
+			bestCost = cost;
+		}
+	}
+	return best;
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** The bank a computer kept was the part of its income nothing was ever bought with: a Hard AI facing
+	* Medium ended its matches on 12,300 on average, a Medium one on up to 62,000.  So every rung
+	* keeps a bank of so many seconds of what it actually earns (m_bankTargetSeconds, aiBankTarget), and
+	* what is over that goes on upgrades, on extra units within the rung's share (aiSurplusBudget), and
+	* on another factory once an income window shows the bank is not coming down (aiWantsMoreProduction).
+	* The upgrades that pay for the standing army are bought below the target as well, each rung from
+	* its own point in the match, and all of it goes through the purchase queue, which keeps below the
+	* same target. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::doSpending( void )
+{
+	if( !purchaseQueueOn() )
+		return;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if( (now + computeUpdatePhase( m_player->getPlayerIndex(), ECONOMY_CHECK_RATE )) % ECONOMY_CHECK_RATE != 0 )
+		return;
+
+	// the income, off what the score screen counts as earned: gathered, hacked, captured and given
+	const Int bank = (Int)m_player->getMoney()->countMoney();
+	const Int earned = m_player->getScoreKeeper()->getTotalMoneyEarned();
+	Bool windowEnded = FALSE;
+	Int bankWindowAgo = bank;
+	if( now - m_incomeMarkFrame >= AI_INCOME_WINDOW_FRAMES )
+	{
+		const Real window = INT_TO_REAL( earned - m_incomeMark ) * LOGICFRAMES_PER_SECOND / INT_TO_REAL( now - m_incomeMarkFrame );
+		windowEnded = m_incomeMarkFrame != 0;		// the first window has no bank before it to compare with
+		bankWindowAgo = m_bankMark;
+		m_incomePerSecond = m_incomeMarkFrame == 0 ? window : 0.5f * (m_incomePerSecond + window);
+		m_incomeMark = earned;
+		m_incomeMarkFrame = now;
+		m_bankMark = bank;
+		DEBUG_LOG(("AI ECONOMY frame %d player %d earns %.0f a second, %d in the bank (%d a window ago), bank target %d, %s\n", now,
+			m_player->getPlayerIndex(), m_incomePerSecond, bank, bankWindowAgo, bankTarget(), bank > bankTarget() ? "spends the rest" : "keeps it"));
+	}
+
+	if( isBaseUnderAttack() )
+		return;		// defendHome's
+	const Int target = bankTarget();
+	const Bool overTarget = bank > target;
+	buyUpgradesForArmy( overTarget );
+	if( !overTarget )
+		return;
+	if( windowEnded )
+		addProductionForIncome( bank, bankWindowAgo, target );
+	trainSurplus( aiSurplusBudget( (Int)m_player->getMoney()->countMoney(), target, m_incomePerSecond, getSkillProfile()->m_surplusShare ) );
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** Only the scripts ever bought an upgrade, from a list written before anyone knew what the AI would
+	* field.  This buys the one player upgrade, of every one a standing building offers, that the army on
+	* the field gets the most out of for its price: every fighting unit the upgrade would change counts
+	* at its price weighed by how it trades with the enemy army this AI remembers (aiCounterFit, as far
+	* as the rung counters), a building or an unarmed unit at m_upgradeNonCombatWeight of its price (at
+	* full price a GLA base made Fortified Structure the first upgrade of every match), and it is bought when that sum is m_upgradePayoff times
+	* the price, half that when the bank is over its target.  One a pass, not before m_upgradeStartSeconds,
+	* at the building with the shortest queue that offers it, through the purchase queue like everything
+	* else. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::buyUpgradesForArmy( Bool overTarget )
+{
+	const AIDifficultyProfile *profile = getSkillProfile();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if( INT_TO_REAL( now ) < profile->m_upgradeStartSeconds * LOGICFRAMES_PER_SECOND )
+		return;
+
+	// every player upgrade a building of ours offers and we could start: not owned, not on order, every
+	// science its button asks for held
+	std::vector<Object *> factories;
+	m_player->iterateObjects( collectFactories, &factories );
+	std::vector<const UpgradeTemplate *> upgrades;
+	std::vector<Object *> where;
+	for( std::vector<Object *>::const_iterator f = factories.begin(); f != factories.end(); ++f )
+	{
+		const CommandSet *commandSet = TheControlBar->findCommandSet( (*f)->getCommandSetString() );
+		if( commandSet == NULL )
+			continue;
+		const UnsignedInt queued = (*f)->getProductionUpdateInterface()->getProductionCount();
+		for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+		{
+			const CommandButton *button = commandSet->getCommandButton( i );
+			if( button == NULL || button->getCommandType() != GUI_COMMAND_PLAYER_UPGRADE || button->getUpgradeTemplate() == NULL )
+				continue;
+			const UpgradeTemplate *upgrade = button->getUpgradeTemplate();
+			if( m_player->hasUpgradeComplete( upgrade ) || m_player->hasUpgradeInProduction( upgrade ) )
+				continue;
+			Bool sciences = TRUE;
+			for( size_t s = 0; s < button->getScienceVec().size(); ++s )
+				if( !m_player->hasScience( button->getScienceVec()[ s ] ) )
+					sciences = FALSE;
+			if( !sciences )
+				continue;
+			size_t u = 0;
+			while( u < upgrades.size() && upgrades[ u ] != upgrade )
+				++u;
+			if( u == upgrades.size() )
+			{
+				upgrades.push_back( upgrade );
+				where.push_back( *f );
+			}
+			else if( queued < where[ u ]->getProductionUpdateInterface()->getProductionCount() )
+				where[ u ] = *f;
+		}
+	}
+	if( upgrades.empty() )
+		return;
+
+	// what each would improve, a fighting unit at its price times how it trades
+	std::vector<AIVisibleEnemy> army;
+	rememberedArmy( &army );
+	std::vector<Object *> owned;
+	m_player->iterateObjects( collectOwned, &owned );
+	std::vector<Real> covered( upgrades.size(), 0.0f );
+	std::vector<const ThingTemplate *> fitTemplate;		// the fit by template, worked out once a pass
+	std::vector<Real> fitValue;
+	for( std::vector<Object *>::const_iterator o = owned.begin(); o != owned.end(); ++o )
+	{
+		const Object *obj = *o;
+		if( obj->isEffectivelyDead() || obj->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
+			continue;
+		const ThingTemplate *tmpl = obj->getTemplate();
+		const Bool fights = !obj->isKindOf( KINDOF_STRUCTURE ) && tmpl->canPossiblyHaveAnyWeapon();
+		Real fit = 1.0f;
+		if( fights && !army.empty() )
+		{
+			size_t t = 0;
+			while( t < fitTemplate.size() && fitTemplate[ t ] != tmpl )
+				++t;
+			if( t == fitTemplate.size() )
+			{
+				fitTemplate.push_back( tmpl );
+				fitValue.push_back( aiCounterFit( armyMatchup( tmpl, m_player, army ), profile->m_counterCompositionWeight ) );
+			}
+			fit = fitValue[ t ];
+		}
+		const Real value = aiUpgradeWeight( fights, fit, profile->m_upgradeNonCombatWeight ) * INT_TO_REAL( tmpl->calcCostToBuild( m_player ) );
+		for( size_t u = 0; u < upgrades.size(); ++u )
+			if( obj->affectedByUpgrade( upgrades[ u ] ) )
+				covered[ u ] += value;
+	}
+
+	std::vector<Int> cost( upgrades.size(), 0 );
+	for( size_t u = 0; u < upgrades.size(); ++u )
+		cost[ u ] = upgrades[ u ]->calcCostToBuild( m_player );
+	const Int pick = aiPickUpgrade( &covered[ 0 ], &cost[ 0 ], (Int)upgrades.size(), profile->m_upgradePayoff, overTarget );
+	if( pick < 0 )
+		return;
+	if( buyUpgrade( where[ pick ]->getProductionUpdateInterface(), upgrades[ pick ] ) )
+		DEBUG_LOG(("AI UPGRADE frame %d player %d queues '%s' at '%s' for %d, improves %.0f of what it owns, %.1f times the price where %.1f will do, %d in the bank, bank target %d, %d enemy kinds known\n",
+			now, m_player->getPlayerIndex(), upgrades[ pick ]->getUpgradeName().str(), where[ pick ]->getTemplate()->getName().str(),
+			cost[ pick ], covered[ pick ], covered[ pick ] / INT_TO_REAL( cost[ pick ] ),
+			overTarget ? 0.5f * profile->m_upgradePayoff : profile->m_upgradePayoff, m_player->getMoney()->countMoney(), bankTarget(),
+			(Int)army.size()));
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** Another tank factory or barracks, whichever the base has fewer of, when an income window ends with
+	* the bank over its target and no lower than a window before, or past m_factoryBankMultiple times the
+	* target (aiWantsMoreProduction): what stands is not spending what comes in.  One at a time, and no more than the rung's m_maxProduction war
+	* factories, barracks and airfields together.  A guessed spend rate a factory stood here first: a
+	* Hard AI earning 93 a second wanted the two factories it had.  Unbuilt plan entries count as standing,
+	* or the rule adds the factory the plan is about to put up. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::addProductionForIncome( Int bank, Int bankWindowAgo, Int target )
+{
+	if( !m_player->getCanBuildBase() || !m_baseCenterSet )
+		return;
+
+	const Int KINDS = 3;
+	const KindOfType PRODUCTION[ KINDS ] = { KINDOF_FS_WARFACTORY, KINDOF_FS_BARRACKS, KINDOF_FS_AIRFIELD };
+	Int standing[ KINDS ];
+	Int total = 0;
+	for( Int k = 0; k < KINDS; ++k )
+	{
+		FactoryLoad load;
+		load.kind = PRODUCTION[ k ];
+		load.finished = 0;
+		load.constructing = 0;
+		load.idle = 0;
+		load.deepest = 0;
+		m_player->iterateObjects( readFactoryLoad, &load );
+		if( load.constructing > 0 )
+			return;		// one at a time
+		standing[ k ] = load.finished;
+		total += load.finished;
+	}
+	// ... and the ones the plan has yet to put up count as standing: early on a Medium plan of two war
+	// factories and a barracks had two up, and the rule added the third the plan was about to build
+	Int planned = 0;
+	for( BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext() )
+	{
+		if( info->getObjectID() != INVALID_ID || !info->isBuildable() )
+			continue;
+		const ThingTemplate *tmpl = TheThingFactory->findTemplate( info->getTemplateName(), FALSE );
+		for( Int k = 0; tmpl && k < KINDS; ++k )
+			if( tmpl->isKindOf( PRODUCTION[ k ] ) )
+			{
+				++planned;
+				break;
+			}
+	}
+	total += planned;
+	const Int cap = getSkillProfile()->m_maxProduction;
+	if( !aiWantsMoreProduction( bank, bankWindowAgo, target, total, cap, getSkillProfile()->m_factoryBankMultiple ) )
+		return;
+
+	Object *dozer = NULL;
+	m_player->iterateObjects( findAnyDozer, &dozer );
+	if( dozer == NULL )
+		return;
+	const Int first = standing[ 1 ] < standing[ 0 ] ? 1 : 0;
+	for( Int k = 0; k < 2; ++k )
+	{
+		const KindOfType kind = PRODUCTION[ k == 0 ? first : 1 - first ];
+		if( queueExtraFactory( dozer, kind, TRUE ) )
+		{
+			DEBUG_LOG(("AI ECONOMY frame %d player %d puts up another %s, %d of at most %d standing (%d of them planned), %d in the bank (%d a window ago), bank target %d, %.0f a second of income\n",
+				TheGameLogic->getFrame(), m_player->getPlayerIndex(), kind == KINDOF_FS_WARFACTORY ? "war factory" : "barracks",
+				total, cap, planned, bank, bankWindowAgo, target, m_incomePerSecond));
+			return;
+		}
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** A unit from each factory with nothing in its queue, while the budget (aiSurplusBudget) covers it.  It
+	* joins the default team, and the next wave takes it along with the other strays.  Spending every idle
+	* factory's worth on every rung lifted Medium's peak army from 67 to 99 and Easy's from 34 to 67, and
+	* Hard against Medium went from 3-0 to 1-1, so each rung's share of its income sets the budget. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::trainSurplus( Int budget )
+{
+	if( budget <= 0 )
+		return;
+	std::vector<AIVisibleEnemy> army;
+	rememberedArmy( &army );
+	std::vector<Object *> factories;
+	m_player->iterateObjects( collectFactories, &factories );
+	for( std::vector<Object *>::const_iterator f = factories.begin(); f != factories.end(); ++f )
+	{
+		ProductionUpdateInterface *pu = (*f)->getProductionUpdateInterface();
+		if( pu->getProductionCount() > 0 )
+			continue;
+		const ThingTemplate *unit = surplusUnit( *f, m_player, army, getSkillProfile()->m_counterCompositionWeight );
+		if( unit == NULL )
+			continue;
+		const Int cost = unit->calcCostToBuild( m_player );
+		if( cost > budget || !buyUnit( pu, unit, AIBUY_ARMY ) )
+			continue;
+		budget -= cost;
+		DEBUG_LOG(("AI ECONOMY frame %d player %d trains '%s' at '%s' out of the surplus, %d of the budget left, %d in the bank\n",
+			TheGameLogic->getFrame(), m_player->getPlayerIndex(), unit->getName().str(), (*f)->getTemplate()->getName().str(),
+			budget, m_player->getMoney()->countMoney()));
 	}
 }
 
@@ -13191,7 +13509,7 @@ void AIPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 21;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost  21: the purchase queue's reservation
+	XferVersion currentVersion = 22;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost  21: the purchase queue's reservation  22: the measured income
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -13584,6 +13902,13 @@ void AIPlayer::xfer( Xfer *xfer )
 		xfer->xferInt( &m_purchases.m_lapsedKey );
 		xfer->xferUnsignedInt( &m_purchases.m_lapsedUntil );
 		xfer->xferAsciiString( &m_purchaseSavingFor );
+	}
+	if( version >= 22 )
+	{
+		xfer->xferInt( &m_incomeMark );
+		xfer->xferUnsignedInt( &m_incomeMarkFrame );
+		xfer->xferInt( &m_bankMark );
+		xfer->xferReal( &m_incomePerSecond );
 	}
 
 	// the ladder rung and the role, which are rolled once and must come back the same way

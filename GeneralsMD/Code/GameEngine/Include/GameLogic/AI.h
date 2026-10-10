@@ -215,6 +215,16 @@ struct AIDifficultyProfile
 	Bool	m_engageGate;										///< weigh a fight by unit against unit, not money alone; nothing leaves home on its own
 	Bool	m_answerArmy;										///< remember the enemy army it has seen, and train the answer to the biggest part of it
 	Bool	m_massUnit;											///< pick one unit the enemy has no answer to, build a fist of it and hit with it
+
+	// Spending: how big a bank it keeps, and what it buys past it (AIPlayer::doSpending)
+	Real	m_bankTargetSeconds;						///< the bank it keeps, in seconds of its own income; 0 = no purchase queue and no spend rule
+	Int		m_bankTargetFloor;							///< ... and never less than this, which is all of it before any income is measured
+	Real	m_upgradePayoff;								///< an upgrade is bought when what it improves is worth this many times its price, half that past the bank target
+	Real	m_upgradeStartSeconds;					///< and not before this far into the match
+	Real	m_upgradeNonCombatWeight;				///< what a building or an unarmed unit counts for next to a fighting unit when an upgrade is weighed
+	Real	m_surplusShare;									///< of the income over aiSurplusBudget's window, how much a bank over target may train as extra units
+	Int		m_maxProduction;								///< war factories, barracks and airfields together, beyond which the spend rule adds none
+	Real	m_factoryBankMultiple;					///< past this many times the bank target a factory is added whatever the bank's trend; 0 = only on the trend
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -476,7 +486,7 @@ const UnsignedInt AI_PURCHASE_EARLY_FRAMES = 6 * 60 * LOGICFRAMES_PER_SECOND;
 	* gatherers and no drop zone. */
 Int aiPurchaseScore( AIPurchaseKind kind, Bool earlyGame );
 
-/** A Hard skirmish AI's purchase queue.  Every spender asks it before it pays, with a stable key (a
+/** A skirmish AI's purchase queue, on every rung with a bank target.  Every spender asks it before it pays, with a stable key (a
 	* template id), the price, its score and whether the thing could start right now (an idle factory,
 	* a dozer).  It remembers one request: the best one it could not afford.  That one has the money
 	* saved for it, and nothing that ranks below it is bought while the purchase would take the bank
@@ -486,7 +496,7 @@ Int aiPurchaseScore( AIPurchaseKind kind, Bool earlyGame );
 	* builds waiting all match and a queue that waits on all of them never buys anything.  Only a
 	* request that could start now reserves.  A reservation whose spender stops asking goes after
 	* AI_PURCHASE_STALE_FRAMES, one that is not met in AI_PURCHASE_HOLD_FRAMES goes and may not reserve
-	* again for as long, and above the hoard threshold (or the reserved price, if that is more) nothing
+	* again for as long, and above hoardAt, the bank target (or the reserved price, if that is more) nothing
 	* is held back at all, so the queue never makes the bank grow past one reserved price.  Ties go to
 	* the lower key. */
 struct AIPurchaseQueue
@@ -521,6 +531,38 @@ struct AIPurchaseQueue
 
 const UnsignedInt AI_PURCHASE_STALE_FRAMES = 20 * LOGICFRAMES_PER_SECOND;
 const UnsignedInt AI_PURCHASE_HOLD_FRAMES = 40 * LOGICFRAMES_PER_SECOND;
+
+/** How long a stretch of income is measured over before the rate is taken again. */
+const UnsignedInt AI_INCOME_WINDOW_FRAMES = 30 * LOGICFRAMES_PER_SECOND;
+
+/** The bank a computer player keeps: seconds of its income, and never under the floor. */
+Int aiBankTarget( Real incomePerSecond, Real seconds, Int floor );
+
+/** Another factory, measured rather than guessed: fewer than cap stand, and the bank is over its target
+	* and no lower than it was an income window ago, so what stands is not spending what comes in, or it is
+	* past multiple times the target whatever its trend (a busy Hard AI's bank swings, and the trend alone
+	* almost never fired).  multiple 0 leaves only the trend. */
+Bool aiWantsMoreProduction( Int bank, Int bankWindowAgo, Int target, Int standing, Int cap, Real multiple );
+
+/** How much a bank over its target may put into extra units on one spend pass: share of the income of
+	* AI_SURPLUS_INCOME_SECONDS, and never what takes the bank under target.  At share 1 that is three
+	* passes' income a pass, which drains a pile; a rung with a small share only tops its plan up. */
+Int aiSurplusBudget( Int bank, Int target, Real incomePerSecond, Real share );
+const Real AI_SURPLUS_INCOME_SECONDS = 30.0f;
+
+/** What a unit counts for when an upgrade is weighed: 1 with nothing known of the enemy or no weight
+	* on it, up to 2 for a unit that wins every trade against what the enemy fields and down to 0 for
+	* one that loses them all.  matchup is its value-weighted aiMatchupScore against the enemy army. */
+Real aiCounterFit( Real matchup, Real weight );
+
+/** What one thing an upgrade would change counts for, as a share of its price: a fighting unit its
+	* aiCounterFit, a building or an unarmed unit the rung's nonCombatWeight. */
+Real aiUpgradeWeight( Bool fights, Real fit, Real nonCombatWeight );
+
+/** The upgrade to buy out of count candidates: the one whose covered value (what of the army it
+	* improves, each thing weighed by aiUpgradeWeight) is the most times its price, if that is at least
+	* payoff, or half of payoff when the bank is past its target.  -1 for none.  Ties go to the first. */
+Int aiPickUpgrade( const Real *covered, const Int *cost, Int count, Real payoff, Bool overTarget );
 
 /** Which approach a team takes: the lane with the least known enemy firepower along it.  A negative
 	* entry is a lane this map does not have.  A tie, or nothing known anywhere, keeps the lane the

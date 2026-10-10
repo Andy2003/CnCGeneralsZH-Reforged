@@ -340,10 +340,25 @@ protected:
 		* tech building so one of them blowing up leaves the tree standing. */
 	virtual void doSuperweapons(void);
 
-	/** The purchase queue (AIPurchaseQueue): every Hard skirmish spender asks before it pays, and the
-		* thing at the top that cannot be afforded yet has the money saved for it.  Off, every ask is yes
-		* and the engine's own money check decides, as before. */
+	/** The purchase queue (AIPurchaseQueue): every skirmish spender asks before it pays, on every rung
+		* with a bank target, and the thing at the top that cannot be afforded yet has the money saved for
+		* it.  Off, every ask is yes and the engine's own money check decides, as before. */
 	Bool purchaseQueueOn(void);
+
+	/** The spend rule, on every rung with a bank target.  Measures the income, and with the bank past
+		* aiBankTarget spends what is over it: upgrades at half the payoff, extra units from idle factories
+		* within aiSurplusBudget, and another factory when the bank has not come down over an income window
+		* (aiWantsMoreProduction).  Upgrades that pay for the army are bought below the target as well,
+		* through the purchase queue. */
+	void doSpending(void);
+	Int bankTarget(void);																	///< what the bank keeps, from the income measured last
+	void buyUpgradesForArmy(Bool overTarget);								///< the player upgrade the standing army gets the most out of
+	void addProductionForIncome(Int bank, Int bankWindowAgo, Int target);	///< another factory, while what stands does not bring the bank down
+	void trainSurplus(Int budget);												///< a unit from each idle factory, within budget
+	Int					m_incomeMark;						///< money earned in all, when the income was last measured ...
+	UnsignedInt	m_incomeMarkFrame;			///< ... and the frame, 0 for never
+	Int					m_bankMark;							///< ... and the bank then
+	Real				m_incomePerSecond;			///< smoothed over the windows measured so far
 	Bool purchaseAllowed(Int key, Int cost, AIPurchaseKind kind, Bool startable, const AsciiString &what);
 	void purchased(Int key, Int cost, AIPurchaseKind kind, const AsciiString &what);
 	Bool buyUnit(ProductionUpdateInterface *pu, const ThingTemplate *unit, AIPurchaseKind kind);	///< queueCreateUnit through the queue
