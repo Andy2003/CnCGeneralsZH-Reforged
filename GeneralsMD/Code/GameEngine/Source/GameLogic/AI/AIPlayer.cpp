@@ -379,6 +379,7 @@ m_role(AIROLE_AGGRESSIVE)
 		m_ambulance[ slot ].id = INVALID_ID;
 		m_ambulance[ slot ].spot.zero();
 	}
+	m_ambulanceLost = 0;
 	m_healerSeconds = 0;
 	m_healerClearSeconds = 0;
 	m_captureTimer = 1;
@@ -10039,27 +10040,53 @@ void AIPlayer::doHelixes( void )
 	* AMBULANCE_BEHIND back from the middle of whoever is out, toward home and clear of every known gun,
 	* or at home with nobody out.  The cash hoard does not hold it back, since a USA at war banks under
 	* the hoard all match.  Our infantry within AMBULANCE_CALL_REACH of it and under half health
-	* walk over and climb in, and it lets them out once they are whole.  It drives to the nearest hazard
+	* walk over and climb in, and each is let out once it is whole.  It drives to the nearest hazard
 	* on our side of the map that no known gun covers; one beside it it notices by itself
-	* (CleanupHazardUpdate::startAutoCleanup).  Split out with plain values so the rules are testable
-	* without a running game. */
+	* (CleanupHazardUpdate::startAutoCleanup).
+	*
+	* It is a 240-health truck with no gun.  Hit in the last AMBULANCE_HIT_FRAMES or inside a known gun's
+	* reach, it drops whatever it was doing, the cleanup included, and drives AMBULANCE_PULLBACK toward
+	* home to the first ground no known gun reaches; under AMBULANCE_REPAIR_HEALTH it goes to be repaired.
+	* Before that it parked 150 from the middle of the army and kept cleaning the toxins of the fight it
+	* stood in: 90 of 112 bought in eight 2v2 matches died, each bought again once the bank allowed.
+	* A lost one is now replaced after AMBULANCE_REBUY_FRAMES.
+	*
+	* A patient leaves its team for the default one until it is let out, as a pulled-out veteran does
+	* (pullOutRanked): left in its team, the team's next script order walked it away from the door, and
+	* 23 of 93 called in were ever let out.
+	*
+	* Split out with plain values so the rules are testable without a running game. */
 //----------------------------------------------------------------------------------------------------------
 static const Int AMBULANCE_CHECK_RATE = LOGICFRAMES_PER_SECOND;
 static const Int AMBULANCE_FIRST_ARMY = 8;
 static const Int AMBULANCE_SECOND_ARMY = 20;
 static const Real AMBULANCE_PATIENT_HEALTH = 0.5f;
 static const Real AMBULANCE_CALL_REACH = 450.0f;
-static const Real AMBULANCE_BEHIND = 150.0f;
+static const Real AMBULANCE_BEHIND = 300.0f;
 static const Real AMBULANCE_HAZARD_REACH = 1500.0f;
 /** The cleanup ability's MaxMoveDistanceFromLocation in retail AmericaVehicle.ini. */
 static const Real AMBULANCE_CLEANUP_RANGE = 300.0f;
 static const Real AMBULANCE_REORDER_DISTANCE = 100.0f;
+static const UnsignedInt AMBULANCE_HIT_FRAMES = 4 * LOGICFRAMES_PER_SECOND;
+static const Real AMBULANCE_PULLBACK = 400.0f;
+static const Real AMBULANCE_REPAIR_HEALTH = 0.5f;
+static const UnsignedInt AMBULANCE_REBUY_FRAMES = 90 * LOGICFRAMES_PER_SECOND;
 
 Int AIAmbulance_wanted( Int army )
 {
 	if( army >= AMBULANCE_SECOND_ARMY )
 		return 2;
 	return army >= AMBULANCE_FIRST_ARMY ? 1 : 0;
+}
+
+Bool AIAmbulance_rebuyWaits( UnsignedInt now, UnsignedInt lost )
+{
+	return lost != 0 && now - lost < AMBULANCE_REBUY_FRAMES;
+}
+
+Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReach )
+{
+	return inGunReach || (lastHit != 0 && now - lastHit < AMBULANCE_HIT_FRAMES);
 }
 
 Bool AIAmbulance_callsPatient( Real healthFraction, Real distance )
@@ -10107,12 +10134,14 @@ void AIPlayer::doAmbulances( void )
 		}
 		DEBUG_LOG(("AI AMBULANCE frame %d player %d loses %d\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(), duty.id));
 		duty.id = INVALID_ID;
+		m_ambulanceLost = TheGameLogic->getFrame();
 	}
+	releaseMended();
 
 	const Int wanted = AIAmbulance_wanted( tallyBase( m_player ).army );
 	// no cash hoard to clear: an Ambulance is 600, and a USA at war banks under the hoard all match long.
 	// queueSupportUnit still waits for twice its price
-	if( owned < wanted && !isBaseUnderAttack() && !scoutInQueue() )
+	if( owned < wanted && !AIAmbulance_rebuyWaits( TheGameLogic->getFrame(), m_ambulanceLost ) && !isBaseUnderAttack() && !scoutInQueue() )
 	{
 		std::vector<Object *> factories;
 		m_player->iterateObjects( collectFactories, &factories );
@@ -10152,6 +10181,8 @@ void AIPlayer::doAmbulances( void )
 	}
 }
 
+static Object *findMender( Player *player, Object *unit );
+
 void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 {
 	DutyAmbulance &duty = m_ambulance[ slot ];
@@ -10165,24 +10196,67 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	const Coord3D *pos = ambulance->getPosition();
 	const UnsignedInt now = TheGameLogic->getFrame();
 
-	// whole again: out they get
-	if( hold->getContainCount() > 0 )
+	// each one whole again gets out; one still hurt stays in and goes on healing
+	const ContainedItemsList *riders = hold->getContainedItemsList();
+	for( ContainedItemsList::const_iterator r = riders->begin(); r != riders->end(); ++r )
 	{
-		Bool whole = TRUE;
-		const ContainedItemsList *riders = hold->getContainedItemsList();
-		for( ContainedItemsList::const_iterator r = riders->begin(); r != riders->end(); ++r )
-			if( (*r)->getBodyModule()->getHealth() < (*r)->getBodyModule()->getMaxHealth() )
-				whole = FALSE;
-		if( whole )
+		Object *rider = *r;
+		if( rider->getBodyModule()->getHealth() < rider->getBodyModule()->getMaxHealth() || rider->getAI() == NULL ||
+				rider->getAI()->getCurrentStateID() == AI_EXIT )
+			continue;
+		DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d lets 1 out whole, '%s' %d, at (%.0f,%.0f)\n", now, m_player->getPlayerIndex(),
+			ambulance->getTemplate()->getName().str(), duty.id, rider->getTemplate()->getName().str(), rider->getID(), pos->x, pos->y));
+		rider->getAI()->aiExit( ambulance, CMD_FROM_AI );
+	}
+
+	// badly hurt: to be repaired, riders and all, who go on healing inside
+	const StateID state = ai->getCurrentStateID();
+	const BodyModuleInterface *body = ambulance->getBodyModule();
+	if( body->getHealth() < AMBULANCE_REPAIR_HEALTH * body->getMaxHealth() )
+	{
+		Object *mender = findMender( m_player, ambulance );
+		if( mender && TheActionManager->canGetRepairedAt( ambulance, mender, CMD_FROM_AI ) )
 		{
-			DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d lets %d out whole at (%.0f,%.0f)\n", now, m_player->getPlayerIndex(),
-				ambulance->getTemplate()->getName().str(), duty.id, (Int)hold->getContainCount(), pos->x, pos->y));
-			ai->aiEvacuate( FALSE, CMD_FROM_AI );
+			if( state != AI_DOCK && state != AI_ENTER && state < 1000 )
+			{
+				DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d goes to be repaired at '%s' %d, %.0f%% health\n", now, m_player->getPlayerIndex(),
+					ambulance->getTemplate()->getName().str(), duty.id, mender->getTemplate()->getName().str(), mender->getID(),
+					body->getHealth() * 100.0f / body->getMaxHealth()));
+				ai->aiGetRepaired( mender, CMD_FROM_SCRIPT );		// not CMD_FROM_AI, which a cleanup under way would keep
+				duty.spot = *mender->getPosition();
+			}
 			return;
 		}
 	}
-	if( cleaner->isCleaningArea() )
-		return;		// its own module drives it until the ground is clean and brings it back
+
+	// shot at, or inside a gun's reach: back toward home, out of every known gun's reach, whatever it was doing
+	if( AIAmbulance_pullsBack( now, body->getLastDamageTimestamp(), deepestReach( guns, pos->x, pos->y, FALSE ) > 0.0f ) )
+	{
+		Coord3D back = *pos;
+		const Real dx = m_baseCenter.x - pos->x;
+		const Real dy = m_baseCenter.y - pos->y;
+		const Real length = (Real)sqrt( dx * dx + dy * dy );
+		if( length > AMBULANCE_PULLBACK )
+		{
+			back.x += dx * AMBULANCE_PULLBACK / length;
+			back.y += dy * AMBULANCE_PULLBACK / length;
+		}
+		else
+			back = m_baseCenter;
+		Coord3D spot = rearOf( &back, guns );
+		const Bool goingThere = ai->isMoving() && sqr( spot.x - duty.spot.x ) + sqr( spot.y - duty.spot.y ) <= sqr( AMBULANCE_REORDER_DISTANCE );
+		if( !goingThere )
+		{
+			DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d pulls back to (%.0f,%.0f) at %.0f%% health%s\n", now, m_player->getPlayerIndex(),
+				ambulance->getTemplate()->getName().str(), duty.id, spot.x, spot.y, body->getHealth() * 100.0f / body->getMaxHealth(),
+				cleaner->isCleaningArea() ? ", off its cleanup" : ""));
+			ai->aiMoveToPosition( &spot, CMD_FROM_SCRIPT );		// not CMD_FROM_AI, which a cleanup under way would keep
+			duty.spot = spot;
+		}
+		return;
+	}
+	if( cleaner->isCleaningArea() || state == AI_DOCK )
+		return;		// its own module drives it until the ground is clean and brings it back; or it is being repaired
 
 	// the hurt nearby climb in, while there is room, and the middle of whoever is out
 	BoardingSearch boarding;
@@ -10208,15 +10282,21 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 			middle.y += obj->getPosition()->y;
 			++out;
 		}
-		if( room <= 0 || !obj->isKindOf( KINDOF_INFANTRY ) )
-			continue;
 		const StateID state = obj->getAI()->getCurrentStateID();
+		if( state == AI_ENTER && obj->getAI()->getGoalObject() == ambulance )
+			--room;		// a seat already taken by one on its way
+		// not a burning man running about, which is infantry with no gun and dies in seconds
+		if( room <= 0 || !obj->isKindOf( KINDOF_INFANTRY ) || aiCombatPower( obj ) <= 0.0f )
+			continue;
 		const BodyModuleInterface *body = obj->getBodyModule();
 		const Real distance = (Real)sqrt( sqr( obj->getPosition()->x - pos->x ) + sqr( obj->getPosition()->y - pos->y ) );
 		if( state == AI_ENTER || state == AI_DOCK || state >= 1000 || !hold->isValidContainerFor( obj, TRUE ) ||
 				!AIAmbulance_callsPatient( body->getHealth() / body->getMaxHealth(), distance ) )
 			continue;
 		leaveTacticsAlone( obj->getID() );
+		// out of its team until it is let out, or the team's next script order walks it off (see releaseMended)
+		obj->setTeam( m_player->getDefaultTeam() );
+		obj->getAI()->setIsRecruitable( FALSE );
 		obj->getAI()->aiEnter( ambulance, CMD_FROM_AI );
 		--room;
 		++called;
@@ -10227,12 +10307,13 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	if( called > 0 || boarding.found )
 		return;		// no new spot while they walk over
 
-	// the nearest hazard, if it is on our side and out of every known gun's reach
+	// the nearest hazard, if it is on our side and clear of every known gun's reach by the healer's margin
 	PartitionFilterAcceptByKindOf kindFilter( MAKE_KINDOF_MASK( KINDOF_CLEANUP_HAZARD ), KINDOFMASK_NONE );
 	PartitionFilterSameMapStatus filterMapStatus( ambulance );
 	PartitionFilter *filters[] = { &kindFilter, &filterMapStatus, NULL };
 	Object *hazard = ThePartitionManager->getClosestObject( pos, AMBULANCE_HAZARD_REACH, FROM_CENTER_2D, filters );
-	if( hazard && isOurSideOfMap( hazard->getPosition() ) && deepestReach( guns, hazard->getPosition()->x, hazard->getPosition()->y, FALSE ) < 0.0f )
+	if( hazard && isOurSideOfMap( hazard->getPosition() ) &&
+			deepestReach( guns, hazard->getPosition()->x, hazard->getPosition()->y, FALSE ) < -HELIX_GUN_MARGIN )
 	{
 		DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d goes to clean '%s' %d at (%.0f,%.0f), %.0f away\n", now, m_player->getPlayerIndex(),
 			ambulance->getTemplate()->getName().str(), duty.id, hazard->getTemplate()->getName().str(), hazard->getID(),
@@ -10443,16 +10524,18 @@ void AIPlayer::pullOutRanked( Team *team, Bool inFight, Real ratio )
 	}
 }
 
-/** Pulled-out ranked units that stand idle again, mended or home, go back to being recruitable.
-	* ponytail: any ranked default-team unit not recruitable counts as one of ours; a script that marks
-	* a default-team veteran unrecruitable would see it undone. */
-void AIPlayer::releaseMendedRanked( void )
+/** Pulled-out ranked units and Ambulance patients that stand idle again, mended, home or let out, go back
+	* to being recruitable.  A patient still inside stays out of reach.
+	* ponytail: any ranked or infantry default-team unit not recruitable counts as one of ours; a script that
+	* marks such a unit unrecruitable would see it undone. */
+void AIPlayer::releaseMended( void )
 {
 	for( DLINK_ITERATOR<Object> m = m_player->getDefaultTeam()->iterate_TeamMemberList(); !m.done(); m.advance() )
 	{
 		Object *obj = m.cur();
 		AIUpdateInterface *ai = obj->getAI();
-		if( ai == NULL || ai->isRecruitable() || obj->getVeterancyLevel() <= LEVEL_REGULAR || obj->isEffectivelyDead() )
+		if( ai == NULL || ai->isRecruitable() || obj->isEffectivelyDead() || obj->isContained() ||
+				(obj->getVeterancyLevel() <= LEVEL_REGULAR && !obj->isKindOf( KINDOF_INFANTRY )) )
 			continue;
 		const StateID state = ai->getCurrentStateID();
 		if( state == AI_DOCK || state == AI_ENTER || state >= 1000 || ai->isMoving() )
@@ -10482,7 +10565,7 @@ void AIPlayer::doRetreats( void )
 	if( m_retreatTimer < 1 )
 		m_retreatTimer = 1;
 
-	releaseMendedRanked();
+	releaseMended();
 
 	if( !m_baseCenterSet )
 		return;			// nowhere to fall back to
@@ -12970,7 +13053,7 @@ void AIPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 19;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances
+	XferVersion currentVersion = 20;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -13350,6 +13433,8 @@ void AIPlayer::xfer( Xfer *xfer )
 			xfer->xferCoord3D( &m_ambulance[ slot ].spot );
 		}
 	}
+	if( version >= 20 )
+		xfer->xferUnsignedInt( &m_ambulanceLost );
 
 	// the ladder rung and the role, which are rolled once and must come back the same way
 	if( version >= 3 )

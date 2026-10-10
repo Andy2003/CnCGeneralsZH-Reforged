@@ -11255,6 +11255,24 @@ TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 	CHECK( !AIAmbulance_callsPatient( 0.1f, 451.0f ) );
 }
 
+/** AIPlayer.cpp: an Ambulance pulls back when shot at or inside a known gun's reach, and a lost one is
+	 replaced only after a wait. */
+extern Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReach );
+extern Bool AIAmbulance_rebuyWaits( UnsignedInt now, UnsignedInt lost );
+
+TEST(the_ai_ambulance_pulls_back_when_hit_and_is_not_rebought_at_once)
+{
+	CHECK( AIAmbulance_pullsBack( 1000, 0, TRUE ) );
+	CHECK( AIAmbulance_pullsBack( 1000, 990, FALSE ) );
+	// never hit, or hit long ago, and clear of every gun: it stays on the job
+	CHECK( !AIAmbulance_pullsBack( 1000, 0, FALSE ) );
+	CHECK( !AIAmbulance_pullsBack( 1000, 500, FALSE ) );
+
+	CHECK( !AIAmbulance_rebuyWaits( 1000, 0 ) );
+	CHECK( AIAmbulance_rebuyWaits( 1000, 900 ) );
+	CHECK( !AIAmbulance_rebuyWaits( 10000, 900 ) );
+}
+
 
 /** AI.cpp: a team that loses a fight stops at the first ground on its way home that none of the
 	 fight's guns reach, a step past it, rather than walking the whole map back to its base. */

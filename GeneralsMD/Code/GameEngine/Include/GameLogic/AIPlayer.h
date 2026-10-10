@@ -534,6 +534,7 @@ protected:
 	};
 	enum { MAX_DUTY_AMBULANCES = 2 };
 	DutyAmbulance	m_ambulance[ MAX_DUTY_AMBULANCES ];
+	UnsignedInt		m_ambulanceLost;		///< the frame the last duty Ambulance was lost, 0 for never
 	Int					m_healerSeconds;		///< for the log only, not saved: healer seconds counted, and those clear of the nearest gun's reach
 	Int					m_healerClearSeconds;
 	Int				m_captureTimer;					///< frames until the next look for something to capture
@@ -683,7 +684,7 @@ protected:
 	Real fightRatio(const Coord3D *centre, Bool countHolders, Real *enemyHealth, Real *enemyPower, std::vector<Real> *enemyGuns);	///< the exchange around centre, by the units in it when the rung weighs them
 	Bool doFallback(Team *team);		///< TRUE when it sent the team's holders back or home on this pass
 	void pullOutRanked(Team *team, Bool inFight, Real ratio);	///< veterans and up leave earlier than the team, to a repair or heal pad
-	void releaseMendedRanked(void);		///< pulled-out ranked units standing idle again become recruitable
+	void releaseMended(void);		///< pulled-out veterans and let-out patients standing idle again become recruitable
 	void stepCalmly(Object *obj, TacticalStep *step, const Coord3D *spot);	///< a move the unit's mood cannot turn into an attack move
 	void restoreMood(Object *obj, TacticalStep *step);
 	Bool pickTacticalSpot(const Object *obj, const Coord3D *from, const Coord3D *awayFrom, Real distance,
