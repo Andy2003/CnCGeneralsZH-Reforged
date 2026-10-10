@@ -37,6 +37,7 @@
 #include "Common/SubsystemInterface.h"
 #include "Common/GameMemory.h"
 #include "Common/GameType.h"
+#include "Common/GameCommon.h"		// LOGICFRAMES_PER_SECOND
 #include "GameLogic/Damage.h"
 #include "Common/STLTypedefs.h"
 
@@ -451,6 +452,75 @@ Int aiHoardAdjustedDelay( Int frames, Int money, Int hoardAt );
 	* the teams the script already permits, up to three more.  A team the data never allows stays
 	* at zero, and no threshold leaves EA's limit alone. */
 Int aiHoardAllowedTeamInstances( Int maxInstances, Int money, Int hoardAt );
+
+/** What a computer player's money can go to, as the purchase queue ranks it. */
+enum AIPurchaseKind
+{
+	AIBUY_POWER = 0,			///< a power plant
+	AIBUY_DOZER,
+	AIBUY_ECONOMY,				///< supply center, gatherer, drop zone, black market, internet center, hacker
+	AIBUY_BASE,						///< a factory or anything else on the build list
+	AIBUY_SUPERWEAPON,		///< a superweapon, or the tech building it needs
+	AIBUY_DEFENSE,				///< a base defense
+	AIBUY_ARMY,
+	AIBUY_UPGRADE,
+	AIBUY_EMERGENCY,			///< fighters trained against enemies already standing in the base
+	AIBUY_KIND_COUNT
+};
+
+/** The first minutes of a match, while economy and power outrank the army. */
+const UnsignedInt AI_PURCHASE_EARLY_FRAMES = 6 * 60 * LOGICFRAMES_PER_SECOND;
+
+/** How much a purchase of this kind matters next to the others; the higher wins the money.  Early in a
+	* match income and power come before the army, which is how a Hard AI kept attacking with two
+	* gatherers and no drop zone. */
+Int aiPurchaseScore( AIPurchaseKind kind, Bool earlyGame );
+
+/** A Hard skirmish AI's purchase queue.  Every spender asks it before it pays, with a stable key (a
+	* template id), the price, its score and whether the thing could start right now (an idle factory,
+	* a dozer).  It remembers one request: the best one it could not afford.  That one has the money
+	* saved for it, and nothing that ranks below it is bought while the purchase would take the bank
+	* under its price.
+	*
+	* The reservation is bounded every way, since the skirmish scripts keep seven to twenty priority
+	* builds waiting all match and a queue that waits on all of them never buys anything.  Only a
+	* request that could start now reserves.  A reservation whose spender stops asking goes after
+	* AI_PURCHASE_STALE_FRAMES, one that is not met in AI_PURCHASE_HOLD_FRAMES goes and may not reserve
+	* again for as long, and above the hoard threshold (or the reserved price, if that is more) nothing
+	* is held back at all, so the queue never makes the bank grow past one reserved price.  Ties go to
+	* the lower key. */
+struct AIPurchaseQueue
+{
+	enum { NONE = -1 };
+	enum Verdict
+	{
+		BUY,				///< pay for it
+		SHORT,			///< cannot afford it, and nothing was saved for it
+		SAVING,			///< cannot afford it, and the money is being saved for it
+		RESERVED,		///< ... from this request on
+		HELD				///< could afford it, but it would eat the money saved for something better
+	};
+	enum Lapse { KEPT, STALE, TIMED_OUT };
+
+	Int					m_key;					///< what the money is saved for, NONE for nothing
+	Int					m_cost;
+	Int					m_score;
+	UnsignedInt	m_since;				///< frame the reservation was made
+	UnsignedInt	m_seen;					///< last frame its spender asked
+	Int					m_held;					///< purchases held back for it so far
+	Int					m_lapsedKey;		///< the last reservation that timed out ...
+	UnsignedInt	m_lapsedUntil;	///< ... and the frame it may reserve again
+
+	AIPurchaseQueue() : m_key( NONE ), m_cost( 0 ), m_score( 0 ), m_since( 0 ), m_seen( 0 ), m_held( 0 ),
+											m_lapsedKey( NONE ), m_lapsedUntil( 0 ) {}
+
+	Lapse expire( UnsignedInt frame );
+	Verdict ask( Int key, Int cost, Int score, Bool startable, Int money, Int hoardAt, UnsignedInt frame );
+	void bought( Int key ) { if( key == m_key ) m_key = NONE; }
+};
+
+const UnsignedInt AI_PURCHASE_STALE_FRAMES = 20 * LOGICFRAMES_PER_SECOND;
+const UnsignedInt AI_PURCHASE_HOLD_FRAMES = 40 * LOGICFRAMES_PER_SECOND;
 
 /** Which approach a team takes: the lane with the least known enemy firepower along it.  A negative
 	* entry is a lane this map does not have.  A tie, or nothing known anywhere, keeps the lane the

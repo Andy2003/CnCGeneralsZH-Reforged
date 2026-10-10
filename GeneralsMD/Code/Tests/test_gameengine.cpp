@@ -11676,6 +11676,107 @@ TEST(a_cash_hoard_allows_more_copies_of_a_team)
 }
 
 
+/** The purchase queue: a Hard AI saves for the best thing it cannot afford yet instead of buying
+	 whatever the bank covers, and every way the saving could turn into a hoard or a deadlock is
+	 bounded.  ask() changes the queue, so every verdict is taken into a local before it is checked. */
+TEST(the_purchase_queue_saves_for_the_best_thing_it_cannot_afford)
+{
+	const Int HOARD = 4000;
+	const Int ARMY = aiPurchaseScore( AIBUY_ARMY, TRUE );
+	const Int POWER = aiPurchaseScore( AIBUY_POWER, TRUE );
+	AIPurchaseQueue q;
+	AIPurchaseQueue::Verdict v;
+
+	// nothing saved for: whatever the bank covers is bought
+	v = q.ask( 10, 1000, ARMY, TRUE, 2000, HOARD, 100 );
+	CHECK_EQ( AIPurchaseQueue::BUY, v );
+
+	// a power plant it cannot pay for, with a dozer free, has the money saved for it
+	v = q.ask( 5, 1200, POWER, TRUE, 800, HOARD, 100 );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+	CHECK_EQ( 5, q.m_key );
+
+	// a tank that would take the bank under the plant's price waits ...
+	v = q.ask( 10, 600, ARMY, TRUE, 800, HOARD, 110 );
+	CHECK_EQ( AIPurchaseQueue::HELD, v );
+	CHECK_EQ( 1, q.m_held );
+	// ... and one that leaves the price in the bank does not
+	v = q.ask( 10, 600, ARMY, TRUE, 2000, HOARD, 120 );
+	CHECK_EQ( AIPurchaseQueue::BUY, v );
+
+	// something that ranks above the plant is bought regardless
+	v = q.ask( 20, 500, aiPurchaseScore( AIBUY_EMERGENCY, TRUE ), TRUE, 800, HOARD, 130 );
+	CHECK_EQ( AIPurchaseQueue::BUY, v );
+
+	// a better thing that could not start now never takes the reservation
+	v = q.ask( 3, 5000, 150, FALSE, 800, HOARD, 140 );
+	CHECK_EQ( AIPurchaseQueue::SHORT, v );
+	CHECK_EQ( 5, q.m_key );
+
+	// the plant itself, once the bank covers it, and then nothing is saved for
+	v = q.ask( 5, 1200, POWER, TRUE, 800, HOARD, 150 );
+	CHECK_EQ( AIPurchaseQueue::SAVING, v );
+	v = q.ask( 5, 1200, POWER, TRUE, 1300, HOARD, 160 );
+	CHECK_EQ( AIPurchaseQueue::BUY, v );
+	q.bought( 5 );
+	CHECK_EQ( (Int)AIPurchaseQueue::NONE, q.m_key );
+
+	// above the hoard threshold nothing is saved for: the bank is already big enough
+	v = q.ask( 7, 6000, 60, TRUE, 4500, HOARD, 200 );
+	CHECK_EQ( AIPurchaseQueue::SHORT, v );
+	CHECK_EQ( (Int)AIPurchaseQueue::NONE, q.m_key );
+
+	// a price above the threshold is saved for from under it, and holds the bank only up to that price
+	v = q.ask( 7, 6000, 60, TRUE, 3000, HOARD, 210 );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+	v = q.ask( 10, 1000, ARMY, TRUE, 5000, HOARD, 220 );
+	CHECK_EQ( AIPurchaseQueue::HELD, v );
+	v = q.ask( 10, 1000, ARMY, TRUE, 6500, HOARD, 230 );
+	CHECK_EQ( AIPurchaseQueue::BUY, v );
+
+	// a reservation its spender stops asking for goes
+	CHECK_EQ( AIPurchaseQueue::KEPT, q.expire( 210 + AI_PURCHASE_STALE_FRAMES - 1 ) );
+	CHECK_EQ( AIPurchaseQueue::STALE, q.expire( 210 + AI_PURCHASE_STALE_FRAMES ) );
+	CHECK_EQ( (Int)AIPurchaseQueue::NONE, q.m_key );
+
+	// one asked for all along but never met times out, and may not take the money again for as long
+	const UnsignedInt start = 1000;
+	v = q.ask( 8, 3000, 50, TRUE, 100, HOARD, start );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+	UnsignedInt frame = start;
+	for( ; frame < start + AI_PURCHASE_HOLD_FRAMES; frame += 100 )
+	{
+		CHECK_EQ( AIPurchaseQueue::KEPT, q.expire( frame ) );
+		v = q.ask( 8, 3000, 50, TRUE, 100, HOARD, frame );
+		CHECK_EQ( AIPurchaseQueue::SAVING, v );
+	}
+	CHECK_EQ( AIPurchaseQueue::TIMED_OUT, q.expire( frame ) );
+	v = q.ask( 8, 3000, 50, TRUE, 100, HOARD, frame );
+	CHECK_EQ( AIPurchaseQueue::SHORT, v );
+	v = q.ask( 9, 3000, 50, TRUE, 100, HOARD, frame );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+	q.bought( 9 );
+	v = q.ask( 8, 3000, 50, TRUE, 100, HOARD, frame + AI_PURCHASE_HOLD_FRAMES );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+
+	// two of the same score: the lower key wins, whichever asked first, so the order is the same everywhere
+	v = q.ask( 4, 3000, 50, TRUE, 100, HOARD, frame + AI_PURCHASE_HOLD_FRAMES );
+	CHECK_EQ( AIPurchaseQueue::RESERVED, v );
+	CHECK_EQ( 4, q.m_key );
+	v = q.ask( 12, 3000, 50, TRUE, 100, HOARD, frame + AI_PURCHASE_HOLD_FRAMES );
+	CHECK_EQ( AIPurchaseQueue::SHORT, v );
+	v = q.ask( 12, 500, 50, TRUE, 1000, HOARD, frame + AI_PURCHASE_HOLD_FRAMES );
+	CHECK_EQ( AIPurchaseQueue::HELD, v );
+
+	// early on income and power outrank the army; later the army climbs past income
+	CHECK( aiPurchaseScore( AIBUY_ECONOMY, TRUE ) > aiPurchaseScore( AIBUY_ARMY, TRUE ) );
+	CHECK( aiPurchaseScore( AIBUY_POWER, TRUE ) > aiPurchaseScore( AIBUY_ARMY, TRUE ) );
+	CHECK( aiPurchaseScore( AIBUY_DOZER, TRUE ) > aiPurchaseScore( AIBUY_ARMY, TRUE ) );
+	CHECK( aiPurchaseScore( AIBUY_ARMY, FALSE ) > aiPurchaseScore( AIBUY_ECONOMY, FALSE ) );
+	CHECK( aiPurchaseScore( AIBUY_POWER, FALSE ) > aiPurchaseScore( AIBUY_ARMY, FALSE ) );
+}
+
+
 /** B4, second attempt.  The cash map aimed at the enemy's money and walked past his army, 7-9; this
 	 one counts the guns the AI knows about along each approach and takes the quietest. */
 TEST(an_attack_takes_the_least_defended_lane)

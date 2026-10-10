@@ -115,6 +115,11 @@ void AISkirmishPlayer::processBaseBuilding( void )
 		Bool isPriority = false;
 		const Bool rushBigGuns = getSkillProfile()->m_economyBuildings;
 		Bool rushTaken = false;
+		// With the purchase queue the priority entries are taken by its score, the first of the best in
+		// list order, so an early drop zone does not wait behind the scripts' bunkers.
+		const Bool byScore = purchaseQueueOn();
+		const Bool earlyGame = TheGameLogic->getFrame() < AI_PURCHASE_EARLY_FRAMES;
+		Int bldgScore = 0;
 		Object *bldg = NULL;
 		const ThingTemplate *powerPlan=NULL;
 		BuildListInfo	*powerInfo = NULL;
@@ -228,7 +233,9 @@ void AISkirmishPlayer::processBaseBuilding( void )
 			// of an outage waited 45 seconds in that queue and the base went dark before it was started.
 			const Bool rushThis = rushBigGuns && (curPlan->isKindOf(KINDOF_FS_SUPERWEAPON) || curPlan->isKindOf(KINDOF_FS_ADVANCED_TECH) ||
 				(powerThin && curPlan->isKindOf(KINDOF_FS_POWER) && !curPlan->isKindOf(KINDOF_CASH_GENERATOR)));
-			const Bool couldBePriority = info->isPriorityBuild() && (!isPriority || (rushThis && !rushTaken)) && m_player->canBuild(curPlan);
+			const Int planScore = byScore ? aiPurchaseScore(purchaseKindOf(curPlan), earlyGame) : 0;
+			const Bool couldBePriority = info->isPriorityBuild() &&
+				(!isPriority || (rushThis && !rushTaken) || planScore > bldgScore) && m_player->canBuild(curPlan);
 			const Bool couldBePower = powerPlan==NULL && curPlan->isKindOf(KINDOF_FS_POWER) &&
 				!curPlan->isKindOf(KINDOF_CASH_GENERATOR) && (isUnderPowered || info->isAutomaticBuild());
 			const Bool couldBeBuilt = bldgPlan==NULL && info->isAutomaticBuild() && info->isBuildable();
@@ -248,6 +255,7 @@ void AISkirmishPlayer::processBaseBuilding( void )
 				bldgInfo = info;
 				isPriority = true;
 				rushTaken = rushThis;
+				bldgScore = planScore;
 			}
 			if (curPlan->isKindOf(KINDOF_FS_POWER)) {
 				if (powerPlan==NULL && !curPlan->isKindOf(KINDOF_CASH_GENERATOR)) {
@@ -377,7 +385,7 @@ Bool AISkirmishPlayer::startTraining( WorkOrder *order, Bool busyOK, AsciiString
 	if( factory )
 	{
 		ProductionUpdateInterface *pu = factory->getProductionUpdateInterface();
-		if (pu && pu->queueCreateUnit( order->m_thing, pu->requestUniqueUnitID() )) {
+		if (pu && buyUnit( pu, order->m_thing, purchaseKindOf( order->m_thing ) )) {
 			order->m_factoryID = factory->getID(); 
 			if (TheGlobalData->m_debugAI) {
 				AsciiString teamStr = "Queuing ";

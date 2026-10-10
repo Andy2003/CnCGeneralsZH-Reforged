@@ -45,6 +45,7 @@ class BuildListInfo;
 // this header used to compile only behind whoever happened to include Team.h first
 class TeamPrototype;
 class TeamTemplateInfo;
+class ProductionUpdateInterface;
 
 /// the skirmish scripts send this team at the enemy at some point, rather than keeping it home on guard
 Bool aiTeamAttacks(const TeamTemplateInfo *info);
@@ -338,6 +339,18 @@ protected:
 		* that, with no clock; as many superweapons as the game's rules allow, and a few copies of the
 		* tech building so one of them blowing up leaves the tree standing. */
 	virtual void doSuperweapons(void);
+
+	/** The purchase queue (AIPurchaseQueue): every Hard skirmish spender asks before it pays, and the
+		* thing at the top that cannot be afforded yet has the money saved for it.  Off, every ask is yes
+		* and the engine's own money check decides, as before. */
+	Bool purchaseQueueOn(void);
+	Bool purchaseAllowed(Int key, Int cost, AIPurchaseKind kind, Bool startable, const AsciiString &what);
+	void purchased(Int key, Int cost, AIPurchaseKind kind, const AsciiString &what);
+	Bool buyUnit(ProductionUpdateInterface *pu, const ThingTemplate *unit, AIPurchaseKind kind);	///< queueCreateUnit through the queue
+	Bool buyUpgrade(ProductionUpdateInterface *pu, const UpgradeTemplate *upgrade);								///< queueUpgrade through the queue
+	static AIPurchaseKind purchaseKindOf(const ThingTemplate *tmpl);
+	AIPurchaseQueue	m_purchases;
+	AsciiString			m_purchaseSavingFor;	///< the reserved item's name, for the log only
 
 	Bool enemyDirection(Coord3D *dir);	///< unit vector from this base towards the nearest enemy's best known address
 	Bool isHeldExpansion(const Object *warehouse);	///< our supply center stands at it, and it is nearer our base than any enemy's

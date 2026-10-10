@@ -1108,9 +1108,13 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 	if (dozer==NULL) {
 		return NULL;
 	}
-	// Check available funds.
+	// Check available funds, and with a Hard AI whether the money is saved for something better.
 	Money *money = m_player->getMoney();
-	if (money->countMoney()<bldgPlan->calcCostToBuild(m_player)) {
+	const Int cost = bldgPlan->calcCostToBuild(m_player);
+	if (!purchaseAllowed(bldgPlan->getTemplateID(), cost, purchaseKindOf(bldgPlan), TRUE, bldgPlan->getName())) {
+		return NULL;
+	}
+	if ((Int)money->countMoney()<cost) {
 		return NULL;
 	}
 
@@ -1332,6 +1336,7 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 		info->setObjectID( bldg->getID() );
 		info->setObjectTimestamp( TheGameLogic->getFrame()+1 );	// Has to be non-zero, so add 1.
 		info->setUnderConstruction(true);
+		purchased( bldgPlan->getTemplateID(), cost, purchaseKindOf(bldgPlan), bldgPlan->getName() );
 
 		if (TheGlobalData->m_debugAI) {
 			AsciiString bldgName = bldgPlan->getName();
@@ -2212,8 +2217,8 @@ Bool AIPlayer::startTraining( WorkOrder *order, Bool busyOK, AsciiString teamNam
 	if( factory )
 	{
 		ProductionUpdateInterface *pu = factory->getProductionUpdateInterface();
-		if (pu && pu->queueCreateUnit( order->m_thing, pu->requestUniqueUnitID() )) {
-			order->m_factoryID = factory->getID(); 
+		if (pu && buyUnit( pu, order->m_thing, purchaseKindOf( order->m_thing ) )) {
+			order->m_factoryID = factory->getID();
 			if (TheGlobalData->m_debugAI) {
 				AsciiString teamStr = "Queuing ";
 				teamStr.concat(order->m_thing->getName());
@@ -3225,7 +3230,7 @@ void AIPlayer::buildUpgrade(const AsciiString &upgrade)
 			// If it doesn't produce, continue.
 			if (!pu) continue;
 			// Try to queue it.
-			if (pu->queueUpgrade(curUpgrade)) {
+			if (buyUpgrade(pu, curUpgrade)) {
 				AsciiString msg = TheNameKeyGenerator->keyToName(m_player->getPlayerNameKey());
 				msg.concat(" queues ");
 				msg.concat(curUpgrade->getUpgradeName());
@@ -5145,8 +5150,9 @@ static Bool groundLineClear( const Coord3D *from, const Coord3D *to )
 }
 
 /** Something of this kind the builder can make right now, off the builder's own buttons, so the
-	* answer is right for every faction and general without a table of names. */
-static const ThingTemplate *buildableOfKind( Object *builder, GUICommandType commandType, KindOfType kind )
+	* answer is right for every faction and general without a table of names.  moneyLater also takes one
+	* the bank cannot pay for yet, for a request the purchase queue saves up for. */
+static const ThingTemplate *buildableOfKind( Object *builder, GUICommandType commandType, KindOfType kind, Bool moneyLater = FALSE )
 {
 	const CommandSet *commandSet = TheControlBar->findCommandSet( builder->getCommandSetString() );
 	if( commandSet == NULL )
@@ -5158,7 +5164,10 @@ static const ThingTemplate *buildableOfKind( Object *builder, GUICommandType com
 		if( button == NULL || button->getCommandType() != commandType )
 			continue;
 		const ThingTemplate *tmpl = button->getThingTemplate();
-		if( tmpl && tmpl->isKindOf( kind ) && TheBuildAssistant->canMakeUnit( builder, tmpl ) == CANMAKE_OK )
+		if( tmpl == NULL || !tmpl->isKindOf( kind ) )
+			continue;
+		const CanMakeType canMake = TheBuildAssistant->canMakeUnit( builder, tmpl );
+		if( canMake == CANMAKE_OK || (moneyLater && canMake == CANMAKE_NO_MONEY) )
 			return tmpl;
 	}
 	return NULL;
@@ -5783,7 +5792,8 @@ void AIPlayer::doPower( void )
 	if( dozer == NULL )
 		return;
 
-	const ThingTemplate *tmpl = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_POWER );
+	// with the purchase queue the plant is asked for before the bank can pay, and the queue saves for it
+	const ThingTemplate *tmpl = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_POWER, purchaseQueueOn() );
 	if( tmpl == NULL || tmpl->isKindOf( KINDOF_CASH_GENERATOR ) || priorityBuildPending( m_player, tmpl ) )
 		return;
 
@@ -5851,6 +5861,30 @@ void AIPlayer::doEconomy( void )
 		m_player->iterateObjects( findAnyDozer, &dozer );
 		if( dozer )
 			doTunnels( dozer );
+	}
+
+	// Early in the match the first drop zone and the first black market do not wait for the hoard: they
+	// are asked for when none stands, and the purchase queue ranks them over the army and saves for them.
+	// Behind the hoard alone a Hard AI went out to fight on two gatherers before it owned either.
+	if( purchaseQueueOn() && TheGameLogic->getFrame() < AI_PURCHASE_EARLY_FRAMES && m_player->getCanBuildBase() &&
+			m_baseCenterSet && !isBaseUnderAttack() )
+	{
+		Object *dozer = NULL;
+		m_player->iterateObjects( findAnyDozer, &dozer );
+		const KindOfType EARLY_INCOME[ 2 ] = { KINDOF_FS_SUPPLY_DROPZONE, KINDOF_FS_BLACK_MARKET };
+		for( Int i = 0; dozer && i < 2; ++i )
+		{
+			const ThingTemplate *tmpl = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, EARLY_INCOME[ i ], TRUE );
+			if( tmpl == NULL || priorityBuildPending( m_player, tmpl ) )
+				continue;
+			TechCount owned;
+			owned.kind = EARLY_INCOME[ i ];
+			owned.standing = 0;
+			owned.onTheWay = 0;
+			m_player->iterateObjects( countTechBuildings, &owned );
+			if( owned.standing + owned.onTheWay == 0 )
+				placeNear( tmpl, &m_baseCenter, 0.5f * m_baseRadius, FALSE );
+		}
 	}
 
 	// hackers and the buildings that pay out on a timer earn their price back, so they only wait for
@@ -6207,8 +6241,9 @@ void AIPlayer::doSuperweapons( void )
 	if( dozer == NULL )
 		return;
 
-	const ThingTemplate *superweapon = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_SUPERWEAPON );
-	const ThingTemplate *techBuilding = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_ADVANCED_TECH );
+	// with the purchase queue they are asked for before the bank can pay, and the queue saves for them
+	const ThingTemplate *superweapon = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_SUPERWEAPON, purchaseQueueOn() );
+	const ThingTemplate *techBuilding = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, KINDOF_FS_ADVANCED_TECH, purchaseQueueOn() );
 
 	TechCount tech;
 	tech.kind = KINDOF_FS_ADVANCED_TECH;
@@ -6237,6 +6272,109 @@ void AIPlayer::doSuperweapons( void )
 }
 
 //----------------------------------------------------------------------------------------------------------
+/** The purchase queue.  Hard skirmish only, the rung that already spends on its own economy; Easy and
+	* Medium, and every campaign AI, buy exactly as they did. */
+//----------------------------------------------------------------------------------------------------------
+Bool AIPlayer::purchaseQueueOn( void )
+{
+	return isSkirmishAI() && getSkillProfile()->m_economyBuildings && getSkillProfile()->m_cashHoardThreshold > 0;
+}
+
+AIPurchaseKind AIPlayer::purchaseKindOf( const ThingTemplate *tmpl )
+{
+	if( tmpl->isKindOf( KINDOF_DOZER ) )
+		return AIBUY_DOZER;
+	if( tmpl->isKindOf( KINDOF_FS_POWER ) && !tmpl->isKindOf( KINDOF_CASH_GENERATOR ) )
+		return AIBUY_POWER;
+	if( tmpl->isKindOf( KINDOF_HARVESTER ) || tmpl->isKindOf( KINDOF_MONEY_HACKER ) || tmpl->isKindOf( KINDOF_FS_SUPPLY_CENTER ) ||
+			tmpl->isKindOf( KINDOF_FS_SUPPLY_DROPZONE ) || tmpl->isKindOf( KINDOF_FS_BLACK_MARKET ) || tmpl->isKindOf( KINDOF_FS_INTERNET_CENTER ) )
+		return AIBUY_ECONOMY;
+	if( tmpl->isKindOf( KINDOF_FS_SUPERWEAPON ) || tmpl->isKindOf( KINDOF_FS_ADVANCED_TECH ) )
+		return AIBUY_SUPERWEAPON;
+	if( tmpl->isKindOf( KINDOF_FS_BASE_DEFENSE ) )
+		return AIBUY_DEFENSE;
+	if( tmpl->isKindOf( KINDOF_STRUCTURE ) )
+		return AIBUY_BASE;
+	return AIBUY_ARMY;
+}
+
+Bool AIPlayer::purchaseAllowed( Int key, Int cost, AIPurchaseKind kind, Bool startable, const AsciiString &what )
+{
+	if( !purchaseQueueOn() )
+		return TRUE;
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const Int money = (Int)m_player->getMoney()->countMoney();
+	const Int held = m_purchases.m_held;
+	const AIPurchaseQueue::Lapse lapse = m_purchases.expire( now );
+	if( lapse != AIPurchaseQueue::KEPT )
+		DEBUG_LOG(("AI QUEUE frame %d player %d stops saving for '%s', %s, %d held back for it, %d in the bank\n", now,
+			m_player->getPlayerIndex(), m_purchaseSavingFor.str(), lapse == AIPurchaseQueue::STALE ? "no longer asked for" : "timed out",
+			held, money));
+
+	const Int score = aiPurchaseScore( kind, now < AI_PURCHASE_EARLY_FRAMES );
+	const AIPurchaseQueue::Verdict verdict = m_purchases.ask( key, cost, score, startable, money,
+		getSkillProfile()->m_cashHoardThreshold, now );
+	if( verdict == AIPurchaseQueue::RESERVED )
+	{
+		m_purchaseSavingFor = what;
+		DEBUG_LOG(("AI QUEUE frame %d player %d saves for '%s', %d of %d in the bank, score %d\n", now,
+			m_player->getPlayerIndex(), what.str(), money, cost, score));
+	}
+	return verdict == AIPurchaseQueue::BUY;
+}
+
+void AIPlayer::purchased( Int key, Int cost, AIPurchaseKind kind, const AsciiString &what )
+{
+	if( !purchaseQueueOn() )
+		return;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if( key == m_purchases.m_key )
+		DEBUG_LOG(("AI QUEUE frame %d player %d buys '%s' for %d, score %d, %d left in the bank, saved for over %d frames and %d held buys\n",
+			now, m_player->getPlayerIndex(), what.str(), cost, aiPurchaseScore( kind, now < AI_PURCHASE_EARLY_FRAMES ),
+			m_player->getMoney()->countMoney(), now - m_purchases.m_since, m_purchases.m_held));
+	else
+		DEBUG_LOG(("AI QUEUE frame %d player %d buys '%s' for %d, score %d, %d left in the bank\n", now,
+			m_player->getPlayerIndex(), what.str(), cost, aiPurchaseScore( kind, now < AI_PURCHASE_EARLY_FRAMES ),
+			m_player->getMoney()->countMoney()));
+	m_purchases.bought( key );
+}
+
+Bool AIPlayer::buyUnit( ProductionUpdateInterface *pu, const ThingTemplate *unit, AIPurchaseKind kind )
+{
+	const Int cost = unit->calcCostToBuild( m_player );
+	if( !purchaseAllowed( unit->getTemplateID(), cost, kind, pu->getProductionCount() == 0, unit->getName() ) )
+		return FALSE;
+	if( !pu->queueCreateUnit( unit, pu->requestUniqueUnitID() ) )
+		return FALSE;
+	purchased( unit->getTemplateID(), cost, kind, unit->getName() );
+	return TRUE;
+}
+
+/** An upgrade's key: its bit in the upgrade mask, which the upgrade center hands out in INI order,
+	* past every template id. */
+static Int upgradePurchaseKey( const UpgradeTemplate *upgrade )
+{
+	const UpgradeMaskType mask = upgrade->getUpgradeMask();
+	for( Int i = 0; i < UPGRADE_MAX_COUNT; ++i )
+		if( mask.test( i ) )
+			return 0x10000 + i;
+	return 0x10000 + UPGRADE_MAX_COUNT;
+}
+
+Bool AIPlayer::buyUpgrade( ProductionUpdateInterface *pu, const UpgradeTemplate *upgrade )
+{
+	const Int key = upgradePurchaseKey( upgrade );
+	const Int cost = upgrade->calcCostToBuild( m_player );
+	if( !purchaseAllowed( key, cost, AIBUY_UPGRADE, pu->getProductionCount() == 0, upgrade->getUpgradeName() ) )
+		return FALSE;
+	if( !pu->queueUpgrade( upgrade ) )
+		return FALSE;
+	purchased( key, cost, AIBUY_UPGRADE, upgrade->getUpgradeName() );
+	return TRUE;
+}
+
+//----------------------------------------------------------------------------------------------------------
 /** A money unit from every factory that trains one and has at most one thing in its queue.  An
 	* idle-only rule measured as two hackers in a whole match, because a barracks feeding the army is
 	* never idle; one slot behind the army's unit is a delay the army does not notice.  It used to be
@@ -6262,7 +6400,7 @@ void AIPlayer::buyMoneyUnits( void )
 		if( pu == NULL || pu->getProductionCount() > MAX_QUEUED_AHEAD )
 			continue;
 		const ThingTemplate *moneyUnit = buildableOfKind( factory, GUI_COMMAND_UNIT_BUILD, KINDOF_MONEY_HACKER );
-		if( moneyUnit && pu->queueCreateUnit( moneyUnit, pu->requestUniqueUnitID() ) )
+		if( moneyUnit && buyUnit( pu, moneyUnit, AIBUY_ECONOMY ) )
 		{
 			DEBUG_LOG(("AI ECONOMY frame %d player %d trains '%s', %d in the bank, room for %d more\n",
 				TheGameLogic->getFrame(), m_player->getPlayerIndex(), moneyUnit->getName().str(),
@@ -6879,7 +7017,7 @@ void AIPlayer::defendHome( void )
 				if( army[ k ].m_weight - answered[ k ] > army[ kind ].m_weight - answered[ kind ] )
 					kind = k;
 			const ThingTemplate *unit = bestDefender( *f, m_player, army[ kind ] );
-			if( unit == NULL || !pu->queueCreateUnit( unit, pu->requestUniqueUnitID() ) )
+			if( unit == NULL || !buyUnit( pu, unit, AIBUY_EMERGENCY ) )
 				break;
 			answered[ kind ] += INT_TO_REAL( unit->calcCostToBuild( m_player ) );
 			DEBUG_LOG(("AI DEFEND frame %d player %d trains '%s' at '%s' against %d intruders, %d in the bank\n",
@@ -7043,7 +7181,7 @@ void AIPlayer::answerArmy( void )
 		if( unit == NULL || score < ANSWER_SCORE )
 			continue;
 		const Int cost = unit->calcCostToBuild( m_player );
-		if( m_player->getMoney()->countMoney() < (UnsignedInt)(cost + ANSWER_RESERVE) || !pu->queueCreateUnit( unit, pu->requestUniqueUnitID() ) )
+		if( m_player->getMoney()->countMoney() < (UnsignedInt)(cost + ANSWER_RESERVE) || !buyUnit( pu, unit, AIBUY_ARMY ) )
 			continue;
 		answered[ kind ] += INT_TO_REAL( cost );
 		DEBUG_LOG(("AI ANSWER frame %d player %d trains '%s' at '%s' against '%s', %.0f of %.0f unanswered, score %.2f, %d in the bank\n",
@@ -7243,7 +7381,7 @@ void AIPlayer::doMass( void )
 					TheBuildAssistant->canMakeUnit( *f, m_massTemplate ) != CANMAKE_OK ||
 					m_player->getMoney()->countMoney() < (UnsignedInt)(cost + MASS_RESERVE) )
 				continue;
-			if( pu->queueCreateUnit( m_massTemplate, pu->requestUniqueUnitID() ) )
+			if( buyUnit( pu, m_massTemplate, AIBUY_ARMY ) )
 				DEBUG_LOG(("AI MASS frame %d player %d trains '%s' at '%s', %d in the fist, %d in the bank\n", now,
 					m_player->getPlayerIndex(), m_massTemplate->getName().str(), (*f)->getTemplate()->getName().str(),
 					(Int)m_massUnits.size(), m_player->getMoney()->countMoney()));
@@ -8380,7 +8518,7 @@ Int AIPlayer::buyGunshipRiders( Int freeSeats )
 
 	ProductionUpdateInterface *pu = barracks->getProductionUpdateInterface();
 	Int queued = 0;
-	while( queued < wanted && pu->queueCreateUnit( rider, pu->requestUniqueUnitID() ) )
+	while( queued < wanted && buyUnit( pu, rider, AIBUY_ARMY ) )
 		++queued;
 	if( queued > 0 )
 		DEBUG_LOG(("AI GUNSHIP frame %d player %d trains %d '%s' at '%s' for %d free seats, %d in the bank, against %s (%d infantry, %d vehicles known)\n",
@@ -9560,7 +9698,7 @@ void AIPlayer::upgradeHelix( Object *helix, Int role, AIEnemyComposition *enemy,
 		return;
 	if( role < 0 && (Int)m_player->getMoney()->countMoney() <= getSkillProfile()->m_cashHoardThreshold + next->calcCostToBuild( m_player ) )
 		return;
-	if( pu->queueUpgrade( next ) )
+	if( buyUpgrade( pu, next ) )
 		DEBUG_LOG(("AI HELIX frame %d player %d upgrades '%s' %d with '%s' as a %s, enemy known: %d infantry, %d vehicles, threat %.0f%% infantry %.0f%% ground vehicles\n",
 			TheGameLogic->getFrame(), m_player->getPlayerIndex(), helix->getTemplate()->getName().str(), helix->getID(),
 			next->getUpgradeName().str(), role < 0 ? "team gunship" : HELIX_ROLE_NAME[ role ], enemy->m_infantryCount, enemy->m_vehicleCount,
@@ -13053,7 +13191,7 @@ void AIPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 20;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost
+	XferVersion currentVersion = 21;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost  21: the purchase queue's reservation
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -13435,6 +13573,18 @@ void AIPlayer::xfer( Xfer *xfer )
 	}
 	if( version >= 20 )
 		xfer->xferUnsignedInt( &m_ambulanceLost );
+	if( version >= 21 )
+	{
+		xfer->xferInt( &m_purchases.m_key );
+		xfer->xferInt( &m_purchases.m_cost );
+		xfer->xferInt( &m_purchases.m_score );
+		xfer->xferUnsignedInt( &m_purchases.m_since );
+		xfer->xferUnsignedInt( &m_purchases.m_seen );
+		xfer->xferInt( &m_purchases.m_held );
+		xfer->xferInt( &m_purchases.m_lapsedKey );
+		xfer->xferUnsignedInt( &m_purchases.m_lapsedUntil );
+		xfer->xferAsciiString( &m_purchaseSavingFor );
+	}
 
 	// the ladder rung and the role, which are rolled once and must come back the same way
 	if( version >= 3 )

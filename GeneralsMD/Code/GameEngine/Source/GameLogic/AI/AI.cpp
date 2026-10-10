@@ -1403,6 +1403,75 @@ Int aiHoardAllowedTeamInstances( Int maxInstances, Int money, Int hoardAt )
 }
 
 //-------------------------------------------------------------------------------------------------
+Int aiPurchaseScore( AIPurchaseKind kind, Bool earlyGame )
+{
+	switch( kind )
+	{
+		case AIBUY_EMERGENCY:		return 200;
+		case AIBUY_POWER:				return 100;
+		case AIBUY_DOZER:				return 90;
+		case AIBUY_ECONOMY:			return earlyGame ? 85 : 50;
+		case AIBUY_BASE:				return 70;
+		case AIBUY_SUPERWEAPON:	return 60;
+		case AIBUY_ARMY:				return earlyGame ? 30 : 55;
+		case AIBUY_DEFENSE:			return 45;
+		case AIBUY_UPGRADE:			return 35;
+		default:								return 0;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+AIPurchaseQueue::Lapse AIPurchaseQueue::expire( UnsignedInt frame )
+{
+	if( m_key == NONE )
+		return KEPT;
+	if( frame - m_since >= AI_PURCHASE_HOLD_FRAMES )
+	{
+		m_lapsedKey = m_key;
+		m_lapsedUntil = frame + AI_PURCHASE_HOLD_FRAMES;
+		m_key = NONE;
+		return TIMED_OUT;
+	}
+	if( frame - m_seen >= AI_PURCHASE_STALE_FRAMES )
+	{
+		m_key = NONE;
+		return STALE;
+	}
+	return KEPT;
+}
+
+//-------------------------------------------------------------------------------------------------
+AIPurchaseQueue::Verdict AIPurchaseQueue::ask( Int key, Int cost, Int score, Bool startable, Int money, Int hoardAt, UnsignedInt frame )
+{
+	if( key == m_key )
+	{
+		m_seen = frame;
+		m_cost = cost;
+		return cost <= money ? BUY : SAVING;
+	}
+
+	const Bool outranks = m_key == NONE || score > m_score || (score == m_score && key < m_key);
+	if( cost <= money )
+	{
+		const Int ceiling = hoardAt > m_cost ? hoardAt : m_cost;
+		if( outranks || money - cost >= m_cost || money > ceiling )
+			return BUY;
+		++m_held;
+		return HELD;
+	}
+
+	if( !startable || !outranks || money > hoardAt || (key == m_lapsedKey && frame < m_lapsedUntil) )
+		return SHORT;
+	m_key = key;
+	m_cost = cost;
+	m_score = score;
+	m_since = frame;
+	m_seen = frame;
+	m_held = 0;
+	return RESERVED;
+}
+
+//-------------------------------------------------------------------------------------------------
 Int aiLeastDefendedLane( const Real *laneFirepower, Int laneCount, Int requestedLane )
 {
 	Int quietest = -1;
