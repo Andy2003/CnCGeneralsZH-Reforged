@@ -10381,10 +10381,16 @@ static Object *findMender( Player *player, Object *unit )
 
 /** The ranked members of a team that AIRetreat_rankPullsOut says go, to the nearest building that mends
 	* them, or home when there is none.  Marked as a walk home, so neither this nor the team's retreat
-	* turns them round for RETREAT_HOME_WALK_FRAMES. */
+	* turns them round for RETREAT_HOME_WALK_FRAMES.
+	*
+	* A pulled unit leaves its team for the default one and is kept from being recruited until it stands
+	* idle again, mended or home.  Left in its team, the team's next script order (a waypoint path, an
+	* attack move) took it off the repair pad on the way: one Tomahawk was sent to its War Factory at 4%,
+	* 2% and 2% health thirty seconds apart and never reached it.  Once idle, any team recruits it back. */
 void AIPlayer::pullOutRanked( Team *team, Bool inFight, Real ratio )
 {
 	const UnsignedInt now = TheGameLogic->getFrame();
+	std::vector<Object *> pulled;
 	for( DLINK_ITERATOR<Object> objIter = team->iterate_TeamMemberList(); !objIter.done(); objIter.advance() )
 	{
 		Object *obj = objIter.cur();
@@ -10427,6 +10433,31 @@ void AIPlayer::pullOutRanked( Team *team, Bool inFight, Real ratio )
 			inFight ? ratio : 0.0f, inFight ? "" : " (none)", (Int)state,
 			(Real)sqrt( sqr( to->x - obj->getPosition()->x ) + sqr( to->y - obj->getPosition()->y ) ),
 			mender ? mender->getTemplate()->getName().str() : "base", (Int)obj->getAI()->getCurrentStateID()));
+		pulled.push_back( obj );
+	}
+	// out of the member walk above, which setTeam would break
+	for( std::vector<Object *>::const_iterator p = pulled.begin(); p != pulled.end(); ++p )
+	{
+		(*p)->setTeam( m_player->getDefaultTeam() );
+		(*p)->getAI()->setIsRecruitable( FALSE );
+	}
+}
+
+/** Pulled-out ranked units that stand idle again, mended or home, go back to being recruitable.
+	* ponytail: any ranked default-team unit not recruitable counts as one of ours; a script that marks
+	* a default-team veteran unrecruitable would see it undone. */
+void AIPlayer::releaseMendedRanked( void )
+{
+	for( DLINK_ITERATOR<Object> m = m_player->getDefaultTeam()->iterate_TeamMemberList(); !m.done(); m.advance() )
+	{
+		Object *obj = m.cur();
+		AIUpdateInterface *ai = obj->getAI();
+		if( ai == NULL || ai->isRecruitable() || obj->getVeterancyLevel() <= LEVEL_REGULAR || obj->isEffectivelyDead() )
+			continue;
+		const StateID state = ai->getCurrentStateID();
+		if( state == AI_DOCK || state == AI_ENTER || state >= 1000 || ai->isMoving() )
+			continue;
+		ai->setIsRecruitable( TRUE );
 	}
 }
 
@@ -10450,6 +10481,8 @@ void AIPlayer::doRetreats( void )
 	m_retreatTimer = REAL_TO_INT_CEIL( profile->m_decisionIntervalSeconds * LOGICFRAMES_PER_SECOND );
 	if( m_retreatTimer < 1 )
 		m_retreatTimer = 1;
+
+	releaseMendedRanked();
 
 	if( !m_baseCenterSet )
 		return;			// nowhere to fall back to
