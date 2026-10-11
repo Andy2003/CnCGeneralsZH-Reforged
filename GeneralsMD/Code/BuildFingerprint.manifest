@@ -10,6 +10,7 @@ Data/Art/Textures/ReforgedBarGLACenter.tga
 Data/Art/Textures/ReforgedBarGLALeft.tga
 Data/Art/Textures/ReforgedBarGLARight.tga
 Data/Art/Textures/ReforgedLaserPink.tga
+Data/Art/Textures/ReforgedMine.tga
 Data/Art/Textures/ReforgedOrders.tga
 Data/Art/Textures/ReforgedSignalAttack.tga
 Data/Art/Textures/ReforgedSignalDefend.tga
@@ -38,6 +39,9 @@ Data/Cinema/lsv_burst.txt
 Data/Cinema/lsv_laser.txt
 Data/Cinema/lsv_spam.txt
 Data/Cinema/lsv_spam2.txt
+Data/Cinema/minefx.txt
+Data/Cinema/minefx_scene.txt
+Data/Cinema/minefx_scene_enemy.txt
 Data/Cinema/missileapex_film.txt
 Data/Cinema/mobwatch.txt
 Data/Cinema/nohud.txt
@@ -179,6 +183,9 @@ Data/Scenarios/mappers.txt
 Data/Scenarios/mass420x2.txt
 Data/Scenarios/mass840.txt
 Data/Scenarios/massmove.txt
+Data/Scenarios/minefx.txt
+Data/Scenarios/minefx_scene.txt
+Data/Scenarios/minefx_scene_enemy.txt
 Data/Scenarios/missileapex.txt
 Data/Scenarios/missileapex_film.txt
 Data/Scenarios/missiledefence.txt
@@ -3911,6 +3918,7 @@ Tools/matchbot/wnet/tcp.cpp
 Tools/matchbot/wnet/tcp.h
 Tools/matchbot/wnet/udp.cpp
 Tools/matchbot/wnet/udp.h
+Tools/mine_marks.py
 Tools/net-check.sh
 Tools/net_check.py
 Tools/optionsmenu_layout.py
