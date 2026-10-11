@@ -225,6 +225,11 @@ struct AIDifficultyProfile
 	Real	m_surplusShare;									///< of the income over aiSurplusBudget's window, how much a bank over target may train as extra units
 	Int		m_maxProduction;								///< war factories, barracks and airfields together, beyond which the spend rule adds none
 	Real	m_factoryBankMultiple;					///< past this many times the bank target a factory is added whatever the bank's trend; 0 = only on the trend
+
+	// Pushing: when the army first leaves home, and how small a force may go
+	Real	m_firstPushSeconds;							///< no attack before this, nor before the first drop zone or black market stands (AI_PURCHASE_EARLY_FRAMES at most)
+	Real	m_minAttackPower;								///< parked teams worth less than this wait for company, up to the wave's longest wait
+	Real	m_siegeTrail;										///< artillery out with a wave keeps this far behind its front unit; 0 = walks with it
 };
 
 //-------------------------------------------------------------------------------------------------

@@ -5845,6 +5845,78 @@ void AIPlayer::doPower( void )
 }
 
 //----------------------------------------------------------------------------------------------------------
+/** The drop zone and the black market: what the opening buys before the army leaves home. */
+static const Int EARLY_INCOME_KINDS = 2;
+static const KindOfType EARLY_INCOME[ EARLY_INCOME_KINDS ] = { KINDOF_FS_SUPPLY_DROPZONE, KINDOF_FS_BLACK_MARKET };
+
+/** Early in the match the first drop zone and the first black market do not wait for the hoard: they
+	* are asked for when none stands, and the purchase queue ranks them over the army and saves for them.
+	* Behind the hoard alone a Hard AI went out to fight on two gatherers before it owned either. */
+void AIPlayer::buyEarlyIncome( void )
+{
+	if( !purchaseQueueOn() || TheGameLogic->getFrame() >= AI_PURCHASE_EARLY_FRAMES || !m_player->getCanBuildBase() ||
+			!m_baseCenterSet || isBaseUnderAttack() )
+		return;
+	Object *dozer = NULL;
+	m_player->iterateObjects( findAnyDozer, &dozer );
+	for( Int i = 0; dozer && i < EARLY_INCOME_KINDS; ++i )
+	{
+		const ThingTemplate *tmpl = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, EARLY_INCOME[ i ], TRUE );
+		if( tmpl == NULL || priorityBuildPending( m_player, tmpl ) )
+			continue;
+		TechCount owned;
+		owned.kind = EARLY_INCOME[ i ];
+		owned.standing = 0;
+		owned.onTheWay = 0;
+		m_player->iterateObjects( countTechBuildings, &owned );
+		if( owned.standing + owned.onTheWay == 0 )
+			placeNear( tmpl, &m_baseCenter, 0.5f * m_baseRadius, FALSE );
+	}
+}
+
+/** Players said the computer attacks too early and too often.  A Hard USA on Twilight Flame sent two
+	* units at frame 5,873 and its first drop zone stood at 10,438.  So no attack team leaves home before
+	* m_firstPushSeconds, nor before a drop zone or black market stands when the side has one to build.
+	* That wait ends with the opening buyEarlyIncome buys in, whatever stands, so a base that cannot
+	* build one still plays.  China has neither and waits for the clock alone. */
+Bool AIPlayer::readyToPush( void )
+{
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if( now < (UnsignedInt)(getSkillProfile()->m_firstPushSeconds * LOGICFRAMES_PER_SECOND) )
+		return FALSE;
+	if( now >= AI_PURCHASE_EARLY_FRAMES || !m_player->getCanBuildBase() )
+		return TRUE;
+	Object *dozer = NULL;
+	m_player->iterateObjects( findAnyDozer, &dozer );
+	const CommandSet *commandSet = dozer ? TheControlBar->findCommandSet( dozer->getCommandSetString() ) : NULL;
+	if( commandSet == NULL )
+		return TRUE;
+	// one the dozer has the prerequisites for, whatever else stops it this moment: asking for one it
+	// could make now, a Hard USA went out at 4.7 minutes, a minute before its drop zone stood.  A USA
+	// drop zone needs the Strategy Center, which Medium puts up late, and is not waited for before it
+	Bool hasButton = FALSE;
+	for( Int i = 0; i < EARLY_INCOME_KINDS; ++i )
+	{
+		for( Int b = 0; b < MAX_COMMANDS_PER_SET; ++b )
+		{
+			const CommandButton *button = commandSet->getCommandButton( b );
+			if( button && button->getCommandType() == GUI_COMMAND_DOZER_CONSTRUCT && button->getThingTemplate() &&
+					button->getThingTemplate()->isKindOf( EARLY_INCOME[ i ] ) &&
+					TheBuildAssistant->canMakeUnit( dozer, button->getThingTemplate() ) != CANMAKE_NO_PREREQ )
+				hasButton = TRUE;
+		}
+		TechCount owned;
+		owned.kind = EARLY_INCOME[ i ];
+		owned.standing = 0;
+		owned.onTheWay = 0;
+		m_player->iterateObjects( countTechBuildings, &owned );
+		if( owned.standing > 0 )
+			return TRUE;
+	}
+	return !hasButton;
+}
+
+//----------------------------------------------------------------------------------------------------------
 /** A bank of a hundred thousand is an army and an economy that were never bought.  The skirmish build
 	* list is a fixed plan - two war factories and a barracks - and the scripts never add to it, so
 	* once the plan stood the money had nowhere to go.
@@ -5859,11 +5931,16 @@ void AIPlayer::doPower( void )
 void AIPlayer::doEconomy( void )
 {
 	const AIDifficultyProfile *profile = getSkillProfile();
-	if( !profile->m_economyBuildings )
-		return;
 	const Int phase = computeUpdatePhase( m_player->getPlayerIndex(), ECONOMY_CHECK_RATE );
 	if( (TheGameLogic->getFrame() + phase) % ECONOMY_CHECK_RATE != 0 )
 		return;
+	// a rung that buys nothing else past its build list still puts its first income up before it pushes
+	if( !profile->m_economyBuildings )
+	{
+		if( m_player->getEnergy()->hasSufficientPower() )
+			buyEarlyIncome();
+		return;
+	}
 
 	if( m_baseCenterSet )
 	{
@@ -5896,29 +5973,7 @@ void AIPlayer::doEconomy( void )
 			doTunnels( dozer );
 	}
 
-	// Early in the match the first drop zone and the first black market do not wait for the hoard: they
-	// are asked for when none stands, and the purchase queue ranks them over the army and saves for them.
-	// Behind the hoard alone a Hard AI went out to fight on two gatherers before it owned either.
-	if( purchaseQueueOn() && TheGameLogic->getFrame() < AI_PURCHASE_EARLY_FRAMES && m_player->getCanBuildBase() &&
-			m_baseCenterSet && !isBaseUnderAttack() )
-	{
-		Object *dozer = NULL;
-		m_player->iterateObjects( findAnyDozer, &dozer );
-		const KindOfType EARLY_INCOME[ 2 ] = { KINDOF_FS_SUPPLY_DROPZONE, KINDOF_FS_BLACK_MARKET };
-		for( Int i = 0; dozer && i < 2; ++i )
-		{
-			const ThingTemplate *tmpl = buildableOfKind( dozer, GUI_COMMAND_DOZER_CONSTRUCT, EARLY_INCOME[ i ], TRUE );
-			if( tmpl == NULL || priorityBuildPending( m_player, tmpl ) )
-				continue;
-			TechCount owned;
-			owned.kind = EARLY_INCOME[ i ];
-			owned.standing = 0;
-			owned.onTheWay = 0;
-			m_player->iterateObjects( countTechBuildings, &owned );
-			if( owned.standing + owned.onTheWay == 0 )
-				placeNear( tmpl, &m_baseCenter, 0.5f * m_baseRadius, FALSE );
-		}
-	}
+	buyEarlyIncome();
 
 	// hackers and the buildings that pay out on a timer earn their price back, so they only wait for
 	// the hoard threshold, and each of them is bought on every pass the bank allows one ...
@@ -7945,8 +8000,6 @@ Bool AIPlayer::holdTeamForWave( Team *team, const AsciiString &approach, Int pat
 	if( info->m_isBaseDefense || info->m_isPerimeterDefense )
 		return FALSE;
 	const Bool underAttack = isBaseUnderAttack();
-	if( !underAttack && !holdsTeamsForWaves() )
-		return refuseHold( team, "press", logRefusal );
 
 	Int freeSlot = -1;
 	Bool anyParked = FALSE;
@@ -7962,10 +8015,15 @@ Bool AIPlayer::holdTeamForWave( Team *team, const AsciiString &approach, Int pat
 			return TRUE;		// already parked; the script asking again changes nothing
 		anyParked = TRUE;
 	}
+	// a wave on its own waits for nobody, and a rung that does not mass sends what is worth sending
+	if( !underAttack && waveGoes( waitingPower( team, NULL ), 0 ) )
+		return refuseHold( team, holdsTeamsForWaves() ? "alone" : "press", logRefusal );
 	if( freeSlot < 0 )
+	{
+		if( !readyToPush() )
+			return TRUE;		// the opening keeps it at home, parked or not
 		return refuseHold( team, "full", logRefusal );		// the staging point is full, so this one goes as the script said
-	if( !underAttack && aiReleaseWaveAt( m_pressure, waitingPower( team, NULL ), WAVE_POWER, 0, WAVE_MAX_HOLD_FRAMES ) )
-		return refuseHold( team, "alone", logRefusal );		// a wave on its own waits for nobody
+	}
 
 	m_heldUsed[ freeSlot ] = TRUE;
 	m_heldTeam[ freeSlot ] = team->getID();
@@ -8019,8 +8077,8 @@ Bool AIPlayer::holdTeamForWave( Team *team, const AsciiString &approach, Int pat
 //----------------------------------------------------------------------------------------------------------
 /** A skirmish script sends a team hunting, or at an area.  Both go from wherever the team stands, on
 	* their own, the moment the script fires: a team just out of the factory walks across the map alone,
-	* past the wave parked at the staging point.  With EngageGate a team still mostly at home parks with
-	* that wave instead, and goes out with it. */
+	* past the wave parked at the staging point.  A team still mostly at home parks with that wave
+	* instead, and goes out with it, unless it is worth sending on its own (waveGoes). */
 //----------------------------------------------------------------------------------------------------------
 Bool AIPlayer::gateTeamAttack( Team *team, const char *cause )
 {
@@ -8038,7 +8096,8 @@ Bool AIPlayer::gateTeamAttack( Team *team, const char *cause )
 		if( isAtHome( (*u)->getPosition() ) )
 			++home;
 	Player *enemy = getAiEnemy();
-	if( getSkillProfile()->m_engageGate && enemy && m_baseCenterSet && 2 * home >= (Int)units.size() &&
+	// every rung: holdTeamForWave lets a team worth sending go, and keeps the rest for the next wave
+	if( enemy && m_baseCenterSet && 2 * home >= (Int)units.size() &&
 			holdTeamForWave( team, AsciiString( "Center" ), enemy->getMpStartIndex() + 1, FALSE ) )
 	{
 		DEBUG_LOG(("AI ENGAGE frame %d player %d parks '%s' for the next wave instead of its script's %s\n",
@@ -8100,6 +8159,20 @@ Bool AIPlayer::holdsTeamsForWaves( void ) const
 	if( profile->m_massBeforeAttacking )
 		return m_pressure <= AIPRESSURE_NORMAL;
 	return m_pressure == AIPRESSURE_DEFEND && profile->m_retreatTtkRatio > 0.0f;
+}
+
+/** Whether parked teams worth power, the oldest parked heldFrames ago, leave now.  Not before the
+	* opening is over (readyToPush).  A trickle under m_minAttackPower waits for company however long it
+	* takes and whatever the pressure: in one 18,000-frame Twilight Flame match each, 43 of the 47
+	* attacks two Hard AIs made were one to four units, and 14 of Medium's 19.  Letting it go after the
+	* wave's longest wait still sent two-unit Hard waves. */
+Bool AIPlayer::waveGoes( Real power, UnsignedInt heldFrames )
+{
+	if( !readyToPush() || power < getSkillProfile()->m_minAttackPower )
+		return FALSE;
+	if( !holdsTeamsForWaves() )
+		return power > 0.0f;
+	return aiReleaseWaveAt( m_pressure, power, WAVE_POWER, heldFrames, WAVE_MAX_HOLD_FRAMES );
 }
 
 /** Who the last push takes out of a team the scripts keep at home.  The workers, the hackers, the
@@ -8230,6 +8303,7 @@ void AIPlayer::doWaves( void )
 	defendHome();
 	sendIdleAttackTeams();
 	sendIdleUnitsHunting();
+	keepSiegeBehind();
 
 	Real power = 0.0f;
 	Int first = -1;
@@ -8264,8 +8338,8 @@ void AIPlayer::doWaves( void )
 	const UnsignedInt heldFrames = TheGameLogic->getFrame() - m_heldSince;
 	// a full staging point goes whatever it adds up to: sixteen GLA teams of one man each are 3,200, and
 	// every team formed behind them would leave alone
-	// and a rung that does not mass lets go the moment the fight at home is over
-	if( teams < MAX_HELD_TEAMS && holdsTeamsForWaves() && !aiReleaseWaveAt( m_pressure, power, WAVE_POWER, heldFrames, WAVE_MAX_HOLD_FRAMES ) )
+	// and a rung that does not mass lets go the moment what is parked is worth sending
+	if( teams < MAX_HELD_TEAMS ? !waveGoes( power, heldFrames ) : !readyToPush() )
 		return;
 	const char *cause = !holdsTeamsForWaves() ? "press" : teams >= MAX_HELD_TEAMS ? "full" : power >= WAVE_POWER ? "wave" : "timeout";
 
@@ -9216,7 +9290,7 @@ Real AIPlayer::addHomeStrays( AIGroup *wave ) const
 //----------------------------------------------------------------------------------------------------------
 void AIPlayer::sendIdleUnitsHunting( void )
 {
-	if( !isSkirmishAI() || !m_baseCenterSet || m_pressure == AIPRESSURE_DEFEND )
+	if( !isSkirmishAI() || !m_baseCenterSet || m_pressure == AIPRESSURE_DEFEND || !readyToPush() )
 		return;
 	const Bool finish = m_pressure == AIPRESSURE_FINISH;
 	const Bool guardsGo = finish &&
@@ -11686,6 +11760,83 @@ static Real groundAttackRange( const Object *obj )
 			best = range;
 	}
 	return best;
+}
+
+/** A ground vehicle whose gun outreaches the line: the Tomahawk, the Scud Launcher, the Nuke and Inferno
+	* Cannons, the Rocket Buggy.  Not one that carries anybody: the Battle Bus's dummy gun reaches 320. */
+static const Real SIEGE_RANGE = 300.0f;
+static Bool isSiegeGun( const Object *obj )
+{
+	return obj->isKindOf( KINDOF_VEHICLE ) && !obj->isKindOf( KINDOF_AIRCRAFT ) && obj->getContain() == NULL &&
+		groundAttackRange( obj ) >= SIEGE_RANGE;
+}
+
+/** How far a trailing siege gun may stray from its place before it is sent back to it. */
+static const Real SIEGE_SLACK = 60.0f;
+
+/** A wave walks its road at the pace of the slowest and nobody keeps an order in it, so a Tomahawk or
+	* a Nuke Cannon can be first round the corner, where it dies to the first tank it meets before its
+	* long gun is any use.  Each wave tick a siege gun out with a group and not firing is sent to a spot
+	* m_siegeTrail behind the group's front unit, the line unit farthest from home, on the side towards
+	* home.  It attack-moves there, so whatever comes into its reach on the way is shot.  When the group
+	* has no line unit left it is left alone.  The front is not the unit nearest the enemy's start: on
+	* Twilight Flame that start was a guess, and a Paladin driving at the real enemy drove away from it.
+	* ponytail: home is a straight line from the front, not the road; take the path's previous waypoint
+	* if guns end up behind a cliff. */
+void AIPlayer::keepSiegeBehind( void )
+{
+	const Real trail = getSkillProfile()->m_siegeTrail;
+	if( !isSkirmishAI() || !m_baseCenterSet || trail <= 0.0f )
+		return;
+	const Coord3D &base = m_baseCenter;
+	std::vector<Object *> owned;
+	m_player->iterateObjects( collectObject, &owned );
+	Int sent = 0;
+	Int ahead = 0;
+	for( std::vector<Object *>::const_iterator o = owned.begin(); o != owned.end(); ++o )
+	{
+		Object *gun = *o;
+		if( gun->isEffectivelyDead() || gun->isContained() || gun->getAI() == NULL || gun->getGroup() == NULL ||
+				!isSiegeGun( gun ) || gun->getAI()->isAttacking() || isAtHome( gun->getPosition() ) || isFallingBack( gun->getID() ) )
+			continue;
+		const Object *front = NULL;
+		Real frontSqr = 0.0f;
+		const VecObjectID &ids = gun->getGroup()->getAllIDs();
+		for( VecObjectID::const_iterator it = ids.begin(); it != ids.end(); ++it )
+		{
+			const Object *mate = TheGameLogic->findObjectByID( *it );
+			if( mate == NULL || mate == gun || mate->isEffectivelyDead() || mate->isContained() || mate->isKindOf( KINDOF_AIRCRAFT ) ||
+					isSiegeGun( mate ) || aiCombatPower( mate ) <= 0.0f )
+				continue;
+			const Real d = sqr( mate->getPosition()->x - base.x ) + sqr( mate->getPosition()->y - base.y );
+			if( front == NULL || d > frontSqr )
+			{
+				front = mate;
+				frontSqr = d;
+			}
+		}
+		if( front == NULL )
+			continue;
+		Coord2D home;
+		home.x = base.x - front->getPosition()->x;
+		home.y = base.y - front->getPosition()->y;
+		if( home.x == 0.0f && home.y == 0.0f )
+			continue;
+		home.normalize();
+		Coord3D spot = *front->getPosition();
+		spot.x += home.x * trail;
+		spot.y += home.y * trail;
+		spot.z = TheTerrainLogic->getGroundHeight( spot.x, spot.y );
+		if( sqr( gun->getPosition()->x - spot.x ) + sqr( gun->getPosition()->y - spot.y ) <= sqr( SIEGE_SLACK ) )
+			continue;
+		gun->getAI()->aiAttackMoveToPosition( &spot, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI );
+		++sent;
+		if( sqr( gun->getPosition()->x - base.x ) + sqr( gun->getPosition()->y - base.y ) > frontSqr )
+			++ahead;
+	}
+	if( sent > 0 )
+		DEBUG_LOG(("AI SIEGE frame %d player %d puts %d siege guns %.0f behind their front, %d of them were ahead of it\n",
+			TheGameLogic->getFrame(), m_player->getPlayerIndex(), sent, trail, ahead));
 }
 
 /** Where a gun fires from, for the high ground's reach: an aircraft's range is flat

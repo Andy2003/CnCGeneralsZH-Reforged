@@ -11878,6 +11878,12 @@ TEST(the_bank_target_and_the_upgrade_the_army_pays_for)
 		CHECK( upper.m_upgradeStartSeconds < lower.m_upgradeStartSeconds );
 		CHECK( upper.m_surplusShare > lower.m_surplusShare );
 		CHECK( upper.m_maxProduction >= lower.m_maxProduction );
+		// every rung waits out an opening and sends no trickle, Hard the shortest wait and the biggest
+		// floor; every rung keeps its artillery behind the line, Hard the farthest
+		CHECK( lower.m_firstPushSeconds > 0.0f && upper.m_firstPushSeconds > 0.0f );
+		CHECK( upper.m_firstPushSeconds <= lower.m_firstPushSeconds );
+		CHECK( upper.m_minAttackPower > lower.m_minAttackPower && lower.m_minAttackPower > 0.0f );
+		CHECK( upper.m_siegeTrail > lower.m_siegeTrail && lower.m_siegeTrail > 0.0f );
 	}
 	// Hard alone builds past its plan, and with a bank past twice its target; Medium out-armies Easy and
 	// Hard out-armies Medium, which an equal share and cap for the two lower rungs had undone

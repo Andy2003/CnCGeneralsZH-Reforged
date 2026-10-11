@@ -658,6 +658,10 @@ protected:
 	void updatePressure(void);
 	void sendIdleUnitsHunting(void);							///< attack units idle at the end of their road, and the guards once the enemy is finished
 	Bool holdsTeamsForWaves(void) const;					///< this rung parks attack teams at the current level
+	Bool readyToPush(void);												///< the economy is in and the opening is over: attack teams may leave home
+	Bool waveGoes(Real power, UnsignedInt heldFrames);	///< what is parked, worth this, leaves now
+	void buyEarlyIncome(void);										///< the first drop zone and black market, ahead of the army
+	void keepSiegeBehind(void);										///< artillery out with a wave trails its front unit
 	Bool leavesToFinish(const Object *obj) const;	///< a fighter the last push takes off guard, as against a worker or a scout
 	/** Every enemy unit this AI has seen and not since lost track of: what it was, whose, and where and
 		* when it was last in sight.  An army that walks back into the fog is still an army.  A row goes when
