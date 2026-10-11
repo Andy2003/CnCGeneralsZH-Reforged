@@ -5395,10 +5395,14 @@ void InGameUI::updateFormationHints( void )
 	for( std::vector<ICoord2D>::const_iterator pt = m_formationDragPoints.begin();
 			 pt != m_formationDragPoints.end(); ++pt )
 	{
+		// past the horizon there is no ground, the same points finishFormationDrag leaves out
 		Coord3D world;
-		TheTacticalView->screenToTerrain( &(*pt), &world );
-		path.push_back( world );
+		if( TheTacticalView->screenToTerrain( &(*pt), &world ) )
+			path.push_back( world );
 	}
+
+	if( path.size() < 2 )
+		return;
 
 	std::vector<Real> arc;
 	buildPathArcLengths( path, arc );
