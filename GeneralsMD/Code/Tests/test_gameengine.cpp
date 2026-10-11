@@ -883,7 +883,7 @@ TEST(fxlist_reforged_ini_parses_and_keeps_its_light)
 	}
 	fclose( fp );
 
-	CHECK_EQ( blocks, 126 );
+	CHECK_EQ( blocks, 127 );
 	CHECK_EQ( lit, blocks );
 }
 

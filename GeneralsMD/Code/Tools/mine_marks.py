@@ -3,7 +3,11 @@ of disturbed earth.  The game lays it flat on the ground at each of a mine field
 (ParticleSystemReforged.ini, MineFX and MineFXPurple), so it is shaded here once, lit from the top
 left, and the soil ring fades out into whatever ground it lands on.
 
-    python Tools/mine_marks.py            # writes Data/Art/Textures/ReforgedMine.tga
+The arming light over each mine is an LED seen from above: a hard, nearly white core a fifth of the
+picture across inside a small glow in the light's colour, red for the standard and cluster mines and
+a cold blue-violet for the EMP mines.  It is drawn additively, so black is nothing.
+
+    python Tools/mine_marks.py            # writes Data/Art/Textures/ReforgedMine.tga and ReforgedMineLed*.tga
 
 Drawn four times too big and brought down, which is the antialiasing."""
 import math
@@ -23,6 +27,10 @@ SOIL_ALPHA = 0.7
 PLATE = 0.70			# radius of the steel, as a share of the half width
 SOIL_OUT = 0.98
 BOLTS = 0.55
+LED_CORE = 0.18			# radius of the hard core, as a share of the half width
+LED_GLOW = 0.17			# the glow falls off as exp(-(r - core) / this)
+LED_GLOW_PEAK = 0.7		# the glow's strength just outside the core, against the core's 1
+LEDS = (("Red", (255, 18, 8), (255, 190, 170)), ("Blue", (80, 100, 255), (200, 215, 255)))
 OUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Art", "Textures")
 
 
@@ -79,6 +87,27 @@ def main():
     path = os.path.join(out_folder, "ReforgedMine.tga")
     image.resize((SHIPPED, SHIPPED), Image.LANCZOS).save(path)
     print(path)
+    for name, glow, core in LEDS:
+        path = os.path.join(out_folder, "ReforgedMineLed%s.tga" % name)
+        led(glow, core).resize((SHIPPED, SHIPPED), Image.LANCZOS).save(path)
+        print(path)
+
+
+def led(glow, core):
+    image = Image.new("RGBA", (DRAWN, DRAWN))
+    pixels = image.load()
+    for py in range(DRAWN):
+        y = (py - CENTRE) / CENTRE
+        for px in range(DRAWN):
+            x = (px - CENTRE) / CENTRE
+            r = math.hypot(x, y)
+            if r < LED_CORE:
+                colour = core
+            else:
+                strength = LED_GLOW_PEAK * math.exp(-(r - LED_CORE) / LED_GLOW) * (1.0 - ramp(0.8, 1.0, r))
+                colour = tuple(int(c * strength) for c in glow)
+            pixels[px, py] = colour + (max(colour),)
+    return image
 
 
 if __name__ == "__main__":
