@@ -12,10 +12,13 @@
 10    spawn      1  ChinaCommandCenter              1   start1:-260:0
 
 # --- the column, on the road --------------------------------------------------------------------
-# spawned after the list's first cut at 3 s, and stopped short of the fight's reach so it keeps driving
+# spawned after the list's first cut at 3 s. Until 2026-10-11 it was ordered to stop at 1100,930 and
+# parked along the top of row 03's frame; now it drives the whole road into the fight, through the
+# camera's spot, with four Gattlings behind it.
 90    spawn      1  ChinaTankOverlord               6   1110 560   50
-100   move       1  ChinaTankOverlord                   1100 930
-420   attackmove 1  ChinaTankOverlord                   1100 1120
+90    spawn      1  ChinaTankGattling               4   1150 470   40
+100   attackmove 1  ChinaTankOverlord                   1100 1120
+100   attackmove 1  ChinaTankGattling                   1100 1120
 
 # --- rf_snow.txt's fight ------------------------------------------------------------------------
 30    spawn      0  AmericaTankCrusader             8   990 1040  36

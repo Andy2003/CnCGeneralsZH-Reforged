@@ -1,19 +1,27 @@
-# Trailer 2, shots 16 and 18: Scenarios/rf_t2_twilight.txt on Twilight Flame (command line there).
-# Zoom is relative to the observer's opening view, which measured 1.23 absolute on this map, so
-# swpair_nuke's 1.6 and swpair_scud's 1.0, written against an older base, do not carry over: at
-# relative 4.0 (4.92 absolute) the frame was black, and at 2.5 with pitch -16 the top 40% was black,
-# the far ground being past the draw distance. Every view here is tilted down to -20 or steeper.
+# Trailer 2, timeline.t2.js rows 16, 17 and 18: Scenarios/rf_t2_twilight.txt on Twilight Flame
+# (command line there). Zoom is relative to the observer's opening view, which measured 1.23 absolute.
+# Every view is tilted down to -20 or steeper where it is wide, as the far ground is past the draw
+# distance above about 3 absolute.
 #
-# 3 s, frames 230 to 450: the ring town from the south-west, the nuke (landing on frame 263) rising
-#   as a column and a fireball over it.
-# 25 s, frames 750 to 900: closer over the pools from the south, the Chinese column driving into
-#   them from frame about 780. The pools are expensive to draw: at 1280x720 this stretch rendered at
-#   about 7 pictures a second, and a low view over them (pitch +6) at one picture every 1.5 to 5.4 s.
-# 35 s, frames 1050 to 1250: the Scud Storm's block round 950,3850, the first Scud landing on 1107.
+# 3 s: the American town at 500,3250 from the south-west, the nuke (called on 100) rising over it.
+# 23 s, frames 690 to 795, row 16: high over the radiation pools round the town, the Chinese column
+#   driving west into them from about 690. The pools are expensive to draw: at 1280x720 a low view
+#   over them took 1.5 to 5.4 s a picture, so this one stays high.
+# 26.5 s, frames 795 to 940, row 17: low beside the GLA Scud Storm (spawned at 3196,4303), the
+#   launcher in the frame's lower third and its missiles climbing up through the frame from about
+#   820 to 955; the Storm is called on 700. The look-at point is 170 past the Storm along the view,
+#   since aiming at it put the empty sand in front of it in the middle; at pitch 20 a quarter of the
+#   frame's top was beyond the draw distance, at 10 only a thin strip. Until 2026-10-11 this row came
+#   from missileapex_film, a separate scenario, at a wide high view with the launchers at the
+#   frame's right edge.
+# 35 s, frames 1050 to 1250, row 18: the Scud Storm's block at 450,4200, closer than before (1.6
+#   where it was 2.2) and centred on the block, the first Scud landing at about 1107.
 
-3.0   cut     1500 3450 2.5 -45 -24
+3.0   cut     500 3250 2.2 -45 -24
 3.5   shot
-25.0  cut     1460 3420 1.8 0 -26
-25.5  shot
-35.0  cut     950 3850 2.2 -45 -22
+23.0  cut     480 3230 1.8 0 -26
+23.5  shot
+26.5  cut     3320 4425 0.85 -45 10
+27.0  shot
+35.0  cut     450 4200 1.6 -45 -22
 35.5  shot
