@@ -11235,17 +11235,27 @@ TEST(the_ai_pulls_ranked_units_out_sooner_the_higher_the_rank)
 
 /** AIPlayer.cpp: the computer buys its first Ambulance once it has an army and a second once the army
 	 is big, and calls in the badly hurt from near it only. */
-extern Int AIAmbulance_wanted( Int army );
+extern Int AIAmbulance_wanted( Int army, Int skill );
 extern Bool AIAmbulance_callsPatient( Real healthFraction, Real distance );
+extern Bool AIAmbulance_mayBuyMore( Int bought, Int skill );
 
 TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 {
-	CHECK_EQ( 0, AIAmbulance_wanted( 0 ) );
-	CHECK_EQ( 0, AIAmbulance_wanted( 7 ) );
-	CHECK_EQ( 1, AIAmbulance_wanted( 8 ) );
-	CHECK_EQ( 1, AIAmbulance_wanted( 19 ) );
-	CHECK_EQ( 2, AIAmbulance_wanted( 20 ) );
-	CHECK_EQ( 2, AIAmbulance_wanted( 200 ) );
+	CHECK_EQ( 0, AIAmbulance_wanted( 0, AISKILL_BRUTAL ) );
+	CHECK_EQ( 0, AIAmbulance_wanted( 7, AISKILL_BRUTAL ) );
+	CHECK_EQ( 1, AIAmbulance_wanted( 8, AISKILL_BRUTAL ) );
+	CHECK_EQ( 1, AIAmbulance_wanted( 19, AISKILL_BRUTAL ) );
+	CHECK_EQ( 2, AIAmbulance_wanted( 20, AISKILL_BRUTAL ) );
+	CHECK_EQ( 2, AIAmbulance_wanted( 200, AISKILL_BRUTAL ) );
+	// Medium keeps one, Easy none
+	CHECK_EQ( 1, AIAmbulance_wanted( 200, AISKILL_MEDIUM ) );
+	CHECK_EQ( 0, AIAmbulance_wanted( 200, AISKILL_EASY ) );
+	// and a match buys only so many
+	CHECK( AIAmbulance_mayBuyMore( 5, AISKILL_BRUTAL ) );
+	CHECK( !AIAmbulance_mayBuyMore( 6, AISKILL_BRUTAL ) );
+	CHECK( AIAmbulance_mayBuyMore( 2, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_mayBuyMore( 3, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_mayBuyMore( 0, AISKILL_EASY ) );
 
 	CHECK( AIAmbulance_callsPatient( 0.3f, 100.0f ) );
 	CHECK( AIAmbulance_callsPatient( 0.49f, 450.0f ) );
@@ -11258,7 +11268,7 @@ TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 /** AIPlayer.cpp: an Ambulance pulls back when shot at or inside a known gun's reach, and a lost one is
 	 replaced only after a wait. */
 extern Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReach );
-extern Bool AIAmbulance_rebuyWaits( UnsignedInt now, UnsignedInt lost );
+extern Bool AIAmbulance_rebuyWaits( UnsignedInt now, UnsignedInt lost, Int skill );
 
 TEST(the_ai_ambulance_pulls_back_when_hit_and_is_not_rebought_at_once)
 {
@@ -11268,9 +11278,12 @@ TEST(the_ai_ambulance_pulls_back_when_hit_and_is_not_rebought_at_once)
 	CHECK( !AIAmbulance_pullsBack( 1000, 0, FALSE ) );
 	CHECK( !AIAmbulance_pullsBack( 1000, 500, FALSE ) );
 
-	CHECK( !AIAmbulance_rebuyWaits( 1000, 0 ) );
-	CHECK( AIAmbulance_rebuyWaits( 1000, 900 ) );
-	CHECK( !AIAmbulance_rebuyWaits( 10000, 900 ) );
+	CHECK( !AIAmbulance_rebuyWaits( 1000, 0, AISKILL_BRUTAL ) );
+	CHECK( AIAmbulance_rebuyWaits( 1000, 900, AISKILL_BRUTAL ) );
+	CHECK( !AIAmbulance_rebuyWaits( 10000, 900, AISKILL_BRUTAL ) );
+	// Medium waits twice as long
+	CHECK( AIAmbulance_rebuyWaits( 6000, 900, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_rebuyWaits( 6500, 900, AISKILL_MEDIUM ) );
 }
 
 

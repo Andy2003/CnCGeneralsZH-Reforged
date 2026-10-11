@@ -561,10 +561,26 @@ protected:
 	{
 		ObjectID		id;					///< INVALID_ID for a free slot
 		Coord3D			spot;				///< where it was last sent
+		Coord3D			seen;				///< for the log only, not saved: where it stood on the last pass
+		Real				seenHealth;	///< for the log only, not saved: its health share on the last pass
+		Real				seenReach;	///< for the log only, not saved: how deep inside a known gun's reach it stood, negative when clear
 	};
 	enum { MAX_DUTY_AMBULANCES = 2 };
 	DutyAmbulance	m_ambulance[ MAX_DUTY_AMBULANCES ];
 	UnsignedInt		m_ambulanceLost;		///< the frame the last duty Ambulance was lost, 0 for never
+	Int				m_ambulancesBought;	///< duty Ambulances that came out this match
+	/// for the log only, not saved: each patient an Ambulance called in, until it is let out, dies or walks off
+	struct CalledPatient
+	{
+		ObjectID		id;
+		ObjectID		ambulance;
+		UnsignedInt	frame;
+		Real				health;
+		Real				distance;
+		Bool				inside;
+	};
+	std::vector<CalledPatient>	m_calledPatients;
+	void followPatients(void);
 	Int					m_healerSeconds;		///< for the log only, not saved: healer seconds counted, and those clear of the nearest gun's reach
 	Int					m_healerClearSeconds;
 	Int				m_captureTimer;					///< frames until the next look for something to capture
