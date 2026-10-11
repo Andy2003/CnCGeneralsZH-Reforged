@@ -224,6 +224,8 @@ static Bool parseActionType( const AsciiString &token, ScenarioActionType *actio
 		*action = SCENARIO_ACTION_REAIM;
 	else if (token == "respond")
 		*action = SCENARIO_ACTION_RESPOND;
+	else if (token == "guard")
+		*action = SCENARIO_ACTION_GUARD;
 	else
 		return FALSE;
 
@@ -318,6 +320,7 @@ static Int tokensNeededFor( ScenarioActionType action )
 		case SCENARIO_ACTION_ATTACK:			return SCENARIO_TOKENS_ATTACK;
 		case SCENARIO_ACTION_ENTER:				return SCENARIO_TOKENS_ATTACK;
 		case SCENARIO_ACTION_DOCK:				return SCENARIO_TOKENS_ATTACK;
+		case SCENARIO_ACTION_GUARD:				return SCENARIO_TOKENS_ATTACK;
 		case SCENARIO_ACTION_PRODUCE:			return SCENARIO_TOKENS_ATTACK;
 		case SCENARIO_ACTION_STOP:				return SCENARIO_TOKENS_STOP;
 		case SCENARIO_ACTION_TALLY:				return SCENARIO_TOKENS_STOP;
@@ -419,6 +422,7 @@ ScenarioParseResult ScenarioDrill_parseLine( const char *line, ScenarioAction *a
 		case SCENARIO_ACTION_ATTACK:
 		case SCENARIO_ACTION_ENTER:
 		case SCENARIO_ACTION_DOCK:
+		case SCENARIO_ACTION_GUARD:
 		case SCENARIO_ACTION_SHIFTATTACK:
 		case SCENARIO_ACTION_FORCEATTACK:
 		case SCENARIO_ACTION_SHIFTPOWER:
@@ -1600,9 +1604,11 @@ static Bool executeOrder( const ScenarioAction &action, Player *player, const Co
 		case SCENARIO_ACTION_ATTACK:
 		case SCENARIO_ACTION_ENTER:
 		case SCENARIO_ACTION_DOCK:
+		case SCENARIO_ACTION_GUARD:
 		{
 			const char *verb = (action.action == SCENARIO_ACTION_ATTACK) ? "attack"
-											 : (action.action == SCENARIO_ACTION_DOCK) ? "dock" : "enter";
+											 : (action.action == SCENARIO_ACTION_DOCK) ? "dock"
+											 : (action.action == SCENARIO_ACTION_GUARD) ? "guard" : "enter";
 			Player *targetPlayer = findPlayerForSlot( action.targetSlot );
 			Object *target = (targetPlayer != NULL)
 											 ? findFirstMatching( targetPlayer, action.targetSelector )
@@ -1619,6 +1625,8 @@ static Bool executeOrder( const ScenarioAction &action, Player *player, const Co
 				group->groupAttackObject( target, SCENARIO_ATTACK_SHOTS, CMD_FROM_SCRIPT );
 			else if (action.action == SCENARIO_ACTION_DOCK)
 				group->groupDock( target, CMD_FROM_SCRIPT );
+			else if (action.action == SCENARIO_ACTION_GUARD)
+				group->groupGuardObject( target, GUARDMODE_NORMAL, CMD_FROM_SCRIPT );
 			else
 				group->groupEnter( target, CMD_FROM_SCRIPT );
 

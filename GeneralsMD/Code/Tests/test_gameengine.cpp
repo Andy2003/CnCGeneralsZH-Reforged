@@ -11219,8 +11219,11 @@ TEST(the_ai_pulls_ranked_units_out_sooner_the_higher_the_rank)
 	CHECK( !AIRetreat_rankPullsOut( 3, 0.60f, false, 1.0f, 0.5f ) );
 
 	// a fight read at 0.7, which a team quitting at 0.5 stays in: the veteran stays, the elite goes
-	CHECK( !AIRetreat_rankPullsOut( 1, 1.0f, true, 0.7f, 0.5f ) );
-	CHECK( AIRetreat_rankPullsOut( 2, 1.0f, true, 0.7f, 0.5f ) );
+	CHECK( !AIRetreat_rankPullsOut( 1, 0.8f, true, 0.7f, 0.5f ) );
+	CHECK( AIRetreat_rankPullsOut( 2, 0.8f, true, 0.7f, 0.5f ) );
+	// but only once the fight has hurt it: Colonel Burton was walked out of one at full health
+	CHECK( !AIRetreat_rankPullsOut( 3, 1.0f, true, 0.1f, 0.5f ) );
+	CHECK( !AIRetreat_rankPullsOut( 2, 0.95f, true, 0.7f, 0.5f ) );
 	// a fight read the same with no enemy in it is no reason to go
 	CHECK( !AIRetreat_rankPullsOut( 3, 1.0f, false, 0.7f, 0.5f ) );
 	// and nobody leaves a fight it is even in or winning, at any rank
