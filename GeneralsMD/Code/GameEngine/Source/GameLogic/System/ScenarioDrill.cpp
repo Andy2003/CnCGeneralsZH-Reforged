@@ -730,7 +730,8 @@ static Object *findFirstMatching( Player *player, const AsciiString &selector )
 	  its modules never start.  The team has to be activated too, or it counts as an empty team.
 	  A unit that moves goes down only on a cell its own locomotors could enter, the test the
 	  pathfinder puts every destination to: a tank set on a cliff or in the sea is taken away again
-	  rather than left to drive out.  Aircraft fly over every cell type, so they always pass. */
+	  rather than left to drive out.  Aircraft are not asked: anything on a JetAIUpdate, the Comanche
+	  included, is made on its ground-only taxiing set, which would refuse it on every cliff. */
 static Bool spawnOne( const ScenarioAction &action, const ThingTemplate *tmpl, Team *team, const Coord3D *pos )
 {
 	Object *obj = TheThingFactory->newObject( tmpl, team );
@@ -741,7 +742,7 @@ static Bool spawnOne( const ScenarioAction &action, const ThingTemplate *tmpl, T
 	obj->setPosition( pos );
 
 	AIUpdateInterface *ai = obj->getAI();
-	if (ai != NULL && ai->getLocomotorSet().getValidSurfaces() != 0
+	if (ai != NULL && ai->getLocomotorSet().getValidSurfaces() != 0 && !obj->isKindOf( KINDOF_AIRCRAFT )
 			&& !TheAI->pathfinder()->validMovementPosition( obj->getCrusherLevel() > 0, obj->getLayer(), ai->getLocomotorSet(), pos ))
 	{
 		static const char *const cellNames[] = { "CLEAR", "WATER", "CLIFF", "RUBBLE", "OBSTACLE",
