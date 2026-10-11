@@ -415,18 +415,21 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 // texel at the pixel's own position, so the viewport's half pixel shift applies to both alike.  Both
 // depths go back to the distance from the eye through the projection the particles are drawn with,
 // w = SoftParticleDepth.x / (z * SoftParticleDepth.y - SoftParticleDepth.z), which is the same
-// matrix the world was drawn with; .w is one over the distance the fade takes, in world units.  The
-// ramp is a smoothstep: a straight one left a crease at both ends of every sprite's fade, and a
-// toxin cloud is hundreds of sprites lying on the ground, whose creases stacked into contour lines.
+// matrix the world was drawn with; .w is one over the longest distance the fade takes, in world
+// units.  A sprite never fades over more than its own half width, which the vertex half hands on in
+// the specular alpha (VertexPipelineDescription::SoftParticle): a mine's flare hangs under a unit
+// above the ground, and twelve units erased it whole.  The ramp is a smoothstep: a straight one
+// left a crease at both ends of every sprite's fade, and a toxin cloud is hundreds of sprites lying
+// on the ground, whose creases stacked into contour lines.
 #define SOFT_PARTICLE_SAMPLING \
 	"Texture2D SceneDepth : register(t7);\n" \
 	"\n" \
-	"float soft_particle_fade(float4 position)\n" \
+	"float soft_particle_fade(float4 position, float half_width)\n" \
 	"{\n" \
 	"    float scene = SceneDepth.Load(int3(position.xy, 0)).r;\n" \
 	"    float behind = SoftParticleDepth.x / (scene * SoftParticleDepth.y - SoftParticleDepth.z);\n" \
 	"    float here = SoftParticleDepth.x / (position.z * SoftParticleDepth.y - SoftParticleDepth.z);\n" \
-	"    float fade = saturate((behind - here) * SoftParticleDepth.w);\n" \
+	"    float fade = saturate((behind - here) * max(SoftParticleDepth.w, 1.0 / half_width));\n" \
 	"    return fade * fade * (3.0 - 2.0 * fade);\n" \
 	"}\n" \
 	"\n"

@@ -300,7 +300,7 @@ TEST(ffshadercompile_a_soft_particle_fades_into_the_scene_depth_on_d3d11_only)
 	CHECK(additive.find("SoftParticleDepth") > additive.find("BlastLightAmbient"));
 	CHECK(additive.find("register(t5)") == std::string::npos);
 	const size_t clip = additive.find("clip(");
-	const size_t fade = additive.find("current *= soft_particle_fade(input.Position);");
+	const size_t fade = additive.find("current *= soft_particle_fade(input.Position, input.Specular.a);");
 	CHECK(clip != std::string::npos);
 	CHECK(fade != std::string::npos);
 	CHECK(clip < fade);
@@ -317,7 +317,7 @@ TEST(ffshadercompile_a_soft_particle_fades_into_the_scene_depth_on_d3d11_only)
 	description.SoftParticle = SOFT_PARTICLE_ALPHA;
 	std::string smoke;
 	CHECK(CombinerShader_Generate(description, COMBINER_SHADER_TARGET_D3D11, smoke));
-	CHECK(smoke.find("current.a *= soft_particle_fade(input.Position);") != std::string::npos);
+	CHECK(smoke.find("current.a *= soft_particle_fade(input.Position, input.Specular.a);") != std::string::npos);
 	CHECK(smoke.find("blast_reaching(input.Position)") > smoke.find("light_reaching(input.Position)"));
 
 	D3DCompileFunction compile = load_compiler();

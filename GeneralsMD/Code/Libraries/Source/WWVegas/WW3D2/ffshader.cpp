@@ -465,8 +465,8 @@ static bool generate_combiners(const CombinerDescription & description,
 	// a hard line again, only a little further out.
 	if (soft) {
 		hlsl += (description.SoftParticle == SOFT_PARTICLE_COLOUR)
-			? "    current *= soft_particle_fade(input.Position);\n"
-			: "    current.a *= soft_particle_fade(input.Position);\n";
+			? "    current *= soft_particle_fade(input.Position, input.Specular.a);\n"
+			: "    current.a *= soft_particle_fade(input.Position, input.Specular.a);\n";
 	}
 
 	hlsl +=
