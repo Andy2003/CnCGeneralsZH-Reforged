@@ -2341,6 +2341,23 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	UnicodeString releaseVersion;
 	releaseVersion.translate( TheVersion->getReleaseVersion() );
 	versionString.concat( releaseVersion );
+	if (TheGlobalData->m_modName.isNotEmpty())
+	{
+		// the label is one line under the menu; a long -mod list keeps its start, the replay keeps all of it
+		const Int MAX_MOD_CHARS = 48;
+		UnicodeString mods = TheVersion->getUnicodeModName();
+		if (mods.getLength() > MAX_MOD_CHARS)
+		{
+			UnicodeString cut;
+			for (Int i = 0; i < MAX_MOD_CHARS - 3; ++i)
+				cut.concat( mods.getCharAt( i ) );
+			cut.concat( u"..." );
+			mods = cut;
+		}
+		versionString.concat( u" [" );
+		versionString.concat( mods );
+		versionString.concat( u"]" );
+	}
 
 	if (TheVersion->showFullVersion())
 	{

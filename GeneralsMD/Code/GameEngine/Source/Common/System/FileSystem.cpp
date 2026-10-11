@@ -54,6 +54,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CDManager.h"
 #include "Common/GameAudio.h"
+#include "Common/GlobalData.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/PerfTimer.h"
 #include "Common/RAMFile.h"
@@ -61,6 +62,12 @@
 
 
 DECLARE_PERF_TIMER(FileSystem)
+
+/// a drive or a root: the user data folder and the like, which a mod folder never stands in for
+static Bool isAbsolutePath( const AsciiString &path )
+{
+	return strchr( path.str(), ':' ) != NULL || path.startsWith( "\\" ) || path.startsWith( "/" );
+}
 
 //----------------------------------------------------------------------------
 //         Externals                                                     
@@ -208,6 +215,23 @@ File*		FileSystem::openFile( const Char *filename, Int access )
 		return NULL;
 	}
 
+	// a mod's copy, loose or archived, goes in front of Run's own loose files and every other archive;
+	// writes stay where they were
+	if ( (access & (File::WRITE | File::CREATE | File::APPEND | File::TRUNCATE)) == 0 )
+	{
+		Bool inModArchive = FALSE;
+		AsciiString modded = modLooseFile( AsciiString( filename ), &inModArchive );
+		if ( modded.isNotEmpty() )
+		{
+			DEBUG_LOG(( "FileSystem::openFile - mod file %s\n", modded.str() ));
+			return TheLocalFileSystem->openFile( modded.str(), access );
+		}
+		if ( inModArchive )
+		{
+			return TheArchiveFileSystem->openFile( filename, access );
+		}
+	}
+
 	if ( TheLocalFileSystem != NULL )
 	{
 		file = TheLocalFileSystem->openFile( filename, access );
@@ -247,7 +271,7 @@ Bool FileSystem::doesFileExist(const Char *filename) const
   if (i!=m_fileExist.end())
     return i->second;
 
-	if (TheLocalFileSystem->doesFileExist(filename)) 
+	if (TheLocalFileSystem->doesFileExist(filename) || modLooseFile(AsciiString(filename)).isNotEmpty())
   {
     m_fileExist[key]=true;
 		return TRUE;
@@ -270,6 +294,74 @@ void FileSystem::getFileListInDirectory(const AsciiString& directory, const Asci
 	USE_PERF_TIMER(FileSystem)
 	TheLocalFileSystem->getFileListInDirectory(AsciiString(""), directory, searchName, filenameList, searchSubdirectories);
 	TheArchiveFileSystem->getFileListInDirectory(AsciiString(""), directory, searchName, filenameList, searchSubdirectories);
+
+	// a mod's loose files listed under their game path, so a file it replaces is loaded once, from the mod (openFile)
+	// TheGlobalData is not there yet while GameData.ini itself loads, and there is no -mod before it is
+	if (TheGlobalData == NULL || isAbsolutePath(directory))
+	{
+		return;
+	}
+	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
+	{
+		const AsciiString &modDir = TheGlobalData->m_mods[i];
+		if (!modDir.endsWith("\\") && !modDir.endsWith("/"))
+		{
+			continue;	// a .big, already in the archive tree
+		}
+		AsciiString modDirectory = modDir;
+		modDirectory.concat(directory);
+		FilenameList modded;
+		TheLocalFileSystem->getFileListInDirectory(AsciiString(""), modDirectory, searchName, modded, searchSubdirectories);
+		for (FilenameListIter it = modded.begin(); it != modded.end(); ++it)
+		{
+			filenameList.insert(AsciiString(it->str() + modDir.getLength()));
+		}
+	}
+}
+
+//============================================================================
+// FileSystem::modLooseFile
+//============================================================================
+AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArchive) const
+{
+	if (inModArchive != NULL)
+	{
+		*inModArchive = FALSE;
+	}
+	// a folder is not a file: "" or "Maps\" would otherwise find the mod folder itself, which exists
+	if (TheGlobalData == NULL || TheGlobalData->m_mods.empty() || isAbsolutePath(filename) ||
+		filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/"))
+	{
+		return AsciiString();
+	}
+
+	// The last -mod that has the file wins, whether it has it loose or in an archive: a later mod's
+	// .big beats an earlier mod's loose copy.  An archive key is the -mod path itself, or that folder
+	// followed by the archive's name (loadMods).
+	const AsciiString archive = TheArchiveFileSystem->getArchiveFilenameForFile(filename);
+	for (size_t i = TheGlobalData->m_mods.size(); i-- > 0; )
+	{
+		const AsciiString &mod = TheGlobalData->m_mods[i];
+		const Bool isFolder = mod.endsWith("\\") || mod.endsWith("/");
+		if (isFolder)
+		{
+			AsciiString path = mod;
+			path.concat(filename);
+			if (TheLocalFileSystem->doesFileExist(path.str()))
+			{
+				return path;
+			}
+		}
+		if (archive.isNotEmpty() && (isFolder ? archive.startsWithNoCase(mod.str()) : archive.compareNoCase(mod) == 0))
+		{
+			if (inModArchive != NULL)
+			{
+				*inModArchive = TRUE;
+			}
+			return AsciiString();
+		}
+	}
+	return AsciiString();
 }
 
 //============================================================================
@@ -290,6 +382,15 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo) co
 	if (generatedMapBytes(filename, &generated, &generatedSize)) {
 		fileInfo->sizeLow = generatedSize;
 		return TRUE;
+	}
+
+	Bool inModArchive = FALSE;
+	AsciiString modded = modLooseFile(filename, &inModArchive);
+	if (modded.isNotEmpty()) {
+		return TheLocalFileSystem->getFileInfo(modded, fileInfo);
+	}
+	if (inModArchive) {
+		return TheArchiveFileSystem->getFileInfo(filename, fileInfo);
 	}
 
 	if (TheLocalFileSystem->getFileInfo(filename, fileInfo)) {

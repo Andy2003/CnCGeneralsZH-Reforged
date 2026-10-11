@@ -1738,3 +1738,11 @@ END
 CONTROLBAR:Demo_ToolTipGLAScienceRebelAmbush
 "Allows you to create a surprise ambush of Rebels anywhere \n \n Rank 1: 4 Rebels \n Rank 2: 6 Rebels \n Rank 3: 10 Rebels \n \n Deploy from: Command Center"
 END
+
+LAN:ErrorModMismatch
+"This game runs different mods. The host's mods: %s. Start the game with the same mods, in the same order, to join."
+END
+
+LAN:NoMod
+"none"
+END

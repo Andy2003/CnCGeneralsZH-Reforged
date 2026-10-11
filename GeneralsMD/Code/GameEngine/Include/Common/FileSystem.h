@@ -138,6 +138,11 @@ public:
 	void getFileListInDirectory(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const; ///< search the given directory for files matching the searchName (egs. *.ini, *.rep).  Possibly search subdirectories.
 	Bool getFileInfo(const AsciiString& filename, FileInfo *fileInfo) const; ///< fills in the FileInfo struct for the file given. returns TRUE if successful.
 
+	/// "<mod dir><filename>" when the last -mod that has this game path has it loose, else empty.  When
+	/// that mod has it in an archive instead, *inModArchive says so.  Either copy beats Run's loose files
+	/// and every archive that is not a mod's.
+	AsciiString modLooseFile(const AsciiString& filename, Bool *inModArchive = NULL) const;
+
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.
 
 	/// language when Data\<language>\Language.ini is loose or in an archive, otherwise the first

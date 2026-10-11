@@ -725,8 +725,8 @@ public:
 
 	Bool				m_isBreakableMovie;							///< if we enter a breakable movie, set this flag
 	Bool				m_breakTheMovie;								///< The user has hit escape!
-	AsciiString m_modDir;
-	AsciiString m_modBIG;
+	std::vector<AsciiString> m_mods;	///< every -mod in command-line order, later wins: a folder ends in '\', anything else is a .big
+	AsciiString m_modName;	///< UTF-8, each mod's "<name> <version>" from its mod.json (else the folder or archive name), joined by ", " in m_mods order; empty without -mod
 
 	//-allAdvice feature
 	//Bool m_allAdvice;

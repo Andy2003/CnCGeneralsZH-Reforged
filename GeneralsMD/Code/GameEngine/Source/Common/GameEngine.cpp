@@ -319,8 +319,12 @@ static void checksumModels( XferCRC &xferCRC )
 		AsciiString model = *it;
 		model.toLower();
 
-		AsciiString source = TheLocalFileSystem->doesFileExist( model.str() )
-			? model : TheArchiveFileSystem->getArchiveFilenameForFile( model );
+		// the file openFile will read: a mod's loose or archived copy first (FileSystem::modLooseFile)
+		Bool inModArchive = FALSE;
+		AsciiString source = TheFileSystem->modLooseFile( model, &inModArchive );
+		if (source.isEmpty())
+			source = TheLocalFileSystem->doesFileExist( model.str() ) && !inModArchive
+				? model : TheArchiveFileSystem->getArchiveFilenameForFile( model );
 
 		ModelChecksum entry;
 		const Bool sourceKnown = TheLocalFileSystem->getFileInfo( source, &entry.source );

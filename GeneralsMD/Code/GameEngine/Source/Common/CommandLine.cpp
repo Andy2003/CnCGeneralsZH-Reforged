@@ -28,9 +28,12 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "zhio.h"
 
+#include <string>
+
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CommandLine.h"
 #include "Common/CRCDebug.h"
+#include "Common/file.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/OptionsCatalog.h"
 #include "Common/version.h"
@@ -2525,6 +2528,80 @@ Int parseUpdateImages(char *args[], int num)
 	return 1;
 }
 
+/** The string value of "key" in mod.json, or empty.  ponytail: a flat object of string values is
+	* all the launcher writes, so this finds the key and reads to the closing quote, honouring only a
+	* backslash escape; a real parser is for the day mod.json grows nesting. */
+static AsciiString modJsonString( const std::string &json, const char *key )
+{
+	const char *space = " \t\r\n";
+	std::string quoted = std::string( "\"" ) + key + "\"";
+	size_t at = std::string::npos;
+	// the key is the quoted name followed by a colon; the same text as somebody's value is not
+	for (size_t found = json.find( quoted ); found != std::string::npos; found = json.find( quoted, found + 1 ))
+	{
+		size_t colon = json.find_first_not_of( space, found + quoted.size() );
+		if (colon != std::string::npos && json[colon] == ':')
+		{
+			at = json.find_first_not_of( space, colon + 1 );
+			break;
+		}
+	}
+	// a number or anything else that is not a string is no name
+	if (at == std::string::npos || json[at] != '"')
+		return AsciiString();
+
+	AsciiString value;
+	for (++at; at < json.size() && json[at] != '"'; ++at)
+	{
+		if (json[at] == '\\' && at + 1 < json.size())
+			++at;
+		value.concat( json[at] );
+	}
+	return value;
+}
+
+/** What the mod is called on the version line, in the replay and in a refused join: "<name> <version>"
+	* from the folder's mod.json, else the folder's or the archive's own name. */
+static AsciiString modIdentity( const AsciiString &modPath, Bool isDir )
+{
+	AsciiString name;
+	if (isDir)
+	{
+		AsciiString jsonPath = modPath;
+		jsonPath.concat( "mod.json" );
+		File *file = TheLocalFileSystem->openFile( jsonPath.str(), File::READ | File::BINARY );
+		if (file != NULL)
+		{
+			Int size = file->size();
+			char *contents = file->readEntireAndClose();
+			std::string json( contents, size );
+			delete [] contents;
+
+			name = modJsonString( json, "name" );
+			AsciiString version = modJsonString( json, "version" );
+			if (name.isNotEmpty() && version.isNotEmpty())
+			{
+				name.concat( ' ' );
+				name.concat( version );
+			}
+		}
+	}
+	if (name.isEmpty())
+	{
+		// the last path component, without the trailing separator a folder was given and without ".big"
+		std::string path( modPath.str() );
+		while (!path.empty() && (path.back() == '\\' || path.back() == '/'))
+			path.pop_back();
+		size_t slash = path.find_last_of( "\\/" );
+		if (slash != std::string::npos)
+			path.erase( 0, slash + 1 );
+		if (!isDir && path.size() > 4 && strcasecmp( path.c_str() + path.size() - 4, ".big" ) == 0)
+			path.erase( path.size() - 4 );
+		name = path.c_str();
+	}
+	return name;
+}
+
 Int parseMod(char *args[], Int num)
 {
 	if (TheWritableGlobalData && num > 1)
@@ -2559,13 +2636,19 @@ Int parseMod(char *args[], Int num)
 			if (!modPath.endsWith("\\") && !modPath.endsWith("/"))
 				modPath.concat('\\');
 			DEBUG_LOG(("Mod dir is '%s'.\n", modPath.str()));
-			TheWritableGlobalData->m_modDir = modPath;
 		}
 		else
 		{
 			DEBUG_LOG(("Mod file is '%s'.\n", modPath.str()));
-			TheWritableGlobalData->m_modBIG = modPath;
 		}
+		// repeatable: each -mod goes after the ones before it and wins over them (loadMods, FileSystem::modLooseFile)
+		TheWritableGlobalData->m_mods.push_back( modPath );
+
+		AsciiString name = modIdentity( modPath, (statBuf.st_mode & S_IFDIR) != 0 );
+		if (TheGlobalData->m_modName.isNotEmpty())
+			TheWritableGlobalData->m_modName.concat( ", " );
+		TheWritableGlobalData->m_modName.concat( name );
+		DEBUG_LOG(("MOD %d name='%s' path='%s'\n", (Int)TheGlobalData->m_mods.size(), name.str(), modPath.str()));
 
 		return 2;
 	}
@@ -2809,6 +2892,13 @@ void parseCommandLine(int argc, char *argv[])
 	}
 
 	TheArchiveFileSystem->loadMods();
+
+	// GameData.ini and the language check have already asked about files the mod may now supply
+	if (TheGlobalData->m_modName.isNotEmpty())
+	{
+		DEBUG_LOG(("MODS %d loaded, last wins: %s\n", (Int)TheGlobalData->m_mods.size(), TheGlobalData->m_modName.str()));
+		TheFileSystem->reset();
+	}
 }
 
 

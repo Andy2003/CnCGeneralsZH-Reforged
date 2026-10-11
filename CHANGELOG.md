@@ -20,6 +20,13 @@ found and fixed â€” EA's own, not port damage.**
 - Windows on Arm laptops, the Snapdragon ones, get a build made for them. Microsoft never shipped those machines the library the game loads its textures and shaders through, so the game brings its own, the texture code the Mac and Linux versions already run. Switched on in place of Microsoft's library on an ordinary Windows PC, it draws the same battlefields, with no tree, house or patch of ground going missing. Nobody has played it on a Snapdragon laptop yet.
 - Thanks to ilyasakin, whose port this is.
 
+## Mods
+
+- A mod is a folder now. Start the game with `-mod` and the folder, and the archives in it win over the game's own, as before, and so do the plain files under its `Data` and `Art` folders, which the game used to ignore. A modder can drop in one changed file without packing an archive first.
+- Several mods run at once. Give `-mod` once for each, and where two of them change the same file, the one named later wins.
+- A `mod.json` in the folder names the mod and its version. The names stand beside the version number in the options menu, in the order the mods were given, and go into every replay you record, so a replay made with mods says which ones, and the replay list marks it as another version when the game is running without them.
+- Joining a LAN game that runs different mods used to end in a box about a mismatch and nothing else. It names the host's mods now, or tells you the host plays without any.
+
 ## The command bar moves to the middle
 
 - The command bar is one console standing in the middle of the bottom edge: a taller radar, your selection and the build grid side by side, with the power bar over the grid. The idle worker and rank keys sit in a row over your selection, and in multiplayer the smoke signals join them. The red under-attack lamp is gone: the ping on the radar, the voice and the line in the event feed already tell you where you are hit, and the lamp only blinked about it a second time.

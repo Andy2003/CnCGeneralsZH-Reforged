@@ -173,29 +173,33 @@ void ArchiveFileSystem::loadIntoDirectoryTree(const ArchiveFile *archiveFile, co
 }
 
 void ArchiveFileSystem::loadMods() {
-	if (TheGlobalData->m_modBIG.isNotEmpty())
+	// In command-line order, each with overwrite: a later -mod wins over an earlier one, and all of them
+	// over the retail and Reforged archives already in the tree.
+	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
 	{
-		ArchiveFile *archiveFile = openArchiveFile(TheGlobalData->m_modBIG.str());
+		const AsciiString &mod = TheGlobalData->m_mods[i];
+		if (mod.endsWith("\\") || mod.endsWith("/"))
+		{
+#ifdef DEBUG_LOGGING
+			Bool ret =
+#endif
+			loadBigFilesFromDirectory(mod, "*.big", TRUE);
+			DEBUG_ASSERTLOG(ret, ("loadBigFilesFromDirectory(%s) returned FALSE!\n", mod.str()));
+			continue;
+		}
+
+		ArchiveFile *archiveFile = openArchiveFile(mod.str());
 
 		if (archiveFile != NULL) {
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", TheGlobalData->m_modBIG.str()));
-			loadIntoDirectoryTree(archiveFile, TheGlobalData->m_modBIG, TRUE);
-			m_archiveFileMap[TheGlobalData->m_modBIG] = archiveFile;
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - %s inserted into the archive file map.\n", TheGlobalData->m_modBIG.str()));
+			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", mod.str()));
+			loadIntoDirectoryTree(archiveFile, mod, TRUE);
+			m_archiveFileMap[mod] = archiveFile;
+			DEBUG_LOG(("ArchiveFileSystem::loadMods - %s inserted into the archive file map.\n", mod.str()));
 		}
 		else
 		{
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - could not openArchiveFile(%s)\n", TheGlobalData->m_modBIG.str()));
+			DEBUG_LOG(("ArchiveFileSystem::loadMods - could not openArchiveFile(%s)\n", mod.str()));
 		}
-	}
-
-	if (TheGlobalData->m_modDir.isNotEmpty())
-	{
-#ifdef DEBUG_LOGGING
-		Bool ret =
-#endif
-		loadBigFilesFromDirectory(TheGlobalData->m_modDir, "*.big", TRUE);
-		DEBUG_ASSERTLOG(ret, ("loadBigFilesFromDirectory(%s) returned FALSE!\n", TheGlobalData->m_modDir.str()));
 	}
 }
 
