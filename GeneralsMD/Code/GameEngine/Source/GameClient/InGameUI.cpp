@@ -11703,7 +11703,7 @@ void InGameUI::drawWireframeNotice( void )
 	for( Int i = 0; i < WIREFRAME_LINES; i++ )
 	{
 		m_wireframeNotice[ i ]->draw( REAL_TO_INT( m_wireframePos.x ) + ( width - lineWidth[ i ] ) / 2, y,
-			GameMakeColor( 255, 220, 120, 170 ), GameMakeColor( 0, 0, 0, 170 ) );
+			GameMakeColor( 255, 220, 120, 100 ), GameMakeColor( 0, 0, 0, 100 ) );
 		y += lineHeight[ i ];
 	}
 }
