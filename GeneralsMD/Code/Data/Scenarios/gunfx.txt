@@ -1,0 +1,28 @@
+# Gunfire effects clip (5e2d6b8b): a three-way fight of rifles, machine gun vehicles and tanks on the
+# open ground between the Twilight Flame starts, so tracers, muzzle flashes, bullet impacts and tank
+# shell tracers are all in one frame. America from the west, China from the north-east, the GLA
+# from the south; all three attack-move onto the middle and meet within a few seconds.
+#
+#   generals.exe -borderless -win -xres 1280 -yres 720 -msaa 0 -quickstart -noshellmap -observer
+#     -multiInstance -particlecap 2500 -map "Maps\Twilight Flame\Twilight Flame.map" -autoskirmish 3
+#     -takeover -side 0 FactionAmerica -side 1 FactionChina -side 2 FactionGLA -seed 7
+#     -scenario gunfx -cinema gunfx -video 120 420 gunfx -maxframes 500
+
+20    spawn      0  AmericaInfantryRanger     10  930 3700  16
+20    spawn      0  AmericaVehicleHumvee       3  880 3760  34
+20    spawn      0  AmericaTankCrusader        3  1000 3660  40
+20    spawn      0  AmericaTankPaladin         2  990 3740  40
+
+20    spawn      1  ChinaInfantryRedguard     10  1230 3850 16
+20    spawn      1  ChinaTankGattling          3  1280 3880 36
+20    spawn      1  ChinaTankBattleMaster      3  1180 3810 40
+20    spawn      1  ChinaTankOverlord          1  1220 3830 50
+
+20    spawn      2  GLAInfantryRebel          10  1230 3540 16
+20    spawn      2  GLAVehicleTechnical        3  1290 3510 34
+20    spawn      2  GLAVehicleQuadCannon       2  1220 3480 36
+20    spawn      2  GLATankScorpion            3  1200 3590 40
+
+40    attackmove 0  *  1135 3696
+40    attackmove 1  *  1135 3696
+40    attackmove 2  *  1135 3696

@@ -1,0 +1,10 @@
+# Scenarios/gunfx.txt on Twilight Flame: the three-way fight on the middle ground, held at close to
+# the game's own zoom and let run, a slow orbit so the tracers cross the frame at changing angles.
+# Shots at the fight's peak for the log; the clip itself is -video 120 420.
+
+0.5   cut     1110 3720 0.65 -45 0
+5.0   orbit   25 12
+6.0   shot
+9.0   shot
+12.0  shot
+15.0  shot
