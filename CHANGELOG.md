@@ -1055,6 +1055,7 @@ A third pass went through the generals' powers, promotions and unit abilities.
 - The Nuclear Missile silo still goes up, since it is where China buys Nuclear Tanks and Uranium Shells. The missile inside it never launches, it has no fire button, and nobody's screen counts down to it.
 - No Aurora Bomber, the Superweapon General's Alpha Aurora included, and no Tactical Nuke upgrade for the Nuke General's MiGs.
 - No demo bike. A terrorist cannot climb onto a Combat Cycle any more; a rebel, a worker, a hijacker or Jarmen Kell still can.
+- The Demolition General's Combat Cycle still leaves the Arms Dealer with its own Terrorist riding it. In 2.8.0 the rule above turned that Terrorist away as well, and the bike rolled out with a worker in the saddle and nothing to fire.
 - A Microwave Tank cannot freeze a building that is still going up. There is nothing for it to fire at until the scaffold is finished, so parking one beside a half-built base no longer keeps it half built.
 - No foundation goes down closer to an enemy building than 300, a margin past the 225 a Patriot battery or a Stinger Site reaches on the ground. That ends walling somebody's base in with scaffolds nobody means to finish, and it ends building a tower in their yard too. The placement ghost says why it is red.
 - The computer opponent is held to the same list, because it asks the same question your build buttons ask before it spends a dollar.
