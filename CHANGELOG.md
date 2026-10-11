@@ -147,6 +147,7 @@ found and fixed â€” EA's own, not port damage.**
 - Two silos ready on the same second fired at the same spot, because nothing that was already in the air was on the map yet. A spot that has just been aimed at is worth nothing to the next shot and climbs back over ten minutes, so the salvo spreads across your base instead of digging one crater.
 - Measured over a half-hour match: a Particle Cannon that fired at the identical spot three times running now spreads six shots over five parts of the map, and comes back to the first one at the end, when what you rebuilt there is worth twice what it killed.
 - The spy satellite goes through the same targeting, and it was scanning one cell of one base seventeen times a match. It sweeps now.
+- The computer drives its Particle Cannon's beam the way you do. It used to draw the same short S across the aim point and burn empty ground on either side of it; now the beam walks from one cluster to the next, leaving each the moment what stood there is dead. Fired into five groups of six Scorpions, the old sweep killed 4. Medium now kills 8 and Hard, which drives at double speed, 11. Easy keeps the old sweep. Replays recorded before this change play out differently.
 
 ## Generals powers the computer actually meant to buy
 

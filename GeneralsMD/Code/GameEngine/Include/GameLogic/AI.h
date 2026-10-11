@@ -230,6 +230,9 @@ struct AIDifficultyProfile
 	Real	m_firstPushSeconds;							///< no attack before this, nor before the first drop zone or black market stands (AI_PURCHASE_EARLY_FRAMES at most)
 	Real	m_minAttackPower;								///< parked teams worth less than this wait for company, up to the wave's longest wait
 	Real	m_siegeTrail;										///< artillery out with a wave keeps this far behind its front unit; 0 = walks with it
+
+	// Superweapons
+	Real	m_beamSteerSeconds;							///< how often a firing Particle Cannon's beam is driven onto the richest ground near it; 0 = the retail S curve
 };
 
 //-------------------------------------------------------------------------------------------------

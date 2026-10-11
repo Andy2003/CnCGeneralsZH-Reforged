@@ -82,6 +82,7 @@
 #include "GameLogic/Module/TransportContain.h"	// ... and a template's hold, before one exists
 #include "GameLogic/Module/JetAIUpdate.h"		// a Comanche is a jet with no runway
 #include "GameLogic/Module/CleanupHazardUpdate.h"	// an Ambulance out cleaning is left to it
+#include "GameLogic/Module/ParticleUplinkCannonUpdate.h"	// driving the beam
 #include <map>
 #include "Platform/MsvcFloatCasts.h"
 
@@ -2142,8 +2143,10 @@ Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real rad
 			for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance()) 
 			{
 				Object *pObj = iter.cur();
-				if (!pObj) 
+				if (!pObj)
 					continue;
+				if (pObj->isEffectivelyDead())
+					continue;			// a tank in its death throes stays on the team for seconds and held a steered beam on its wreck
 				if (!observerKnowsAbout(pObj, observerNdx))
 					continue;			// a superweapon is aimed at what has been scouted, not at the object list
 
@@ -4826,6 +4829,7 @@ void AIPlayer::update( void )
 		AI_PHASE( AIP_ECONOMY, doSpending() );					// Upgrades for the army, and whatever is over the bank target.
 		AI_PHASE( AIP_POWER,   doPower() );							// Keep the lights on, and out of reach.
 		AI_PHASE( AIP_ECONOMY, doSuperweapons() );			// The big guns, as soon as they can be bought.
+		AI_PHASE( AIP_TACTICS, doParticleBeams() );			// ... and the Particle Cannon's beam driven across his base.
 		AI_PHASE( AIP_WAVE,    rememberEnemies() );			// Write down the enemy army in sight.
 		AI_PHASE( AIP_WAVE,    answerArmy() );					// Train the answer to the part of it nothing answers.
 		AI_PHASE( AIP_WAVE,    doMass() );							// Build the fist, and send it when it is one.
@@ -6357,6 +6361,93 @@ void AIPlayer::doSuperweapons( void )
 	// buildableOfKind already asked canMakeUnit, which holds the defence ration
 	if( superweapon && !priorityBuildPending( m_player, superweapon ) )
 		buildAsap( superweapon );
+}
+
+static void findParticleCannons( Object *obj, void *userData )
+{
+	static const NameKeyType key = NAMEKEY( "ParticleUplinkCannonUpdate" );
+	if( !obj->isKindOf( KINDOF_FS_SUPERWEAPON ) )
+		return;
+	ParticleUplinkCannonUpdate *cannon = (ParticleUplinkCannonUpdate *)obj->findUpdateModule( key );
+	if( cannon )
+		((std::vector<ParticleUplinkCannonUpdate *> *)userData)->push_back( cannon );
+}
+
+/** How far from the burning spot a steer looks, about four seconds of the beam's fast drive. */
+const Real BEAM_STEER_REACH = 150.0f;
+/** The look is a square of this many steps each side of the burning spot. */
+const Int BEAM_STEER_STEPS = 3;
+
+//----------------------------------------------------------------------------------------------------------
+/** A computer player's Particle Cannon used to draw EA's S curve: 200 feet along the line from the
+	* uplink to the aim point, 50 either side of it, whatever stood there.  The aim was the richest
+	* spot in his base, and most of the ten seconds of beam burned the ground on either side of it.
+	* A player drives the beam instead, from one building to the next.  So does this: every
+	* m_beamSteerSeconds it looks around the spot the beam is burning, and sends it to the ground
+	* worth most with the same score the aim used, nearer ground preferred.  What the beam has killed
+	* drops out of that score, so it moves on from a dead cluster to the next one by itself.
+	* Hard steers more often than the game's double click delay, which makes the cannon drive at its
+	* fast speed; Medium drives at the walking speed; Easy keeps the S curve. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::doParticleBeams( void )
+{
+	const Real every = getSkillProfile()->m_beamSteerSeconds;
+	if( every <= 0.0f )
+		return;
+	const Int rate = REAL_TO_INT_CEIL( every * LOGICFRAMES_PER_SECOND );
+	if( TheGameLogic->getFrame() % rate != 0 )
+		return;
+
+	std::vector<ParticleUplinkCannonUpdate *> cannons;
+	m_player->iterateObjects( findParticleCannons, &cannons );
+	for( size_t i = 0; i < cannons.size(); ++i )
+	{
+		Coord3D spot;
+		Real radius;
+		if( !cannons[ i ]->getBurningSpot( &spot, &radius ) )
+			continue;
+		Coord3D aim;
+		if( richestGroundNear( &spot, radius, &aim ) )
+			cannons[ i ]->setSpecialPowerOverridableDestination( &aim );
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------
+Bool AIPlayer::richestGroundNear( const Coord3D *spot, Real radius, Coord3D *aim )
+{
+	const Int me = m_player->getPlayerIndex();
+	const Real step = BEAM_STEER_REACH / BEAM_STEER_STEPS;
+	Real best = 0.0f;
+	for( Int x = -BEAM_STEER_STEPS; x <= BEAM_STEER_STEPS; ++x )
+	{
+		for( Int y = -BEAM_STEER_STEPS; y <= BEAM_STEER_STEPS; ++y )
+		{
+			Coord3D pos;
+			pos.x = spot->x + x * step;
+			pos.y = spot->y + y * step;
+			pos.z = 0.0f;
+			Int value = 0;
+			for( Int p = 0; p < ThePlayerList->getPlayerCount(); ++p )
+			{
+				Player *other = ThePlayerList->getNthPlayer( p );
+				if( other != m_player && m_player->getRelationship( other->getDefaultTeam() ) == ENEMIES )
+					value += getPlayerSuperweaponValue( &pos, p, radius, TRUE, me );
+			}
+			const Real distance = sqrt( (Real)(x * x + y * y) ) * step;
+			const Real worth = value * (1.0f - 0.5f * distance / BEAM_STEER_REACH);
+			if( worth > best )
+			{
+				best = worth;
+				*aim = pos;
+			}
+		}
+	}
+	if( best <= 0.0f )
+		return FALSE;
+	aim->z = TheTerrainLogic->getGroundHeight( aim->x, aim->y );
+	DEBUG_LOG(("AI BEAM frame %d player %d drives the beam from (%.0f,%.0f) to (%.0f,%.0f), worth %.0f, radius %.0f\n",
+		TheGameLogic->getFrame(), me, spot->x, spot->y, aim->x, aim->y, best, radius));
+	return TRUE;
 }
 
 //----------------------------------------------------------------------------------------------------------

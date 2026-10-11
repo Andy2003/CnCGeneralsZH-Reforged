@@ -1143,9 +1143,9 @@ Real AI::getAdjustedVisionRangeForObject(const Object *object, Int factorsToCons
 	*                      scoutS maxSc decis  cntr  mass   ttk  indiv team infl focus save harv expand guard hoard econ micro  gate  answer massU  bankS  floor payoff upgr    nonc  share maxF fMult */
 static const AIDifficultyProfile s_defaultSkillLadder[ AISKILL_COUNT ] =
 {
-	/* Easy      */ { 75.0f, 1,  7.0f,  0.00f, FALSE, 0.00f, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE,  FALSE, FALSE,     0, FALSE, FALSE, FALSE, FALSE, FALSE, 120.0f, 6000, 4.0f, 720.0f, 0.05f, 0.05f, 3, 0.0f, 360.0f, 1500.0f,  80.0f },
-	/* Medium    */ { 45.0f, 1,  3.0f,  0.50f, FALSE, 0.35f, TRUE,  FALSE, FALSE, TRUE,  TRUE,  TRUE,  TRUE,  FALSE,  6000, FALSE, FALSE, FALSE, FALSE, FALSE,  60.0f, 5000, 2.5f, 420.0f, 0.05f, 0.10f, 3, 0.0f, 300.0f, 3000.0f, 120.0f },
-	/* Hard      */ { 25.0f, 2,  1.5f,  1.00f, TRUE,  0.50f, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,   4000, TRUE,  TRUE,  TRUE,  TRUE,  FALSE,  30.0f, 4000, 1.5f, 180.0f, 0.05f, 1.00f, 8, 2.0f, 240.0f, 4500.0f, 160.0f }
+	/* Easy      */ { 75.0f, 1,  7.0f,  0.00f, FALSE, 0.00f, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE,  FALSE, FALSE,     0, FALSE, FALSE, FALSE, FALSE, FALSE, 120.0f, 6000, 4.0f, 720.0f, 0.05f, 0.05f, 3, 0.0f, 360.0f, 1500.0f,  80.0f, 0.00f },
+	/* Medium    */ { 45.0f, 1,  3.0f,  0.50f, FALSE, 0.35f, TRUE,  FALSE, FALSE, TRUE,  TRUE,  TRUE,  TRUE,  FALSE,  6000, FALSE, FALSE, FALSE, FALSE, FALSE,  60.0f, 5000, 2.5f, 420.0f, 0.05f, 0.10f, 3, 0.0f, 300.0f, 3000.0f, 120.0f, 1.00f },
+	/* Hard      */ { 25.0f, 2,  1.5f,  1.00f, TRUE,  0.50f, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,   4000, TRUE,  TRUE,  TRUE,  TRUE,  FALSE,  30.0f, 4000, 1.5f, 180.0f, 0.05f, 1.00f, 8, 2.0f, 240.0f, 4500.0f, 160.0f, 0.25f }
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -1792,6 +1792,7 @@ void AI::parseSkillLevel(INI *ini, void *instance, void* /*store*/, const void* 
 		{ "FirstPushSeconds",					INI::parseReal, NULL, offsetof( AIDifficultyProfile, m_firstPushSeconds ) },
 		{ "MinAttackPower",						INI::parseReal, NULL, offsetof( AIDifficultyProfile, m_minAttackPower ) },
 		{ "SiegeTrail",								INI::parseReal, NULL, offsetof( AIDifficultyProfile, m_siegeTrail ) },
+		{ "BeamSteerSeconds",					INI::parseReal, NULL, offsetof( AIDifficultyProfile, m_beamSteerSeconds ) },
 		{ NULL, NULL, NULL, 0 }
 	};
 

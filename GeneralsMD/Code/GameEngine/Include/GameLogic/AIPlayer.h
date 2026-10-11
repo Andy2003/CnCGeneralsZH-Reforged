@@ -339,6 +339,8 @@ protected:
 		* that, with no clock; as many superweapons as the game's rules allow, and a few copies of the
 		* tech building so one of them blowing up leaves the tree standing. */
 	virtual void doSuperweapons(void);
+	void doParticleBeams(void);	///< drive a firing Particle Cannon's beam onto the richest ground within reach of it
+	Bool richestGroundNear(const Coord3D *spot, Real radius, Coord3D *aim);	///< that ground, FALSE when there is nothing worth moving to
 
 	/** The purchase queue (AIPurchaseQueue): every skirmish spender asks before it pays, on every rung
 		* with a bank target, and the thing at the top that cannot be afforded yet has the money saved for
