@@ -3054,7 +3054,8 @@ Bool AIPlayer::selectTeamToBuild( void )
 	const AIDifficultyProfile *profile = getSkillProfile();
 	AIEnemyComposition enemy;
 	std::vector<AIVisibleEnemy> army;
-	if (profile->m_counterCompositionWeight > 0.0f)
+	const Bool skirmish = isSkirmishAI();		// a Challenge or mission opponent picks by priority alone, as EA's did
+	if (skirmish && profile->m_counterCompositionWeight > 0.0f)
 		computeEnemyComposition( &enemy, &army );
 
 	// what a perfect counter, and the role preference, are worth in units of production priority
@@ -3067,7 +3068,7 @@ Bool AIPlayer::selectTeamToBuild( void )
 	const Real DOMINANT_SHARE = 0.3f;
 	const Real HARD_COUNTERED = 0.25f;
 	std::vector<AIVisibleEnemy> dominant;
-	if( profile->m_answerArmy && enemy.m_totalThreat > 0.0f )
+	if( skirmish && profile->m_answerArmy && enemy.m_totalThreat > 0.0f )
 	{
 		size_t top = 0;
 		for( size_t k = 1; k < army.size(); ++k )
@@ -3087,10 +3088,13 @@ Bool AIPlayer::selectTeamToBuild( void )
 		const Bool isDefenceTeam = info->m_isBaseDefense || info->m_isPerimeterDefense;
 
 		Real score = INT_TO_REAL( info->m_productionPriority );
-		score += profile->m_counterCompositionWeight * COUNTER_SPAN *
-						 aiCounterScore( enemy, teamCapability( *t, m_player, army ) );
-		if( (m_role == AIROLE_DEFENSIVE) == (isDefenceTeam != FALSE) )
-			score += ROLE_SPAN;
+		if( skirmish )
+		{
+			score += profile->m_counterCompositionWeight * COUNTER_SPAN *
+							 aiCounterScore( enemy, teamCapability( *t, m_player, army ) );
+			if( (m_role == AIROLE_DEFENSIVE) == (isDefenceTeam != FALSE) )
+				score += ROLE_SPAN;
+		}
 		if( !dominant.empty() && !isDefenceTeam && teamCapability( *t, m_player, dominant ).m_answer < HARD_COUNTERED )
 			score -= COUNTER_SPAN;
 
@@ -4681,7 +4685,7 @@ void AIPlayer::doUpgradesAndSkills( void )
 			case 3: skillset = &sideInfo->m_skillSet4; break;
 			case 4: skillset = &sideInfo->m_skillSet5; break;
 		}
-		const Bool saves = getSkillProfile()->m_savesSciencePoints;
+		const Bool saves = isSkirmishAI() && getSkillProfile()->m_savesSciencePoints;
 		Int i;
 		for (i=0; i<skillset->m_numSkills; i++) {
 			ScienceType science = skillset->m_skills[i];
@@ -4800,28 +4804,30 @@ void AIPlayer::update( void )
 	AI_PHASE( AIP_TEAM,    doTeamBuilding() );			// See if it's time to start another team.
 	AI_PHASE( AIP_UPGRADE, doUpgradesAndSkills() );	// See if it's time to build an upgrade or buy a skill.
 	AI_PHASE( AIP_BRIDGE,  updateBridgeRepair() );	// Handle any bridge repairs.
-	AI_PHASE( AIP_SCOUT,   doScouting() );					// Keep one unit looking at the map.
-	AI_PHASE( AIP_RETREAT, doRetreats() );					// Break off the fights we are losing.
-	// The economy is the skirmish AI's own. A Challenge or mission opponent is handed its money, its
-	// base and its superweapon by the map script, which is the whole of its difficulty: run on top of
-	// that, Kwai's $30000 stood three nuclear silos a minute into the match.
-	const Bool ownEconomy = isSkirmishAI();
-	if( ownEconomy ) AI_PHASE( AIP_EXPAND,  doExpansion() );		// Go and take the money that is lying around.
-	if( ownEconomy ) AI_PHASE( AIP_CAPTURE, doCapture() );			// ... and the money that is standing around.
-	AI_PHASE( AIP_CAPTURE, doHijack() );						// Take the enemy's tanks rather than shoot them.
-	if( ownEconomy ) AI_PHASE( AIP_ECONOMY, doEconomy() );			// ... and the money sitting in the bank.
-	AI_PHASE( AIP_ECONOMY, doSpending() );					// Upgrades for the army, and whatever is over the bank target.
-	if( ownEconomy ) AI_PHASE( AIP_POWER,   doPower() );				// Keep the lights on, and out of reach.
-	if( ownEconomy ) AI_PHASE( AIP_ECONOMY, doSuperweapons() );	// The big guns, as soon as they can be bought.
-	AI_PHASE( AIP_WAVE,    rememberEnemies() );			// Write down the enemy army in sight.
-	AI_PHASE( AIP_WAVE,    answerArmy() );					// Train the answer to the part of it nothing answers.
-	AI_PHASE( AIP_WAVE,    doMass() );							// Build the fist, and send it when it is one.
-	AI_PHASE( AIP_WAVE,    doWaves() );							// Send the parked attack teams out together.
-	AI_PHASE( AIP_TACTICS, doTactics() );						// Fight each unit from where it is strongest.
-	AI_PHASE( AIP_TACTICS, doTransports() );				// Put the helicopters' riders down at the fight.
-	AI_PHASE( AIP_TACTICS, doShuttles() );					// Fly the wave's ground units up its road.
-	AI_PHASE( AIP_TACTICS, doHelixes() );					// Helix upgrades by the enemy army, healers, bomb raids.
-	AI_PHASE( AIP_TACTICS, doAmbulances() );				// Ambulances behind the army, for the hurt and the hazards.
+	// Everything below is the skirmish AI's own. A Challenge or mission opponent is handed its money,
+	// its base, its attacks and its superweapon by the map script, which is the whole of its difficulty:
+	// run on top of that, Kwai's $30000 stood three nuclear silos a minute into the match.
+	if( isSkirmishAI() )
+	{
+		AI_PHASE( AIP_SCOUT,   doScouting() );					// Keep one unit looking at the map.
+		AI_PHASE( AIP_RETREAT, doRetreats() );					// Break off the fights we are losing.
+		AI_PHASE( AIP_EXPAND,  doExpansion() );					// Go and take the money that is lying around.
+		AI_PHASE( AIP_CAPTURE, doCapture() );						// ... and the money that is standing around.
+		AI_PHASE( AIP_CAPTURE, doHijack() );						// Take the enemy's tanks rather than shoot them.
+		AI_PHASE( AIP_ECONOMY, doEconomy() );						// ... and the money sitting in the bank.
+		AI_PHASE( AIP_ECONOMY, doSpending() );					// Upgrades for the army, and whatever is over the bank target.
+		AI_PHASE( AIP_POWER,   doPower() );							// Keep the lights on, and out of reach.
+		AI_PHASE( AIP_ECONOMY, doSuperweapons() );			// The big guns, as soon as they can be bought.
+		AI_PHASE( AIP_WAVE,    rememberEnemies() );			// Write down the enemy army in sight.
+		AI_PHASE( AIP_WAVE,    answerArmy() );					// Train the answer to the part of it nothing answers.
+		AI_PHASE( AIP_WAVE,    doMass() );							// Build the fist, and send it when it is one.
+		AI_PHASE( AIP_WAVE,    doWaves() );							// Send the parked attack teams out together.
+		AI_PHASE( AIP_TACTICS, doTactics() );						// Fight each unit from where it is strongest.
+		AI_PHASE( AIP_TACTICS, doTransports() );				// Put the helicopters' riders down at the fight.
+		AI_PHASE( AIP_TACTICS, doShuttles() );					// Fly the wave's ground units up its road.
+		AI_PHASE( AIP_TACTICS, doHelixes() );					// Helix upgrades by the enemy army, healers, bomb raids.
+		AI_PHASE( AIP_TACTICS, doAmbulances() );				// Ambulances behind the army, for the hurt and the hazards.
+	}
 
 #ifdef DEBUG_LOGGING
 	Int64 playerEnd;
@@ -6556,7 +6562,7 @@ Bool AIPlayer::placeNear( const ThingTemplate *tmpl, const Coord3D *center, Real
 //----------------------------------------------------------------------------------------------------------
 AsciiString AIPlayer::chooseApproachLabel( const Coord3D *from, const AsciiString &requested, Int pathSuffix )
 {
-	if( !getSkillProfile()->m_useInfluenceMapForAttackLane || from == NULL )
+	if( !isSkirmishAI() || !getSkillProfile()->m_useInfluenceMapForAttackLane || from == NULL )
 		return requested;
 
 	const Int LANE_COUNT = 3;
@@ -6592,7 +6598,7 @@ AsciiString AIPlayer::chooseApproachLabel( const Coord3D *from, const AsciiStrin
 //----------------------------------------------------------------------------------------------------------
 AsciiString AIPlayer::secondApproachLabel( const Coord3D *from, const AsciiString &taken, Int pathSuffix )
 {
-	if( !getSkillProfile()->m_useInfluenceMapForAttackLane )
+	if( !isSkirmishAI() || !getSkillProfile()->m_useInfluenceMapForAttackLane )
 		return AsciiString::TheEmptyString;
 
 	const Int LANE_COUNT = 3;
