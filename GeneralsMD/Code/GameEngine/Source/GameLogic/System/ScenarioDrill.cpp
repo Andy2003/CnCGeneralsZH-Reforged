@@ -727,8 +727,11 @@ static Object *findFirstMatching( Player *player, const AsciiString &selector )
 
 /** The recipe the debug spawn path uses (GameLogic.cpp's unitTimings): a template's onCreate ran in
 	  the constructor, but a unit that was never built still has to be told it is finished, or half
-	  its modules never start.  The team has to be activated too, or it counts as an empty team. */
-static Bool spawnOne( const ThingTemplate *tmpl, Team *team, const Coord3D *pos )
+	  its modules never start.  The team has to be activated too, or it counts as an empty team.
+	  A unit that moves goes down only on a cell its own locomotors could enter, the test the
+	  pathfinder puts every destination to: a tank set on a cliff or in the sea is taken away again
+	  rather than left to drive out.  Aircraft fly over every cell type, so they always pass. */
+static Bool spawnOne( const ScenarioAction &action, const ThingTemplate *tmpl, Team *team, const Coord3D *pos )
 {
 	Object *obj = TheThingFactory->newObject( tmpl, team );
 	if (obj == NULL)
@@ -736,6 +739,22 @@ static Bool spawnOne( const ThingTemplate *tmpl, Team *team, const Coord3D *pos 
 
 	obj->setOrientation( 0 );
 	obj->setPosition( pos );
+
+	AIUpdateInterface *ai = obj->getAI();
+	if (ai != NULL && ai->getLocomotorSet().getValidSurfaces() != 0
+			&& !TheAI->pathfinder()->validMovementPosition( obj->getCrusherLevel() > 0, obj->getLayer(), ai->getLocomotorSet(), pos ))
+	{
+		static const char *const cellNames[] = { "CLEAR", "WATER", "CLIFF", "RUBBLE", "OBSTACLE",
+			"BRIDGE_IMPASSABLE", "IMPASSABLE" };
+		// a point off the map has no cell at all
+		const PathfindCell *cell = TheAI->pathfinder()->getCell( obj->getLayer(), pos );
+		const Int type = cell != NULL ? cell->getType() : -1;
+		DEBUG_LOG(("SCENARIO: frame %d spawn slot %d '%s' refused at (%.0f,%.0f): cell type %d (%s), no unit of it could stand there\n",
+							 action.frame, action.slot, action.selector.str(), pos->x, pos->y, type,
+							 cell != NULL ? cellNames[type] : "OFF_MAP"));
+		TheGameLogic->destroyObject( obj );
+		return FALSE;
+	}
 
 	for( BehaviorModule **m = obj->getBehaviorModules(); *m; ++m )
 	{
@@ -804,7 +823,7 @@ static Bool executeSpawn( const ScenarioAction &action, Player *player, const Co
 			}
 		}
 
-		if (spawnOne( tmpl, team, &pos ))
+		if (spawnOne( action, tmpl, team, &pos ))
 			++made;
 	}
 
