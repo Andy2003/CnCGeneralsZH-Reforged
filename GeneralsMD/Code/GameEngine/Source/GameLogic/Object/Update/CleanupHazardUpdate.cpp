@@ -390,6 +390,11 @@ void CleanupHazardUpdate::startAutoCleanup()
 	const Bool guarding = ai->getCurrentStateID() == AI_GUARD;
 	if( !guarding && !ai->isIdle() )
 		return;
+	// the AI's own Ambulance cleans what the AI sends it to, which keeps it behind the army and clear of
+	// the guns it knows: by itself it drove up to 300 ahead of where it waited, and 7 of 25 lost in twelve
+	// Hard against Medium matches on Twilight Flame (2026-10-11) died within 30 s of a cleanup it started
+	if( obj->getControllingPlayer() && obj->getControllingPlayer()->isAIDutyAmbulance( obj ) )
+		return;
 
 	PartitionFilterAcceptByKindOf kindFilter(MAKE_KINDOF_MASK(KINDOF_CLEANUP_HAZARD), KINDOFMASK_NONE);
 	PartitionFilterSameMapStatus filterMapStatus(obj);

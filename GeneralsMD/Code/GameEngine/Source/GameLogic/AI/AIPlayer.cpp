@@ -10915,6 +10915,12 @@ Bool AIPlayer::isDutyAmbulance( const Object *obj ) const
 	return FALSE;
 }
 
+Bool AIPlayer::isWalkingToAmbulance( const Object *obj ) const
+{
+	AIUpdateInterface *ai = const_cast<Object *>( obj )->getAI();		// getGoalObject is not const
+	return ai && ai->getCurrentStateID() == AI_ENTER && ai->getGoalObject() && isDutyAmbulance( ai->getGoalObject() );
+}
+
 /** For the log only: what became of each patient an Ambulance called in.  It climbs in, then is let out
 	* or dies inside; or it dies on the way; or something else gives it an order first and it walks off. */
 void AIPlayer::followPatients( void )
@@ -10958,6 +10964,15 @@ void AIPlayer::followPatients( void )
 		DEBUG_LOG(("AI PATIENT frame %d player %d %d %s after %d s at %.0f%% health, %.0f from the ambulance; called at %.0f%% health from %.0f\n", now,
 			m_player->getPlayerIndex(), patient.id, outcome, (now - patient.frame) / LOGICFRAMES_PER_SECOND, health * 100.0f, away,
 			patient.health * 100.0f, patient.distance));
+		if( obj && !obj->isEffectivelyDead() && !patient.inside )
+		{
+			const Object *goal = obj->getAI()->getGoalObject();
+			DEBUG_LOG(("AI PATIENT frame %d player %d %d walk-off state %d source %d goal %d team '%s' recruitable %d hit %d s ago; ambulance state %d moving %d\n", now,
+				m_player->getPlayerIndex(), patient.id, (Int)obj->getAI()->getCurrentStateID(), (Int)obj->getAI()->getLastCommandSource(),
+				goal ? (Int)goal->getID() : 0, obj->getTeam() ? obj->getTeam()->getName().str() : "", (Int)obj->getAI()->isRecruitable(),
+				(now - obj->getBodyModule()->getLastDamageTimestamp()) / LOGICFRAMES_PER_SECOND,
+				ambulanceUp ? (Int)ambulance->getAI()->getCurrentStateID() : -1, ambulanceUp ? (Int)ambulance->getAI()->isMoving() : -1));
+		}
 		m_calledPatients.erase( m_calledPatients.begin() + p );
 	}
 }
@@ -11556,6 +11571,10 @@ void AIPlayer::doRetreats( void )
 				// round at the mouth
 				if( obj->getAI()->hasTunnelTrip() )
 					continue;
+				// nor one walking to an Ambulance that called it in: sent home instead, it left the Ambulance
+				// hurt (the other 2 of the 4 walk-offs in six Hard USA mirrors)
+				if( isWalkingToAmbulance( obj ) )
+					continue;
 				// one that is kiting the fight is winning its own share of it however the totals read: a
 				// Rocket Buggy turned for home in front of four tanks it outran and outranged died turning
 				const TacticalStep *kiting = findTacticalStep( obj->getID() );
@@ -11794,8 +11813,10 @@ Bool AIPlayer::doFallback( Team *team )
 		// its safe spot when the hold ran out kept that walk, unmarked, and the same pass pulled it out
 		// again for another full hold.  One with no gun has no fight to go back to: a Dozer pulled out of
 		// a fight was walked back into it.
+		// One walking to an Ambulance that called it in carries on too: walked home instead, it had left
+		// the Ambulance's enter order still hurt.
 		const Bool givesUp = what == AIFALLBACK_GO_HOME && !fightOver;
-		if( (!givesUp && obj->getAI()->isMoving()) || (what == AIFALLBACK_RESUME && aiCombatPower( obj ) <= 0.0f) )
+		if( isWalkingToAmbulance( obj ) || (!givesUp && obj->getAI()->isMoving()) || (what == AIFALLBACK_RESUME && aiCombatPower( obj ) <= 0.0f) )
 			restoreMood( obj, step );
 		else if( what == AIFALLBACK_RESUME )
 		{
@@ -12333,7 +12354,10 @@ void AIPlayer::tacticsFor( Object *obj )
 	const TeamTemplateInfo *info = team->getPrototype()->getTemplateInfo();
 	if( info && (info->m_isBaseDefense || info->m_isPerimeterDefense) )
 		return;
-	if( obj->getID() == m_capturerID || obj->getID() == m_hijackerID || isDutyHelix( obj ) || isDutyAmbulance( obj ) )
+	// nor a patient on its way into an Ambulance: past leaveTacticsAlone's ten seconds the pull-out and the
+	// rejoin walked 2 of 4 such patients off in six Hard USA mirrors on Twilight Flame (2026-10-11)
+	if( obj->getID() == m_capturerID || obj->getID() == m_hijackerID || isDutyHelix( obj ) || isDutyAmbulance( obj ) ||
+			isWalkingToAmbulance( obj ) )
 		return;
 	for( Int i = 0; i < MAX_AI_SCOUTS; ++i )
 	{
