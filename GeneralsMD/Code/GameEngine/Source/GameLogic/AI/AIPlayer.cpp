@@ -604,7 +604,7 @@ void AIPlayer::checkForSupplyCenter( BuildListInfo *info, Object *bldg )
 		// safe radius, capped at two extra - a centre with three piles beside it can keep more
 		// trucks busy, and one with a single pile cannot.
 		//
-		if( getSkillProfile()->m_adaptiveHarvesters )
+		if( isSkirmishAI() && getSkillProfile()->m_adaptiveHarvesters )
 		{
 			Int warehouses = 0;
 			PartitionFilterAcceptByKindOf supplyOnly( MAKE_KINDOF_MASK( KINDOF_SUPPLY_SOURCE ), KINDOFMASK_NONE );
@@ -1101,7 +1101,7 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 {
 	// Find a dozer.
 	Object *dozer = findDozer(info->getLocation());
-	if (dozer==NULL && getSkillProfile()->m_economyBuildings && isPowerThin() &&
+	if (dozer==NULL && isSkirmishAI() && getSkillProfile()->m_economyBuildings && isPowerThin() &&
 			bldgPlan->isKindOf(KINDOF_FS_POWER) && !bldgPlan->isKindOf(KINDOF_CASH_GENERATOR)) {
 		// every dozer busy and the power running out: a Hard AI takes one off whatever it is doing. A China
 		// asked for a plant with 26,000 in the bank and waited 95 seconds, going dark half way, because
@@ -4239,7 +4239,17 @@ Int AIPlayer::computeStructureDelay( void )
 													  TheAI->getAiData()->m_structuresWealthyMod,
 													  getBuildRateScale() ),
 															 m_player->getMoney()->countMoney(),
-															 getSkillProfile()->m_cashHoardThreshold );
+															 hoardThreshold() );
+}
+
+//----------------------------------------------------------------------------------------------------------
+/**
+ * The bank at which a skirmish AI starts building faster.  A Challenge or mission opponent is handed
+ * its fortune by the map script and builds at the pace that script was written for.
+ */
+Int AIPlayer::hoardThreshold( void )
+{
+	return isSkirmishAI() ? getSkillProfile()->m_cashHoardThreshold : 0;
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -4287,7 +4297,7 @@ Int AIPlayer::computeTeamDelay( void )
 													  TheAI->getAiData()->m_teamWealthyMod,
 													  getBuildRateScale() ),
 															 m_player->getMoney()->countMoney(),
-															 getSkillProfile()->m_cashHoardThreshold );
+															 hoardThreshold() );
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -4792,13 +4802,17 @@ void AIPlayer::update( void )
 	AI_PHASE( AIP_BRIDGE,  updateBridgeRepair() );	// Handle any bridge repairs.
 	AI_PHASE( AIP_SCOUT,   doScouting() );					// Keep one unit looking at the map.
 	AI_PHASE( AIP_RETREAT, doRetreats() );					// Break off the fights we are losing.
-	AI_PHASE( AIP_EXPAND,  doExpansion() );					// Go and take the money that is lying around.
-	AI_PHASE( AIP_CAPTURE, doCapture() );						// ... and the money that is standing around.
+	// The economy is the skirmish AI's own. A Challenge or mission opponent is handed its money, its
+	// base and its superweapon by the map script, which is the whole of its difficulty: run on top of
+	// that, Kwai's $30000 stood three nuclear silos a minute into the match.
+	const Bool ownEconomy = isSkirmishAI();
+	if( ownEconomy ) AI_PHASE( AIP_EXPAND,  doExpansion() );		// Go and take the money that is lying around.
+	if( ownEconomy ) AI_PHASE( AIP_CAPTURE, doCapture() );			// ... and the money that is standing around.
 	AI_PHASE( AIP_CAPTURE, doHijack() );						// Take the enemy's tanks rather than shoot them.
-	AI_PHASE( AIP_ECONOMY, doEconomy() );						// ... and the money sitting in the bank.
+	if( ownEconomy ) AI_PHASE( AIP_ECONOMY, doEconomy() );			// ... and the money sitting in the bank.
 	AI_PHASE( AIP_ECONOMY, doSpending() );					// Upgrades for the army, and whatever is over the bank target.
-	AI_PHASE( AIP_POWER,   doPower() );							// Keep the lights on, and out of reach.
-	AI_PHASE( AIP_ECONOMY, doSuperweapons() );			// The big guns, as soon as they can be bought.
+	if( ownEconomy ) AI_PHASE( AIP_POWER,   doPower() );				// Keep the lights on, and out of reach.
+	if( ownEconomy ) AI_PHASE( AIP_ECONOMY, doSuperweapons() );	// The big guns, as soon as they can be bought.
 	AI_PHASE( AIP_WAVE,    rememberEnemies() );			// Write down the enemy army in sight.
 	AI_PHASE( AIP_WAVE,    answerArmy() );					// Train the answer to the part of it nothing answers.
 	AI_PHASE( AIP_WAVE,    doMass() );							// Build the fist, and send it when it is one.
