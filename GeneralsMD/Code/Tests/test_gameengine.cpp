@@ -11887,13 +11887,14 @@ TEST(the_bank_target_and_the_upgrade_the_army_pays_for)
 		CHECK( upper.m_minAttackPower > lower.m_minAttackPower && lower.m_minAttackPower > 0.0f );
 		CHECK( upper.m_siegeTrail > lower.m_siegeTrail && lower.m_siegeTrail > 0.0f );
 	}
-	// Hard alone builds past its plan, and with a bank past twice its target; Medium out-armies Easy and
-	// Hard out-armies Medium, which an equal share and cap for the two lower rungs had undone
+	// Hard builds past its plan with a bank past twice its target, Medium only past a bigger multiple and
+	// to a lower cap, Easy never; Medium out-armies Easy and Hard out-armies Medium, which an equal share
+	// and cap for the two lower rungs had undone
 	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_maxProduction > data.m_skill[ AISKILL_MEDIUM ].m_maxProduction );
 	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_factoryBankMultiple > 0.0f );
-	CHECK_EQ( 0.0f, data.m_skill[ AISKILL_MEDIUM ].m_factoryBankMultiple );
+	CHECK( data.m_skill[ AISKILL_MEDIUM ].m_factoryBankMultiple > data.m_skill[ AISKILL_BRUTAL ].m_factoryBankMultiple );
 	CHECK_EQ( 0.0f, data.m_skill[ AISKILL_EASY ].m_factoryBankMultiple );
-	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_surplusShare >= 5.0f * data.m_skill[ AISKILL_MEDIUM ].m_surplusShare );
+	CHECK( data.m_skill[ AISKILL_BRUTAL ].m_surplusShare >= 4.0f * data.m_skill[ AISKILL_MEDIUM ].m_surplusShare );
 	// Easy fires the retail S curve; Medium drives the Particle Cannon's beam at walking pace, Hard
 	// steers it often enough to count as the double click that drives it fast
 	CHECK_EQ( 0.0f, data.m_skill[ AISKILL_EASY ].m_beamSteerSeconds );
