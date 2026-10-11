@@ -615,6 +615,62 @@ void RTS3DScene::renderSpecificDrawables(RenderInfoClass &rinfo, Int numDrawable
 	}
 }
 
+//=============================================================================
+/** Which of the Direct3D 11 frame's own looks a drawable wears this frame, and its four numbers
+	* (DRAW_EFFECT_SAMPLING in ffshader.h): seconds, strength, a seed from the drawable's id and the
+	* drawable's opacity.  Only reads the object, which the renderer is allowed to do; nothing here
+	* goes back into the logic.  None under -d3d9, -headless or Classic graphics, where the heat
+	* vision pass and the disabled tint draw what they always drew.
+	*
+	* An enemy a detector found is revealed, and an own stealthed unit that is see-through is cloaked,
+	* with the detector's pulse as the strength in both.  The cloak only in the translucent pass: the
+	* scene's copy it bends is taken at its first draw, and the behind-building markers draw an
+	* occluded unit early, mid-way through the opaque world.  Mines keep the heat vision's old exception.
+	* An EMP takes precedence over power: an EMP'd building is out of power as well. */
+//=============================================================================
+static unsigned chooseDrawEffect( const Drawable *draw, const Object *obj, Bool translucentPass, float parameters[4] )
+{
+	if ( !Direct3D11_Draw_Effects() )
+		return DRAW_EFFECT_NONE;
+
+	unsigned effect = DRAW_EFFECT_NONE;
+	const StealthLookType look = draw->getStealthLook();
+	const Real pulse = draw->getSecondMaterialPassOpacity();
+	const Real opacity = draw->getEffectiveOpacity();
+	Real strength = 1.0f;
+
+	if ( look == STEALTHLOOK_VISIBLE_DETECTED && !draw->isKindOf( KINDOF_MINE ) )
+	{
+		effect = DRAW_EFFECT_REVEALED;
+		strength = pulse;
+	}
+	else if ( ( look == STEALTHLOOK_VISIBLE_FRIENDLY || look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED )
+		&& opacity < 0.99f && translucentPass )
+	{
+		effect = DRAW_EFFECT_CLOAK;
+		strength = ( look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED ) ? pulse : 0.0f;
+	}
+	else if ( obj && !obj->isEffectivelyDead() )
+	{
+		if ( obj->isDisabledByType( DISABLED_EMP ) )
+			effect = DRAW_EFFECT_EMP;
+		else if ( obj->isKindOf( KINDOF_STRUCTURE )
+			&& ( obj->isDisabledByType( DISABLED_UNDERPOWERED ) || obj->isDisabledByType( DISABLED_SCRIPT_UNDERPOWERED )
+				|| obj->isDisabledByType( DISABLED_HACKED ) ) )
+			effect = DRAW_EFFECT_OUTAGE;
+	}
+
+	if ( effect != DRAW_EFFECT_NONE )
+	{
+		// an hour of seconds keeps the sines' arguments small enough for single precision
+		parameters[0] = (float)( WW3D::Get_Sync_Time() % 3600000u ) * 0.001f;
+		parameters[1] = strength;
+		parameters[2] = (float)fmod( (double)draw->getID() * 0.6180339887, 1.0 );
+		parameters[3] = opacity;
+	}
+	return effect;
+}
+
 //============================================================================
 // RTS3DScene::renderOneObject
 //=============================================================================
@@ -703,12 +759,18 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		lightEnv.Reset(sph.Center, ambient);
 
 
+		// The Direct3D 11 frame's own look for this object, if it is in one of the four states that
+		// have one.  The two that replace the disabled tint skip it: the dark grey under them only
+		// muddied the cold grey they draw.
+		rinfo.drawEffect = chooseDrawEffect( draw, obj, rinfo.alphaOverride < 1.0f, rinfo.drawEffectParameters );
+
 		// HANDLE THE SPECIAL DRAWABLE-LEVEL COLORING SETTINGS FIRST
 
 		const Vector3 *tintColor = NULL;
 		const Vector3 *selectionColor = NULL;
 
-		tintColor			 = draw->getTintColor();
+		if ( rinfo.drawEffect != DRAW_EFFECT_OUTAGE && rinfo.drawEffect != DRAW_EFFECT_EMP )
+			tintColor = draw->getTintColor();
 		selectionColor = draw->getSelectionColor();
 
 		if ( tintColor || selectionColor )
@@ -749,8 +811,10 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			}
 		}
 
-		//Apply custom render pass for any drawables with heatvision enabled
-		if (draw->getSecondMaterialPassOpacity() != 0 ) 
+		//Apply custom render pass for any drawables with heatvision enabled.  The cloak and the
+		//revealed look draw the detector's pulse themselves, over the unit's own paint.
+		if (draw->getSecondMaterialPassOpacity() != 0
+			&& rinfo.drawEffect != DRAW_EFFECT_CLOAK && rinfo.drawEffect != DRAW_EFFECT_REVEALED )
 		{
 			rinfo.materialPassEmissiveOverride = draw->getSecondMaterialPassOpacity();
 
@@ -869,6 +933,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	}//drawable or robj is not hidden
 
 	rinfo.light_environment = NULL;
+	rinfo.drawEffect = DRAW_EFFECT_NONE;
 	if (doExtraMaterialPop)	//check if there is an extra material on the stack from the add'l material effect.
 		rinfo.Pop_Material_Pass();
 	if (doExtraFlagsPop)

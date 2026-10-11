@@ -834,6 +834,8 @@ static void pushDirect3D11PostChain( void )
 {
 	// Classic graphics is the game's own picture, which is what -d3d9 draws: hard edged sprites.
 	Direct3D11_Allow_Soft_Particles( !TheGlobalData->m_classicGraphics );
+	// and its own looks for the power outage, the EMP and the two stealth states
+	Direct3D11_Allow_Draw_Effects( !TheGlobalData->m_classicGraphics );
 	const AsciiString & requested = TheGlobalData->m_direct3D11PostChain;
 	if( !Direct3D11_Post_Chain( requested.str() ) && !requested.isEmpty() )
 	{
