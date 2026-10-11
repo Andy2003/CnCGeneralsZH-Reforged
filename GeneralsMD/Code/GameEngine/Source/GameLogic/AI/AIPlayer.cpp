@@ -9234,8 +9234,27 @@ void AIPlayer::sendWave( AIGroup *wave, const AsciiString &approach, Int pathSuf
 	AsciiString pathLabel;
 	pathLabel.format( "%s%d", approach.str(), pathSuffix );
 	Waypoint *way = TheTerrainLogic->getClosestWaypointOnPath( &center, pathLabel );
-	DEBUG_LOG(("AI WAVE frame %d player %d sends %d teams, %d units, %.0f power, after %d s, down %s\n", TheGameLogic->getFrame(),
-		m_player->getPlayerIndex(), teams, wave->getCount(), power, heldFrames / LOGICFRAMES_PER_SECOND, pathLabel.str()));
+	// the ranked units pullOutRanked has out of their teams, mending or on the way, against the whole army
+	Int rankedOut = 0;
+	Real rankedOutPower = 0.0f;
+	Real armyPower = 0.0f;
+	std::vector<Object *> owned;
+	m_player->iterateObjects( collectOwned, &owned );
+	for( size_t o = 0; o < owned.size(); ++o )
+	{
+		const Object *obj = owned[ o ];
+		if( obj->isEffectivelyDead() || obj->isKindOf( KINDOF_STRUCTURE ) || obj->getAI() == NULL )
+			continue;
+		const Real unitPower = aiCombatPower( obj );
+		armyPower += unitPower;
+		if( obj->getVeterancyLevel() > LEVEL_REGULAR && !obj->getAI()->isRecruitable() && obj->getTeam() == m_player->getDefaultTeam() )
+		{
+			++rankedOut;
+			rankedOutPower += unitPower;
+		}
+	}
+	DEBUG_LOG(("AI WAVE frame %d player %d sends %d teams, %d units, %.0f power, after %d s, down %s; %d ranked out mending, %.0f of %.0f army power\n", TheGameLogic->getFrame(),
+		m_player->getPlayerIndex(), teams, wave->getCount(), power, heldFrames / LOGICFRAMES_PER_SECOND, pathLabel.str(), rankedOut, rankedOutPower, armyPower));
 	if( way == NULL )
 		return;
 	std::vector<Object *> units;
@@ -10799,7 +10818,7 @@ void AIPlayer::doHelixes( void )
 	* through the support-unit queue.  An Ambulance waits
 	* AMBULANCE_BEHIND back from the middle of whoever is out, toward home and clear of every known gun,
 	* or at home with nobody out.  The cash hoard does not hold it back, since a USA at war banks under
-	* the hoard all match.  Our infantry within AMBULANCE_CALL_REACH of it and under half health
+	* the hoard all match.  Our infantry within AMBULANCE_CALL_REACH of it, under half health and not hit lately,
 	* walk over and climb in, and each is let out once it is whole.  It drives to the nearest hazard
 	* on our side of the map that no known gun covers; one beside it it notices by itself
 	* (CleanupHazardUpdate::startAutoCleanup).
@@ -10821,7 +10840,8 @@ static const Int AMBULANCE_CHECK_RATE = LOGICFRAMES_PER_SECOND;
 static const Int AMBULANCE_FIRST_ARMY = 8;
 static const Int AMBULANCE_SECOND_ARMY = 20;
 static const Real AMBULANCE_PATIENT_HEALTH = 0.5f;
-static const Real AMBULANCE_CALL_REACH = 450.0f;
+static const Real AMBULANCE_CALL_REACH = 900.0f;
+static const UnsignedInt AMBULANCE_PATIENT_QUIET = 2 * LOGICFRAMES_PER_SECOND;
 static const Real AMBULANCE_BEHIND = 300.0f;
 static const Real AMBULANCE_HAZARD_REACH = 1500.0f;
 /** The cleanup ability's MaxMoveDistanceFromLocation in retail AmericaVehicle.ini. */
@@ -10864,10 +10884,15 @@ Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReac
 /** What becomes of each one called is in the AI PATIENT lines.  In one Hard and one Medium match (ambC,
 	* 2026-10-11) 10 of 15 died on the way, every one within three seconds of the call, so in the fight
 	* that hurt it; every one that lived to climb in was let out whole.  Leaving out whoever was hit in the
-	* last four seconds called nobody at all in the same two matches. */
-Bool AIAmbulance_callsPatient( Real healthFraction, Real distance )
+	* last four seconds called nobody at all in the same two matches.
+	*
+	* So one still being shot is not called, and one left alone for AMBULANCE_PATIENT_QUIET is, from twice
+	* the old 450.  In six Hard USA mirrors on Twilight Flame (2026-10-11) every hurt soldier within 450 had
+	* been hit in the last two seconds; the quiet ones, out of the fight, stood 450 to 1,500 away for ten
+	* seconds and more, which is the walk back toward an Ambulance waiting behind the army. */
+Bool AIAmbulance_callsPatient( Real healthFraction, Real distance, UnsignedInt sinceHit )
 {
-	return healthFraction < AMBULANCE_PATIENT_HEALTH && distance <= AMBULANCE_CALL_REACH;
+	return healthFraction < AMBULANCE_PATIENT_HEALTH && distance <= AMBULANCE_CALL_REACH && sinceHit >= AMBULANCE_PATIENT_QUIET;
 }
 
 /** A vehicle with a hold that cleans hazards: the Ambulance, and each general's copy of it. */
@@ -11127,8 +11152,9 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 			continue;
 		const BodyModuleInterface *body = obj->getBodyModule();
 		const Real distance = (Real)sqrt( sqr( obj->getPosition()->x - pos->x ) + sqr( obj->getPosition()->y - pos->y ) );
-		if( state == AI_ENTER || state == AI_DOCK || state >= 1000 || !hold->isValidContainerFor( obj, TRUE ) ||
-				!AIAmbulance_callsPatient( body->getHealth() / body->getMaxHealth(), distance ) )
+		if( state == AI_ENTER || state == AI_DOCK || state >= 1000 || !hold->isValidContainerFor( obj, TRUE ) )
+			continue;
+		if( !AIAmbulance_callsPatient( body->getHealth() / body->getMaxHealth(), distance, now - body->getLastDamageTimestamp() ) )
 			continue;
 		leaveTacticsAlone( obj->getID() );
 		// out of its team until it is let out, or the team's next script order walks it off (see releaseMended)

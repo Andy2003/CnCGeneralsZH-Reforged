@@ -11236,7 +11236,7 @@ TEST(the_ai_pulls_ranked_units_out_sooner_the_higher_the_rank)
 /** AIPlayer.cpp: the computer buys its first Ambulance once it has an army and a second once the army
 	 is big, and calls in the badly hurt from near it only. */
 extern Int AIAmbulance_wanted( Int army, Int skill );
-extern Bool AIAmbulance_callsPatient( Real healthFraction, Real distance );
+extern Bool AIAmbulance_callsPatient( Real healthFraction, Real distance, UnsignedInt sinceHit );
 extern Bool AIAmbulance_mayBuyMore( Int bought, Int skill );
 
 TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
@@ -11257,12 +11257,14 @@ TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 	CHECK( !AIAmbulance_mayBuyMore( 3, AISKILL_MEDIUM ) );
 	CHECK( !AIAmbulance_mayBuyMore( 0, AISKILL_EASY ) );
 
-	CHECK( AIAmbulance_callsPatient( 0.3f, 100.0f ) );
-	CHECK( AIAmbulance_callsPatient( 0.49f, 450.0f ) );
+	CHECK( AIAmbulance_callsPatient( 0.3f, 100.0f, 60 ) );
+	CHECK( AIAmbulance_callsPatient( 0.49f, 900.0f, 60 ) );
 	// half health or more stays in the fight
-	CHECK( !AIAmbulance_callsPatient( 0.5f, 100.0f ) );
+	CHECK( !AIAmbulance_callsPatient( 0.5f, 100.0f, 60 ) );
 	// too far off to walk over
-	CHECK( !AIAmbulance_callsPatient( 0.1f, 451.0f ) );
+	CHECK( !AIAmbulance_callsPatient( 0.1f, 901.0f, 60 ) );
+	// still being shot: it would die on the way
+	CHECK( !AIAmbulance_callsPatient( 0.3f, 100.0f, 59 ) );
 }
 
 /** AIPlayer.cpp: an Ambulance pulls back when shot at or inside a known gun's reach, and a lost one is
