@@ -8242,6 +8242,7 @@ void AIPlayer::doWaves( void )
 		++teams;
 	}
 	const Bool gunshipFilling = loadGunships();
+	evacuateBuildings();
 	garrisonBuildings();		// after the gunships: the wave's riders first, the home guard's leftovers into buildings
 	if( first < 0 )
 		return;
@@ -8622,25 +8623,129 @@ Bool AIPlayer::loadGunships( void )
 }
 
 /** One of our own buildings whose men shoot out of it - a Bunker, a Fire Base, a Palace - finished, not
-	* knocked out by an EMP or a hacker, and with a seat free.  Not a tunnel or a heal bay. */
+	* knocked out by an EMP or a hacker, and with a seat free.  Not a tunnel or a heal bay, and not a map
+	* building we hold, which stays a neutral seat: counted as ours, a farmhouse taken while the base was
+	* hit went on taking men and buying them in a quiet base. */
+static Bool isMapBuilding( const Object *obj );
 static void findFiringBuilding( Object *obj, void *userData )
 {
 	ContainModuleInterface *contain = obj->getContain();
-	if( obj->isKindOf( KINDOF_STRUCTURE ) && contain && !contain->isTunnelContain() && !contain->isHealContain() &&
+	if( obj->isKindOf( KINDOF_STRUCTURE ) && contain && !contain->isTunnelContain() && !contain->isHealContain() && !isMapBuilding( obj ) &&
 			(Int)contain->getContainCount() < contain->getContainMax() && contain->isPassengerAllowedToFire() &&
 			!obj->isEffectivelyDead() && !obj->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) && !obj->testStatus( OBJECT_STATUS_SOLD ) )
 		((std::vector<Object *> *)userData)->push_back( obj );
 }
 
+/** How near an enemy has to be to a neutral building for our men to go in, and how far off the last one
+	* has to be before they come out again.  The gap keeps them from stepping in and out of the same house
+	* while a fight drifts along its edge. */
+static const Real GARRISON_ENEMY_NEAR = 350.0f;
+static const Real GARRISON_ENEMY_GONE = 500.0f;
+
+/** How far from where he stands a man out in the field goes for a building, by skill.  Easy takes none:
+	* its men stay with their team, as they always did. */
+static const Real GARRISON_FRONT_REACH[] = { 0.0f, 150.0f, 250.0f };
+
+/** The health share under which our men leave a building before it comes down on them, by skill.  A
+	* civilian building hurts its men when it falls (DamagePercentToUnits).  Easy stays to the end. */
+static const Real GARRISON_LEAVE_HEALTH[] = { 0.0f, 0.25f, 0.4f };
+
+/** The nearest visible enemy unit within radius of pos that is not a worker, or NULL. */
+static Object *enemyWithin( Player *player, const Coord3D *pos, Real radius )
+{
+	PartitionFilterPlayerAffiliation filterTeam( player, (ALLOW_ALLIES|ALLOW_NEUTRAL), false );
+	PartitionFilterAlive filterAlive;
+	PartitionFilterRejectByObjectStatus filterStealth( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_STEALTHED ),
+		MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_DETECTED, OBJECT_STATUS_DISGUISED ) );
+	PartitionFilterRejectByKindOf filterHarvesters( MAKE_KINDOF_MASK( KINDOF_HARVESTER ), KINDOFMASK_NONE );
+	PartitionFilterRejectByKindOf filterDozers( MAKE_KINDOF_MASK( KINDOF_DOZER ), KINDOFMASK_NONE );
+	PartitionFilter *filters[] = { &filterTeam, &filterAlive, &filterStealth, &filterHarvesters, &filterDozers, NULL };
+	MemoryPoolObjectHolder hold;
+	SimpleObjectIterator *around = ThePartitionManager->iterateObjectsInRange( pos, radius, FROM_BOUNDINGSPHERE_2D, filters, ITER_SORTED_NEAR_TO_FAR );
+	hold.hold( around );
+	// a man or a vehicle: the first version filled a farmhouse at home for an enemy Bunker standing near it
+	// from the second minute, and others for an Inferno Cannon's shell and a pool of toxin
+	for( Object *obj = around->first(); obj; obj = around->next() )
+		if( obj->isKindOf( KINDOF_INFANTRY ) || obj->isKindOf( KINDOF_VEHICLE ) )
+			return obj;
+	return NULL;
+}
+
+/** A civilian building, a farmhouse or a church, which no faction builds: ours once we are in it.  Its
+	* template names no side, or the civilian one; a Bunker names its faction's. */
+static Bool isMapBuilding( const Object *obj )
+{
+	const AsciiString &side = obj->getTemplate()->getDefaultOwningSide();
+	return obj->getContain()->isGarrisonable() && (side.isEmpty() || side.compareNoCase( "Civilian" ) == 0);
+}
+
+/** The structure each of our men is inside, once each, in the order the men come. */
+static void collectOccupiedBuildings( Object *obj, void *userData )
+{
+	Object *building = obj->getContainedBy();
+	std::vector<Object *> *list = (std::vector<Object *> *)userData;
+	if( obj->isKindOf( KINDOF_INFANTRY ) && building && building->isKindOf( KINDOF_STRUCTURE ) &&
+			std::find( list->begin(), list->end(), building ) == list->end() )
+		list->push_back( building );
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** The men garrisonBuildings put in a building stayed there for the rest of the match: a farmhouse taken
+	* while the base was hit kept the next wave's infantry when the fight was long over, and a house at
+	* the front kept its men while the front moved on.  They come out of a map building once no enemy is
+	* near it, and Medium and Hard take them out of any building, our own Bunker as well, before it falls. */
+//----------------------------------------------------------------------------------------------------------
+void AIPlayer::evacuateBuildings( void )
+{
+	if( !isSkirmishAI() )
+		return;
+	std::vector<Object *> buildings;
+	m_player->iterateObjects( collectOccupiedBuildings, &buildings );
+	for( std::vector<Object *>::const_iterator b = buildings.begin(); b != buildings.end(); ++b )
+	{
+		Object *building = *b;
+		const BodyModuleInterface *body = building->getBodyModule();
+		const Real health = body->getHealth() / body->getMaxHealth();
+		const char *why = NULL;
+		if( health < GARRISON_LEAVE_HEALTH[ m_skillLevel ] )
+			why = "falling";
+		else if( isMapBuilding( building ) && !enemyWithin( m_player, building->getPosition(), GARRISON_ENEMY_GONE ) )
+			why = "quiet";
+		if( why == NULL )
+			continue;
+		DEBUG_LOG(("AI GARRISON frame %d player %d empties '%s' %d, %d men, %s, %.0f%% health\n", TheGameLogic->getFrame(),
+			m_player->getPlayerIndex(), building->getTemplate()->getName().str(), building->getID(),
+			building->getContain()->getContainCount(), why, health * 100.0f));
+		building->getContain()->orderAllPassengersToExit( CMD_FROM_AI, FALSE );
+	}
+}
+
+/** Add the map's empty garrisonable buildings within radius of pos to seats, each once. */
+static void addMapSeats( Player *player, const Coord3D *pos, Real radius, std::vector<Object *> *seats )
+{
+	PartitionFilterAlive filterAlive;
+	PartitionFilterOnMap filterOnMap;
+	PartitionFilterGarrisonableByPlayer filterGarrison( player, TRUE, CMD_FROM_AI );
+	PartitionFilter *filters[] = { &filterAlive, &filterOnMap, &filterGarrison, 0 };
+	MemoryPoolObjectHolder hold;
+	SimpleObjectIterator *nearby = ThePartitionManager->iterateObjectsInRange( pos, radius, FROM_CENTER_2D, filters );
+	hold.hold( nearby );
+	for( Object *b = nearby->first(); b; b = nearby->next() )
+		if( isMapBuilding( b ) && b->getContain()->isPassengerAllowedToFire() &&
+				std::find( seats->begin(), seats->end(), b ) == seats->end() )
+			seats->push_back( b );
+}
+
 //----------------------------------------------------------------------------------------------------------
 /** The computer built Bunkers and Fire Bases and never put a man in one, and walked past every empty
-	* farmhouse in its own base while the enemy's rebels moved in.  The home guard fills them: the
-	* default team's infantry standing at home and the base defence teams'.  Our own firing buildings take
-	* both, and Medium and up train men for their empty seats out of the bank (buyGunshipRiders).  An empty
-	* neutral building at home takes the base defence teams' men, and the default team's only while the
-	* base is hit: the default team's idle men at home are the next wave's (addHomeStrays), and a farmhouse
-	* in a quiet base is not worth a wave's infantry.  A wave's own men and an attack team's are never taken.
-	* Runs after loadGunships on the same pass, so a man it has sent to a gunship is no longer idle here. */
+	* farmhouse while the enemy's rebels moved in.  Our own firing buildings take the default team's
+	* infantry standing at home, wherever the building is, so a Bunker at an expansion is manned from home;
+	* a base defence team's men take those at home only.  Medium and up train men for the empty seats out
+	* of the bank (buyGunshipRiders).  A map building takes our men only while an enemy is near it: at home
+	* that is the base being hit, and in the field, for Medium and Hard, it is the front, where a team's
+	* men standing idle or on guard go into the empty houses within their reach.  evacuateBuildings lets
+	* them out again.  A wave's own men are never taken.  Runs after loadGunships on the same pass, so a
+	* man it has sent to a gunship is no longer idle here. */
 //----------------------------------------------------------------------------------------------------------
 void AIPlayer::garrisonBuildings( void )
 {
@@ -8650,30 +8755,9 @@ void AIPlayer::garrisonBuildings( void )
 	m_player->iterateObjects( findFiringBuilding, &seats );
 	const size_t own = seats.size();
 	const Real reach = 2.0f * m_baseRadius;
-	{
-		PartitionFilterAlive filterAlive;
-		PartitionFilterOnMap filterOnMap;
-		PartitionFilterGarrisonableByPlayer filterGarrison( m_player, TRUE, CMD_FROM_AI );
-		PartitionFilter *filters[] = { &filterAlive, &filterOnMap, &filterGarrison, 0 };
-		MemoryPoolObjectHolder hold;
-		SimpleObjectIterator *nearby = ThePartitionManager->iterateObjectsInRange( &m_baseCenter, reach, FROM_CENTER_2D, filters );
-		hold.hold( nearby );
-		for( Object *b = nearby->first(); b; b = nearby->next() )
-			if( b->getControllingPlayer() != m_player && b->getContain()->isPassengerAllowedToFire() )
-				seats.push_back( b );
-	}
-	if( seats.empty() )
-		return;
+	const Real frontReach = GARRISON_FRONT_REACH[ m_skillLevel ];
+	addMapSeats( m_player, &m_baseCenter, reach, &seats );
 
-	// seats nobody is walking to, as loadGunships counts them
-	std::vector<ObjectID> goals;
-	m_player->iterateObjects( collectBoardingGoals, &goals );
-	std::vector<Int> free;
-	for( std::vector<Object *>::const_iterator s = seats.begin(); s != seats.end(); ++s )
-		free.push_back( (*s)->getContain()->getContainMax() - (Int)(*s)->getContain()->getContainCount() -
-			(Int)std::count( goals.begin(), goals.end(), (*s)->getID() ) );
-
-	const Bool underAttack = isBaseUnderAttack();
 	const Team *defaultTeam = m_player->getDefaultTeam();
 	std::vector<GunshipRider> riders;
 	for( Player::PlayerTeamList::const_iterator t = m_player->getPlayerTeams()->begin(); t != m_player->getPlayerTeams()->end(); ++t )
@@ -8684,38 +8768,71 @@ void AIPlayer::garrisonBuildings( void )
 		{
 			Team *team = iter.cur();
 			const Bool isDefault = team == defaultTeam;
-			if( !isDefault && (!guard || !team->isActive()) )
+			if( !isDefault && !team->isActive() )
 				continue;
+			Bool parked = FALSE;
+			for( Int i = 0; i < MAX_HELD_TEAMS; ++i )
+				if( m_heldUsed[ i ] && m_heldTeam[ i ] == team->getID() )
+					parked = TRUE;
+			if( parked )
+				continue;		// a wave's
 			for( DLINK_ITERATOR<Object> m = team->iterate_TeamMemberList(); !m.done(); m.advance() )
 			{
 				Object *rider = m.cur();
-				if( !isGunshipRider( rider ) || isFallingBack( rider->getID() ) || !isAtHome( rider->getPosition() ) )
+				if( !isGunshipRider( rider ) || isFallingBack( rider->getID() ) )
 					continue;
 				const StateID state = rider->getAI()->getCurrentStateID();
 				if( state != AI_IDLE && state != AI_GUARD && state != AI_GUARD_RETALIATE )
 					continue;
-				GunshipRider entry = { rider, isDefault ? "default" : "guard" };
+				const Bool home = isAtHome( rider->getPosition() );
+				if( home ? !isDefault && !guard : frontReach <= 0.0f )
+					continue;
+				if( !home )
+					addMapSeats( m_player, rider->getPosition(), frontReach, &seats );
+				GunshipRider entry = { rider, !home ? "front" : isDefault ? "default" : "guard" };
 				riders.push_back( entry );
 			}
 		}
+	}
+	if( seats.empty() )
+		return;
+
+	// seats nobody is walking to, as loadGunships counts them, and whether a map building has an enemy
+	// near enough to be worth going in
+	std::vector<ObjectID> goals;
+	m_player->iterateObjects( collectBoardingGoals, &goals );
+	std::vector<Int> free;
+	std::vector<const Object *> threat;		// what makes a map building worth it; our own is its own reason
+	for( size_t s = 0; s < seats.size(); ++s )
+	{
+		const BodyModuleInterface *body = seats[ s ]->getBodyModule();
+		free.push_back( seats[ s ]->getContain()->getContainMax() - (Int)seats[ s ]->getContain()->getContainCount() -
+			(Int)std::count( goals.begin(), goals.end(), seats[ s ]->getID() ) );
+		// nobody goes into a building evacuateBuildings would take him out of again
+		if( body->getHealth() < body->getMaxHealth() * GARRISON_LEAVE_HEALTH[ m_skillLevel ] )
+			free.back() = 0;
+		threat.push_back( s < own ? seats[ s ] : enemyWithin( m_player, seats[ s ]->getPosition(), GARRISON_ENEMY_NEAR ) );
 	}
 
 	for( std::vector<GunshipRider>::const_iterator r = riders.begin(); r != riders.end(); ++r )
 	{
 		Object *rider = r->obj;
 		const Bool stray = strcmp( r->from, "default" ) == 0;
+		const Bool front = strcmp( r->from, "front" ) == 0;
 		Int nearest = -1;
 		Real nearestSqr = 0.0f;
 		for( size_t g = 0; g < seats.size(); ++g )
 		{
 			const Bool mine = g < own;
-			if( free[ g ] <= 0 || (!mine && stray && !underAttack) )
+			if( free[ g ] <= 0 || threat[ g ] == NULL )
 				continue;
 			ContainModuleInterface *contain = seats[ g ]->getContain();
 			if( !contain->isValidContainerFor( rider, TRUE ) || !contain->isPassengerAllowedToFire( rider->getID() ) )
 				continue;
 			const Real distSqr = sqr( seats[ g ]->getPosition()->x - rider->getPosition()->x ) + sqr( seats[ g ]->getPosition()->y - rider->getPosition()->y );
-			if( distSqr > sqr( reach ) )
+			// a man at the front only within his reach; one at home to any building at home, and a stray
+			// to our own anywhere: an expansion's Bunker is manned from home
+			if( front ? distSqr > sqr( frontReach ) : !(mine && stray) && !isAtHome( seats[ g ]->getPosition() ) )
 				continue;
 			// our own building before a neutral one, then the nearest; a tie goes to the first in list order
 			const Bool nearestMine = nearest >= 0 && (size_t)nearest < own;
@@ -8729,23 +8846,23 @@ void AIPlayer::garrisonBuildings( void )
 			continue;
 		Object *building = seats[ nearest ];
 		--free[ nearest ];
-		DEBUG_LOG(("AI GARRISON frame %d player %d puts '%s' %d into '%s' %d, %d of %d seats taken, %s, %s%s\n", TheGameLogic->getFrame(),
+		DEBUG_LOG(("AI GARRISON frame %d player %d puts '%s' %d into '%s' %d, %d of %d seats taken, %s, %s, %s, for '%s'\n", TheGameLogic->getFrame(),
 			m_player->getPlayerIndex(), rider->getTemplate()->getName().str(), rider->getID(), building->getTemplate()->getName().str(), building->getID(),
 			building->getContain()->getContainCount(), building->getContain()->getContainMax(), (size_t)nearest < own ? "own" : "neutral",
-			r->from, underAttack ? ", base under attack" : ""));
+			r->from, isAtHome( building->getPosition() ) ? "home" : "field", threat[ nearest ]->getTemplate()->getName().str()));
 		rider->getAI()->aiEnter( building, CMD_FROM_AI );
 	}
 
-	// men for our own empty firing seats at home: a trained rider comes out at home, and one for a Bunker at
-	// an expansion would stand at home with nothing to walk to.  Only out of money above the cash hoard: the
-	// first version bought five Red Guards for China's first Bunker a minute in, and the skirmish script,
-	// finding the bank and the trucks short a few seconds later, sold the whole base in two of eight matches.
-	// The script's own Bunker team fills the Bunker anyway, in time
+	// men for our own empty firing seats, at home and at the expansions: a trained rider comes out at home
+	// and a stray walks from there to any of them.  Only out of money above the cash hoard: the first
+	// version bought five Red Guards for China's first Bunker a minute in, and the skirmish script, finding
+	// the bank and the trucks short a few seconds later, sold the whole base in two of eight matches.  The
+	// script's own Bunker team fills the Bunker anyway, in time
 	if( (Int)m_player->getMoney()->countMoney() <= getSkillProfile()->m_cashHoardThreshold )
 		return;
 	Int freeSeats = 0;
 	for( size_t g = 0; g < own; ++g )
-		if( free[ g ] > 0 && isAtHome( seats[ g ]->getPosition() ) )
+		if( free[ g ] > 0 )
 			freeSeats += free[ g ];
 	buyGunshipRiders( freeSeats );
 }
