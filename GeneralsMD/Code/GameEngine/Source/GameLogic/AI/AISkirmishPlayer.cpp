@@ -86,6 +86,16 @@ m_currentEnemy(NULL)
 {
 	m_frameLastBuildingBuilt = TheGameLogic->getFrame();
 	p->setCanBuildUnits(true); // turn on ai production by default.
+
+	//
+	// Role is rolled once and kept for the whole match.  Sins is explicit that its AI does not flip
+	// personality mid-game, and that consistency is what makes an opponent readable and therefore
+	// counterable - an AI that turtles for ten minutes and then rushes is not deep, it is noise.
+	// GameLogicRandomValue, so a replay rolls the same one.  Rolled here rather than in AIPlayer's
+	// constructor so a Challenge or mission opponent leaves the logic random stream as retail did;
+	// nothing between the two constructors draws, so a skirmish rolls on the same draw as before.
+	//
+	m_role = (GameLogicRandomValue( 0, AIROLE_COUNT - 1 ) == 0) ? AIROLE_AGGRESSIVE : AIROLE_DEFENSIVE;
 }
 
 AISkirmishPlayer::~AISkirmishPlayer()

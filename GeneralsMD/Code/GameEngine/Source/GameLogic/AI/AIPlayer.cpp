@@ -430,14 +430,8 @@ m_role(AIROLE_AGGRESSIVE)
 	m_placementRing = 0;
 	m_difficulty = TheScriptEngine->getGlobalDifficulty(); 
 	m_skillLevel = skillLevelForDifficulty( m_difficulty );
-
-	//
-	// Role is rolled once and kept for the whole match.  Sins is explicit that its AI does not flip
-	// personality mid-game, and that consistency is what makes an opponent readable and therefore
-	// counterable - an AI that turtles for ten minutes and then rushes is not deep, it is noise.
-	// GameLogicRandomValue, so a replay rolls the same one.
-	//
-	m_role = (GameLogicRandomValue( 0, AIROLE_COUNT - 1 ) == 0) ? AIROLE_AGGRESSIVE : AIROLE_DEFENSIVE;
+	// m_role is rolled in AISkirmishPlayer's constructor: a script-driven opponent must not draw
+	// from the logic random stream where retail did not.
 
 	m_teamSeconds = TheAI->getAiData()->m_teamSeconds;
 
