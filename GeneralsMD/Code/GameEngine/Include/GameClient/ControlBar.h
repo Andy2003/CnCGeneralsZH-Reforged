@@ -1109,8 +1109,8 @@ protected:
 	// the following methods are for populating the context GUI controls for a particular context
 	static void populateButtonProc( Object *obj, void *userData );
 	void populatePurchaseScience(Player* player);
-	/// one rank's section of the promotion screen; compact: a mod's buttons in reading order, no gaps
-	void populatePurchaseScienceRank( Player *player, const CommandSet *commandSet, GameWindow **windows, Int windowCount, Bool compact );
+	/// one rank's section of the promotion screen: placed[i] goes on windows[i]
+	void populatePurchaseScienceRank( Player *player, const CommandButton *const *placed, GameWindow **windows, Int windowCount );
 	void populateCommand( Object *obj );
 	void populateMultiSelect( void );
 	void populateMultiSelectUnitList( void );

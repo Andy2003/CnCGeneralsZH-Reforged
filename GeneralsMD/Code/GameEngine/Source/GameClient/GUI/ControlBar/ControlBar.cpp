@@ -657,52 +657,194 @@ static Bool isSciencePurchaseShown( const Player *player, const CommandButton *c
 	return !player->isScienceHidden( science ) && TheScienceStore->playerHasRootPrereqsForScience( player, science );
 }
 
-/** Puts one rank's purchase buttons on its windows.  The caller has hidden every window.  Retail keeps
-	* slot i on window i, gaps and all; compact takes the set's shown buttons in slot order and lays them
-	* on the windows in reading order, left to right and a row before the next.  The windows are fixed
-	* by the layout, so a rank with more buttons than windows loses the rest and the log names them. */
-void ControlBar::populatePurchaseScienceRank( Player *player, const CommandSet *commandSet, GameWindow **windows, Int windowCount, Bool compact )
+/// the promotion screen's sections: rank 1, rank 3 and rank 8 (the 5 star general)
+enum { PURCHASE_SCIENCE_RANK_SECTIONS = 3 };
+
+/** Does upgrade's science name base's among its own prerequisites - Paradrop 2 over Paradrop 1? */
+static Bool isSciencePurchaseUpgradeOf( const CommandButton *upgrade, const CommandButton *base )
 {
-	const CommandButton *placed[ MAX_COMMANDS_PER_SET ];
-	GameWindow *ordered[ MAX_COMMANDS_PER_SET ];
-	Int i;
+	if( base->getScienceVec().empty() || upgrade->getScienceVec().empty() )
+		return FALSE;
+	return TheScienceStore->isDirectPrereq( base->getScienceVec()[ 0 ], upgrade->getScienceVec()[ 0 ] );
+}
 
-	for( i = 0; i < windowCount; i++ )
-	{
-		placed[ i ] = commandSet->getCommandButton( i );
-		ordered[ i ] = windows[ i ];
-	}
+/** Lays a mod faction's purchase buttons on the three rank sections of our promotion screen.  A mod's
+	* command sets were written for the mod's own screen and leave holes in ours, so the slots are not
+	* kept.  Each section is a grid of columns and rows read off its windows' positions.  A chain of
+	* upgrades - a science whose prerequisite is another science on the screen - stacks down one column,
+	* base on top, the way Zero Hour stacks Paradrop 1, 2 and 3.  A chain whose base sits in an earlier
+	* section starts in the column under that base when this section has one; the other chains take the
+	* leftmost column with room.  What is left, single skills and the part of a chain that did not fit,
+	* fills the free windows in reading order and slot order.  The windows are fixed by the layout, so a
+	* section with more buttons than windows drops the rest and the log names them. */
+static void layoutModPurchaseSciences( const Player *player, const CommandSet *const *commandSets, GameWindow **const *sectionWindows, const Int *windowCounts, const CommandButton *(*placed)[ MAX_COMMANDS_PER_SET ] )
+{
+	enum { NO_WINDOW = -1, NO_CHAIN = -1 };
+	const CommandButton *earlierButtons[ MAX_COMMANDS_PER_SET * PURCHASE_SCIENCE_RANK_SECTIONS ];
+	Int earlierColumnX[ MAX_COMMANDS_PER_SET * PURCHASE_SCIENCE_RANK_SECTIONS ];
+	Int earlierCount = 0;
 
-	if( compact )
+	for( Int section = 0; section < PURCHASE_SCIENCE_RANK_SECTIONS; section++ )
 	{
+		const CommandSet *commandSet = commandSets[ section ];
+		GameWindow **windows = sectionWindows[ section ];
+		const Int windowCount = windowCounts[ section ];
+		Int windowX[ MAX_COMMANDS_PER_SET ];
+		Int windowY[ MAX_COMMANDS_PER_SET ];
+		Int columnX[ MAX_COMMANDS_PER_SET ];
+		Int rowY[ MAX_COMMANDS_PER_SET ];
+		Int columnCount = 0;
+		Int rowCount = 0;
+		Int i;
+
+		for( i = 0; i < windowCount; i++ )
+		{
+			placed[ section ][ i ] = NULL;
+			windows[ i ]->winGetScreenPosition( &windowX[ i ], &windowY[ i ] );
+			if( std::find( columnX, columnX + columnCount, windowX[ i ] ) == columnX + columnCount )
+				columnX[ columnCount++ ] = windowX[ i ];
+			if( std::find( rowY, rowY + rowCount, windowY[ i ] ) == rowY + rowCount )
+				rowY[ rowCount++ ] = windowY[ i ];
+		}
+		std::sort( columnX, columnX + columnCount );
+		std::sort( rowY, rowY + rowCount );
+
+		// cell[column][row] is the window there, or NO_WINDOW; a filled cell turns NO_WINDOW too
+		Int cell[ MAX_COMMANDS_PER_SET ][ MAX_COMMANDS_PER_SET ];
+		for( Int column = 0; column < columnCount; column++ )
+			for( Int row = 0; row < rowCount; row++ )
+				cell[ column ][ row ] = NO_WINDOW;
+		for( i = 0; i < windowCount; i++ )
+		{
+			const Int column = std::find( columnX, columnX + columnCount, windowX[ i ] ) - columnX;
+			const Int row = std::find( rowY, rowY + rowCount, windowY[ i ] ) - rowY;
+			cell[ column ][ row ] = i;
+		}
+
+		const CommandButton *shown[ MAX_COMMANDS_PER_SET ];
 		Int shownCount = 0;
 		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+			if( isSciencePurchaseShown( player, commandSet->getCommandButton( i ) ) )
+				shown[ shownCount++ ] = commandSet->getCommandButton( i );
+
+		// chains of shown buttons, a base's first upgrade following it; roots first, then anything a
+		// branch or a loop left unclaimed starts a chain of its own
+		Int chainMembers[ MAX_COMMANDS_PER_SET ][ MAX_COMMANDS_PER_SET ];
+		Int chainLength[ MAX_COMMANDS_PER_SET ];
+		Int chainCount = 0;
+		Int chainOf[ MAX_COMMANDS_PER_SET ];
+		std::fill( chainOf, chainOf + shownCount, (Int)NO_CHAIN );
+		for( Int rootsOnly = 1; rootsOnly >= 0; rootsOnly-- )
 		{
-			const CommandButton *commandButton = commandSet->getCommandButton( i );
-			if( !isSciencePurchaseShown( player, commandButton ) )
-				continue;
-			if( shownCount < windowCount )
-				placed[ shownCount ] = commandButton;
-			else
-				DEBUG_LOG(( "PROMOTION %s has %d windows, no room for %s\n", commandSet->getName().str(), windowCount, commandButton->getName().str() ));
-			shownCount++;
+			for( Int start = 0; start < shownCount; start++ )
+			{
+				if( chainOf[ start ] != NO_CHAIN )
+					continue;
+				Bool hasBaseHere = FALSE;
+				for( Int other = 0; other < shownCount; other++ )
+					hasBaseHere |= other != start && isSciencePurchaseUpgradeOf( shown[ start ], shown[ other ] );
+				if( rootsOnly && hasBaseHere )
+					continue;
+
+				const Int chain = chainCount++;
+				chainLength[ chain ] = 0;
+				for( Int member = start; member != NO_CHAIN; )
+				{
+					chainOf[ member ] = chain;
+					chainMembers[ chain ][ chainLength[ chain ]++ ] = member;
+					Int next = NO_CHAIN;
+					for( Int upgrade = 0; upgrade < shownCount && next == NO_CHAIN; upgrade++ )
+						if( chainOf[ upgrade ] == NO_CHAIN && isSciencePurchaseUpgradeOf( shown[ upgrade ], shown[ member ] ) )
+							next = upgrade;
+					member = next;
+				}
+			}
 		}
-		for( i = shownCount; i < windowCount; i++ )
-			placed[ i ] = NULL;
 
-		std::stable_sort( ordered, ordered + windowCount, []( GameWindow *a, GameWindow *b )
+		Int leftovers[ MAX_COMMANDS_PER_SET ];
+		Int leftoverCount = 0;
+
+		auto placeButton = [&]( Int column, Int row, Int member )
 		{
-			Int ax, ay, bx, by;
-			a->winGetScreenPosition( &ax, &ay );
-			b->winGetScreenPosition( &bx, &by );
-			return ay != by ? ay < by : ax < bx;
-		} );
-	}
+			placed[ section ][ cell[ column ][ row ] ] = shown[ member ];
+			earlierButtons[ earlierCount ] = shown[ member ];
+			earlierColumnX[ earlierCount++ ] = columnX[ column ];
+			cell[ column ][ row ] = NO_WINDOW;
+		};
+		auto freeRows = [&]( Int column )
+		{
+			Int count = 0;
+			for( Int row = 0; row < rowCount; row++ )
+				count += cell[ column ][ row ] != NO_WINDOW;
+			return count;
+		};
+		auto stackChain = [&]( Int chain, Int column )
+		{
+			Int member = 0;
+			for( Int row = 0; row < rowCount && member < chainLength[ chain ]; row++ )
+				if( cell[ column ][ row ] != NO_WINDOW )
+					placeButton( column, row, chainMembers[ chain ][ member++ ] );
+			while( member < chainLength[ chain ] )
+				leftovers[ leftoverCount++ ] = chainMembers[ chain ][ member++ ];
+		};
 
-	for( i = 0; i < windowCount; i++ )
+		Bool stacked[ MAX_COMMANDS_PER_SET ] = { FALSE };
+		const Int earlierSections = earlierCount;
+		for( Int chain = 0; chain < chainCount; chain++ )
+		{
+			const CommandButton *root = shown[ chainMembers[ chain ][ 0 ] ];
+			for( Int earlier = 0; earlier < earlierSections && !stacked[ chain ]; earlier++ )
+			{
+				if( !isSciencePurchaseUpgradeOf( root, earlierButtons[ earlier ] ) )
+					continue;
+				const Int column = std::find( columnX, columnX + columnCount, earlierColumnX[ earlier ] ) - columnX;
+				if( column == columnCount )
+					continue;
+				stackChain( chain, column );
+				stacked[ chain ] = TRUE;
+			}
+		}
+		for( Int chain = 0; chain < chainCount; chain++ )
+		{
+			if( stacked[ chain ] || chainLength[ chain ] < 2 )
+				continue;
+			Int roomiest = 0;
+			for( Int column = 0; column < columnCount; column++ )
+			{
+				if( freeRows( column ) >= chainLength[ chain ] )
+				{
+					roomiest = column;
+					break;
+				}
+				if( freeRows( column ) > freeRows( roomiest ) )
+					roomiest = column;
+			}
+			stackChain( chain, roomiest );
+			stacked[ chain ] = TRUE;
+		}
+		for( Int chain = 0; chain < chainCount; chain++ )
+			if( !stacked[ chain ] )
+				leftovers[ leftoverCount++ ] = chainMembers[ chain ][ 0 ];
+
+		std::sort( leftovers, leftovers + leftoverCount );
+		Int leftover = 0;
+		for( Int row = 0; row < rowCount; row++ )
+			for( Int column = 0; column < columnCount && leftover < leftoverCount; column++ )
+				if( cell[ column ][ row ] != NO_WINDOW )
+					placeButton( column, row, leftovers[ leftover++ ] );
+		for( ; leftover < leftoverCount; leftover++ )
+			DEBUG_LOG(( "PROMOTION %s has %d windows, no room for %s\n", commandSet->getName().str(), windowCount, shown[ leftovers[ leftover ] ]->getName().str() ));
+	}
+}
+
+/** Puts one rank's placed buttons on its windows, placed[i] on windows[i].  The caller has hidden
+	* every window. */
+void ControlBar::populatePurchaseScienceRank( Player *player, const CommandButton *const *placed, GameWindow **windows, Int windowCount )
+{
+	for( Int i = 0; i < windowCount; i++ )
 	{
 		const CommandButton *commandButton = placed[ i ];
-		GameWindow *window = ordered[ i ];
+		GameWindow *window = windows[ i ];
 
 		if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
 			continue;
@@ -765,12 +907,21 @@ void ControlBar::populatePurchaseScience( Player* player )
 			commandSet8 == NULL )
 		return;
 
-	// a mod's command sets were laid out for the mod's own screen and leave gaps in ours; retail's
-	// keep their slots, gaps and all, as Zero Hour shipped them
-	const Bool compact = ControlBarIsModFaction( player->getPlayerTemplate() );
-	populatePurchaseScienceRank( player, commandSet1, m_sciencePurchaseWindowsRank1, MAX_PURCHASE_SCIENCE_RANK_1, compact );
-	populatePurchaseScienceRank( player, commandSet3, m_sciencePurchaseWindowsRank3, MAX_PURCHASE_SCIENCE_RANK_3, compact );
-	populatePurchaseScienceRank( player, commandSet8, m_sciencePurchaseWindowsRank8, MAX_PURCHASE_SCIENCE_RANK_8, compact );
+	const CommandSet *sectionSets[ PURCHASE_SCIENCE_RANK_SECTIONS ] = { commandSet1, commandSet3, commandSet8 };
+	GameWindow **sectionWindows[ PURCHASE_SCIENCE_RANK_SECTIONS ] = { m_sciencePurchaseWindowsRank1, m_sciencePurchaseWindowsRank3, m_sciencePurchaseWindowsRank8 };
+	const Int windowCounts[ PURCHASE_SCIENCE_RANK_SECTIONS ] = { MAX_PURCHASE_SCIENCE_RANK_1, MAX_PURCHASE_SCIENCE_RANK_3, MAX_PURCHASE_SCIENCE_RANK_8 };
+	const CommandButton *placed[ PURCHASE_SCIENCE_RANK_SECTIONS ][ MAX_COMMANDS_PER_SET ];
+
+	// retail keeps slot i on window i, gaps and all, as Zero Hour shipped it
+	if( ControlBarIsModFaction( player->getPlayerTemplate() ) )
+		layoutModPurchaseSciences( player, sectionSets, sectionWindows, windowCounts, placed );
+	else
+		for( Int section = 0; section < PURCHASE_SCIENCE_RANK_SECTIONS; section++ )
+			for( i = 0; i < windowCounts[ section ]; i++ )
+				placed[ section ][ i ] = sectionSets[ section ]->getCommandButton( i );
+
+	for( Int section = 0; section < PURCHASE_SCIENCE_RANK_SECTIONS; section++ )
+		populatePurchaseScienceRank( player, placed[ section ], sectionWindows[ section ], windowCounts[ section ] );
 
 	//
 	// Somebody else's screen is a read-out, not a shop: a watcher sees what that general has bought
