@@ -3,9 +3,10 @@ of disturbed earth.  The game lays it flat on the ground at each of a mine field
 (ParticleSystemReforged.ini, MineFX and MineFXPurple), so it is shaded here once, lit from the top
 left, and the soil ring fades out into whatever ground it lands on.
 
-The arming light over each mine is an LED seen from above: a hard, nearly white core a fifth of the
-picture across inside a small glow in the light's colour, red for the standard and cluster mines and
-a cold sky blue for the EMP mines.  It is drawn additively, so black is nothing.
+The arming light over each mine is an LED seen from above: a lens in the light's colour, red for the
+standard and cluster mines and a saturated blue for the EMP mines, with a near-white hot spot in its
+middle, inside a dark bezel.  It is alpha blended, not additive, so the lens keeps its colour over
+grass, sand or snow and the bezel parts it from whatever ground is round it.
 
     python Tools/mine_marks.py            # writes Data/Art/Textures/ReforgedMine.tga and ReforgedMineLed*.tga
 
@@ -28,10 +29,12 @@ OUTLINE = 0.035			# a near-black edge round the steel, as a share of the half wi
 PLATE = 0.70			# radius of the steel, as a share of the half width
 SOIL_OUT = 0.98
 BOLTS = 0.55
-LED_CORE = 0.22			# radius of the hard core, as a share of the half width
-LED_GLOW = 0.22			# the glow falls off as exp(-(r - core) / this)
-LED_GLOW_PEAK = 0.85		# the glow's strength just outside the core, against the core's 1
-LEDS = (("Red", (255, 30, 12), (255, 215, 200)), ("Blue", (60, 100, 255), (170, 200, 255)))
+LED_HOT = 0.10			# radius of the near-white hot spot, as a share of the half width
+LED_LENS = 0.50			# radius of the lit lens in the light's colour
+LED_BEZEL_OUT = 0.74		# outer edge of the dark bezel round the lens
+LED_BEZEL = (10, 8, 8)
+LED_BEZEL_ALPHA = 0.9
+LEDS = (("Red", (255, 28, 10), (255, 235, 225)), ("Blue", (40, 110, 255), (225, 240, 255)))
 OUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Art", "Textures")
 
 
@@ -96,7 +99,7 @@ def main():
         print(path)
 
 
-def led(glow, core):
+def led(lens, hot):
     image = Image.new("RGBA", (DRAWN, DRAWN))
     pixels = image.load()
     for py in range(DRAWN):
@@ -104,12 +107,13 @@ def led(glow, core):
         for px in range(DRAWN):
             x = (px - CENTRE) / CENTRE
             r = math.hypot(x, y)
-            if r < LED_CORE:
-                colour = core
-            else:
-                strength = LED_GLOW_PEAK * math.exp(-(r - LED_CORE) / LED_GLOW) * (1.0 - ramp(0.8, 1.0, r))
-                colour = tuple(int(c * strength) for c in glow)
-            pixels[px, py] = colour + (max(colour),)
+            lit = ramp(LED_HOT, LED_HOT + 0.08, r)
+            colour = tuple(h + (l - h) * lit for h, l in zip(hot, lens))
+            bezel = ramp(LED_LENS - 0.02, LED_LENS + 0.02, r)
+            colour = tuple(int(c + (b - c) * bezel) for c, b in zip(colour, LED_BEZEL))
+            alpha = 1.0 - ramp(LED_BEZEL_OUT - 0.04, LED_BEZEL_OUT + 0.04, r)
+            alpha *= 1.0 - (1.0 - LED_BEZEL_ALPHA) * bezel
+            pixels[px, py] = colour + (int(255 * alpha),)
     return image
 
 
