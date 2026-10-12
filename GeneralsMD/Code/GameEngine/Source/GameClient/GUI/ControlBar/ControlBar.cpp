@@ -587,12 +587,9 @@ Player *ControlBar::getSelectedPlayer( void )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Watching, the selection drives the whole bar: clicking a unit watches its owner.  The
-	* portrait's panel comes up and the bar wears his side's metal, and clicking empty ground puts
-	* everybody and the watcher's own plain bar back.
-	*
-	* Before this, picking up somebody's tank told you nothing about him: the bar stayed on whatever
-	* side had last been chosen off the list, and the money plate with it. */
+/** Watching, the selection drives the bar's contents: clicking a unit watches its owner and his
+	* panel comes up, clicking empty ground puts everybody back.  The bar itself stays ControlBar Pro's
+	* observer bar throughout, as the owner asked; it no longer changes into the watched side's. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::updateWatchedPlayer( void )
 {
@@ -618,19 +615,6 @@ void ControlBar::watchPlayer( Player *player )
 		showObserverPlayerInfo();
 	else
 		showObserverPlayerList();
-
-	const PlayerTemplate *wear = player ? player->getPlayerTemplate()
-																			: ThePlayerList->getLocalPlayer()->getPlayerTemplate();
-	// by template name rather than side: under -modfactions a mod's GLA wears the American bar and
-	// ours the GLA one, the same side and not the same bar
-	if( m_controlBarSchemeManager && wear && wear->getName().compare( m_watchedSide ) != 0 )
-	{
-		// a scheme lays the whole bar out again, so it is set when the side really changes and not
-		// on every click
-		m_watchedSide = wear->getName();
-		m_controlBarSchemeManager->setControlBarSchemeByPlayerTemplate( wear );
-		restoreStageAfterScheme();
-	}
 
 	// a seat clicked at the top clears the selection before it gets here, so what is selected is
 	// read again rather than taken from the caller
@@ -1391,7 +1375,6 @@ ControlBar::ControlBar( void )
 	m_controlBarSchemeManager = NULL;
 	m_isObserverCommandBar = FALSE;
 	m_observerLookAtPlayer = NULL;
-	m_watchedSide.clear();
 	m_watchedSelection = NULL;
 	m_currentControlBarStage = CONTROL_BAR_STAGE_DEFAULT;
 	m_buildToolTipLayout = NULL;
@@ -2781,7 +2764,6 @@ void ControlBar::reset( void )
 
 	m_isObserverCommandBar = FALSE; // reset us to use a normal command bar
 	m_observerLookAtPlayer = NULL;
-	m_watchedSide.clear();
 	m_watchedSelection = NULL;
 	m_currentControlBarStage = CONTROL_BAR_STAGE_DEFAULT;	// a minimised bar is this match's, not the next one's
 

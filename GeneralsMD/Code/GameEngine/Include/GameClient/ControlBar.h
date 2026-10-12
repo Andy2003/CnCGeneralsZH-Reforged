@@ -1328,7 +1328,6 @@ protected:
 
 	Bool m_isObserverCommandBar;												///< If this is true, the command bar behaves greatly differnt
 	Player *m_observerLookAtPlayer;											///< The current player we're looking at, Null if we're not looking at anyone.
-	AsciiString m_watchedSide;													///< the side the bar is wearing while watching, so a selection change only lays it out again when it really changes side
 	GameWindow *m_radarAttackGlowWindow;										///< WinUAttack
 	Int m_remainingRadarAttackGlowFrames;										///< logic frames left on the lamp's flashing
 	Player *m_watchedSelection;													///< the player the selection last named while watching, NULL for nobody
