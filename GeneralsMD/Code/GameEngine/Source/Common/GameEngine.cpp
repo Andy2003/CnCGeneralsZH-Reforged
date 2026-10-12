@@ -1253,6 +1253,28 @@ void GameEngine::init( int argc, char *argv[] )
 		ini.load("Data\\INI\\CommandMapDemo.ini", INI_LOAD_MULTIFILE, NULL);
 #endif
 
+		// The player's own keys, which the launcher's Hotkeys page writes beside Options.ini:
+		// CommandMap blocks laid over the ones above, and CommandButtonHotKey blocks for the command
+		// bar.  Client only and never in the INI CRC, so a key here changes nothing for anyone else in
+		// a match.  The file is the player's to edit by hand, and a broken one costs the keys from the
+		// broken block on, not the start.
+		{
+			AsciiString hotkeys = TheGlobalData->getPath_UserData();
+			hotkeys.concat( "Hotkeys.ini" );
+			if( TheFileSystem->doesFileExist( hotkeys.str() ) )
+			{
+				try
+				{
+					ini.load( hotkeys, INI_LOAD_MULTIFILE, NULL );
+					DEBUG_LOG(( "HOTKEYS: read %s\n", hotkeys.str() ));
+				}
+				catch( ... )
+				{
+					DEBUG_LOG(( "HOTKEYS: %s stopped at a block it could not read; the keys before it stand\n", hotkeys.str() ));
+				}
+			}
+		}
+
 		initSubsystem(TheActionManager,"TheActionManager", MSGNEW("GameEngineSubsystem") ActionManager(), NULL);
 		//initSubsystem((CComObject<WebBrowser> *)TheWebBrowser,"(CComObject<WebBrowser> *)TheWebBrowser", (CComObject<WebBrowser> *)createWebBrowser(), NULL);
 		initSubsystem(TheGameStateMap,"TheGameStateMap", MSGNEW("GameEngineSubsystem") GameStateMap, NULL, NULL, NULL );

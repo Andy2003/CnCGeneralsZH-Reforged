@@ -4491,12 +4491,14 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 
 	setCommandBarBorder(button, commandButton->getCommandButtonMappedBorderType());
 	
-	// the key is the game's own, the letter after the '&' in the button's label - the English
-	// label's in every language, so a Turkish or German player presses what an English one does -
-	// and the button wears it in its top left corner
+	// the key is the one the player gave the button on the launcher's Hotkeys page, or else the
+	// game's own, the letter after the '&' in the button's label - the English label's in every
+	// language, so a Turkish or German player presses what an English one does - and the button
+	// wears it in its top left corner
 	if( TheHotKeyManager )
 	{
-		WideChar letter = TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0;
+		WideChar letter = HotKeyManager::playerButtonKey( commandButton->getName(),
+			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0 );
 		if( letter >= u'a' && letter <= u'z' )
 			letter -= ( u'a' - u'A' );
 		if( letter != 0 )

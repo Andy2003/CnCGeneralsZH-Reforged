@@ -32,6 +32,7 @@ found and fixed â€” EA's own, not port damage.**
 ## One interface
 
 - The choice between a Classic and a Reforged interface is gone. There is one, laid out the way Zero Hour shipped, and the orders Reforged added now live on the keys you already know: A attack-moves, holding Ctrl fires on whatever is under the cursor as it did in 2003, a guard order can cover a patch of ground instead of one spot, and orders queue up one after another. Everything your base is building stands on the screen as a line of text each, the six closest to done first and "+N more" for the rest. Superweapon countdowns are listed the same way, up to eighteen. Whether the right button gives orders, or the left as in 1.04, is a setting in the launcher.
+- Every key is yours to move. The launcher's Hotkeys page draws the command bar of every building and unit each general can field, cameos and letters as the game shows them, and a click and a keypress gives any button a new letter or none. Two buttons on one bar that would share a letter are marked before you play. The keyboard commands are there too, from bookmarks and team keys to the camera, along with the ones Zero Hour never bound: select every fighting unit, vehicle or aircraft, every barracks, war factory or airfield, the next idle worker or unit, pause, the general's promotions, the three signals to your allies and the general's powers. Your keys are yours alone; the other players in a match keep theirs, and a match never refuses you for them.
 
 ## The command bar moves to the middle
 

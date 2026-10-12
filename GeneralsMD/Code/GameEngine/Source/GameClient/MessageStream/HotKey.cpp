@@ -60,6 +60,12 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/GameText.h"
 #include "Common/AudioEventRTS.h"
+#include "Common/INI.h"
+#include "Common/ThingTemplate.h"
+#include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/GadgetPushButton.h"
+#include "GameClient/InGameUI.h"
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -207,6 +213,11 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 	{
 		if( BitTest( win->winGetStatus(), WIN_STATUS_ENABLED ) )
  		{
+			// what a player's own key (Hotkeys.ini) pressed can be read back from the log
+			const CommandButton *command = (const CommandButton *)GadgetButtonGetData( win );
+			const DrawableList *selected = TheInGameUI ? TheInGameUI->getAllSelectedDrawables() : NULL;
+			DEBUG_LOG(( "HOTKEYS: %s pressed %s, selection led by %s\n", key.str(), command ? command->getName().str() : "a window",
+				( selected && !selected->empty() ) ? selected->front()->getTemplate()->getName().str() : "nothing" ));
  			TheWindowManager->winSendSystemMsg( win->winGetParent(), GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
  
  			// here we make the same click sound that the GUI uses when you click a button
@@ -283,6 +294,47 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 		marker++;
 	}
 	return AsciiString::TheEmptyString;	
+}
+
+//-----------------------------------------------------------------------------
+/** The player's command button keys from Hotkeys.ini, by button name in lower case: an upper case
+	* letter, or 0 for a button the player wants without a key.  Read once while the engine starts and
+	* kept for the whole run, so it lives outside the manager, which every game client rebuilds. */
+static std::map< std::string, WideChar > s_playerButtonKeys;
+
+//-----------------------------------------------------------------------------
+WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey )
+{
+	AsciiString name = button;
+	name.toLower();
+	std::map< std::string, WideChar >::const_iterator it = s_playerButtonKeys.find( name.str() );
+	return it == s_playerButtonKeys.end() ? labelKey : it->second;
+}
+
+//-----------------------------------------------------------------------------
+/** CommandButtonHotKey <button name>, Key = one letter or NONE, End.  Only the player's own
+	* Hotkeys.ini carries these, and nothing in it reaches the INI CRC. */
+/*static*/ void INI::parseCommandButtonHotKeyDefinition( INI *ini )
+{
+	AsciiString name = ini->getNextToken();
+	name.toLower();
+
+	static const FieldParse fields[] =
+	{
+		{ "Key", INI::parseAsciiString, NULL, 0 },
+		{ NULL, NULL, NULL, 0 }
+	};
+	AsciiString key;
+	ini->initFromINI( &key, fields );
+
+	WideChar letter = 0;
+	if( key.getLength() == 1 && isalpha( (unsigned char)key.getCharAt( 0 ) ) )
+		letter = (WideChar)toupper( (unsigned char)key.getCharAt( 0 ) );
+	else if( key.compareNoCase( "NONE" ) != 0 )
+		throw INI_INVALID_DATA;
+
+	s_playerButtonKeys[ name.str() ] = letter;
+	DEBUG_LOG(( "HOTKEYS: button %s key %s\n", name.str(), key.str() ));
 }
 
 //-----------------------------------------------------------------------------

@@ -109,6 +109,12 @@ public:
 		* would land. */
 	GameWindow *findHotKey( const AsciiString& key, Bool *pressable ) const;
 
+	/** The key a command button gets: the one the player gave it in Hotkeys.ini (the launcher's
+		* Hotkeys page writes it, INI::parseCommandButtonHotKeyDefinition reads it), 0 where the player
+		* took the key away, and labelKey, the letter after the label's '&', where the player left the
+		* button alone. */
+	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey );
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
