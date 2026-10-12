@@ -11,6 +11,8 @@ Data/Art/Textures/ReforgedBarGLALeft.tga
 Data/Art/Textures/ReforgedBarGLARight.tga
 Data/Art/Textures/ReforgedLaserPink.tga
 Data/Art/Textures/ReforgedMine.tga
+Data/Art/Textures/ReforgedMineGlowBlue.tga
+Data/Art/Textures/ReforgedMineGlowRed.tga
 Data/Art/Textures/ReforgedMineLedBlue.tga
 Data/Art/Textures/ReforgedMineLedRed.tga
 Data/Art/Textures/ReforgedOrders.tga
@@ -38,11 +40,14 @@ Data/Cinema/hero_loop_09.txt
 Data/Cinema/hero_loop_10.txt
 Data/Cinema/inf_jam.txt
 Data/Cinema/inf_walk.txt
+Data/Cinema/looks4.txt
+Data/Cinema/looks4amber.txt
 Data/Cinema/lsv_burst.txt
 Data/Cinema/lsv_laser.txt
 Data/Cinema/lsv_spam.txt
 Data/Cinema/lsv_spam2.txt
 Data/Cinema/minefx.txt
+Data/Cinema/minefx_desert.txt
 Data/Cinema/minefx_player.txt
 Data/Cinema/minefx_scene.txt
 Data/Cinema/minefx_scene_enemy.txt
@@ -185,11 +190,13 @@ Data/Scenarios/jetpass.txt
 Data/Scenarios/laserglow.txt
 Data/Scenarios/leadinfantry.txt
 Data/Scenarios/leadvehicle.txt
+Data/Scenarios/looks4.txt
 Data/Scenarios/mappers.txt
 Data/Scenarios/mass420x2.txt
 Data/Scenarios/mass840.txt
 Data/Scenarios/massmove.txt
 Data/Scenarios/minefx.txt
+Data/Scenarios/minefx_desert.txt
 Data/Scenarios/minefx_player.txt
 Data/Scenarios/minefx_scene.txt
 Data/Scenarios/minefx_scene_enemy.txt
