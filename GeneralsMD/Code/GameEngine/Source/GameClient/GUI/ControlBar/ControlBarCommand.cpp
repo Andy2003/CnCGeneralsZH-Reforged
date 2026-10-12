@@ -500,7 +500,7 @@ void ControlBar::populateCommand( Object *obj )
 									}
 
 									Bool found = FALSE;
-									for( i = 0; !found && i < MAX_PURCHASE_SCIENCE_RANK_1; i++ )
+									for( i = 0; !found && i < MAX_COMMANDS_PER_SET; i++ )
 									{
 										const CommandButton *command = commandSet1->getCommandButton( i );
 										if( command && command->getCommandType() == GUI_COMMAND_PURCHASE_SCIENCE )
@@ -519,7 +519,7 @@ void ControlBar::populateCommand( Object *obj )
 											}
 										}
 									}
-									for( i = 0; !found && i < MAX_PURCHASE_SCIENCE_RANK_3; i++ )
+									for( i = 0; !found && i < MAX_COMMANDS_PER_SET; i++ )
 									{
 										const CommandButton *command = commandSet3->getCommandButton( i );
 										if( command && command->getCommandType() == GUI_COMMAND_PURCHASE_SCIENCE )
@@ -538,7 +538,7 @@ void ControlBar::populateCommand( Object *obj )
 											}
 										}
 									}
-									for( i = 0; !found && i < MAX_PURCHASE_SCIENCE_RANK_8; i++ )
+									for( i = 0; !found && i < MAX_COMMANDS_PER_SET; i++ )
 									{
 										const CommandButton *command = commandSet8->getCommandButton( i );
 										if( command && command->getCommandType() == GUI_COMMAND_PURCHASE_SCIENCE )
