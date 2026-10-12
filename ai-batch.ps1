@@ -140,6 +140,11 @@ for ($i = 0; $i -lt $Runs; $i++) {
 	if ($ExtraArgs.Count) { $args += $ExtraArgs }
 
 	while (@($started | Where-Object { -not $_.Proc.HasExited }).Count -ge $Parallel) {
+		# a run that never reaches its match (a bad -side, a missing map) sits in the shell for good, and
+		# the wait for a free slot would wait with it: the timeout applies here as well as below
+		foreach ($r in $started) {
+			if (-not $r.Proc.HasExited -and $r.Clock.Elapsed.TotalMinutes -gt $TimeoutMinutes) { $r.Proc.Kill() }
+		}
 		Start-Sleep -Milliseconds 200
 	}
 	$proc = Start-Process -FilePath $exePath -ArgumentList $args -WorkingDirectory $RunDir -PassThru
