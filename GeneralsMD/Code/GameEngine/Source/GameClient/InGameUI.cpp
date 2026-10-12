@@ -3016,8 +3016,10 @@ void InGameUI::watchDozers( void )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Where the command bar starts on screen, or the screen's bottom while the bar is hidden: it is
-	* hidden while the game loads and in the observer views. */
+/** Where the command bar's left piece, the radar, starts on screen, or the screen's bottom while the
+	* bar is hidden: it is hidden while the game loads and in the observer views.  ControlBar Pro's bar
+	* is three pieces with the world between them, and what stands over the bar on the left stands on
+	* the radar's piece; it travels with the frame when the bar drops. */
 //-------------------------------------------------------------------------------------------------
 static Int controlBarTop( void )
 {
@@ -3028,7 +3030,7 @@ static Int controlBarTop( void )
 
 	ICoord2D barPos;
 	bar->winGetScreenPosition( &barPos.x, &barPos.y );
-	return barPos.y;
+	return TheControlBar->getPanelRect( ControlBar::CB_PANEL_LEFT )->lo.y + barPos.y - TheControlBar->getPanelOrigin()->y;
 }
 
 //-------------------------------------------------------------------------------------------------

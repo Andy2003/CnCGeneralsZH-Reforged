@@ -566,11 +566,8 @@ void ControlBarScheme::init(void)
 	if(win)
 	{
 		win->winSetEnabledImage(0,m_powerPurchaseImage);
-		// the loader's stretch, as the game shipped: the painting at its shipped size, in the middle
-		// of the screen
-		Int w = 0, h = 0;
-		win->winGetSize( &w, &h );
-		win->winSetPosition( ( (Int)TheDisplay->getWidth() - w ) / 2, ( (Int)TheDisplay->getHeight() - h ) / 2 );
+		// where it stands is ControlBar Pro's GeneralsExpPoints.wnd at its pieces' scale, centred at the
+		// top (ControlBarLayoutUniform in ControlBar::initWindows), so nothing here moves it
 	}
 
 	//
@@ -939,6 +936,9 @@ void ControlBarSchemeManager::init( void )
 	ini.load( AsciiString( "Data\\INI\\ControlBarScheme.ini" ), INI_LOAD_OVERWRITE, NULL );
 	// the fork's edits to EA's schemes, each block naming only what it changes
 	ini.load( AsciiString( "Data\\INI\\ControlBarSchemeReforged.ini" ), INI_LOAD_MULTIFILE, NULL );
+	// ControlBar Pro's schemes, the bar every side wears: each replaces EA's of the same name whole,
+	// so nothing above reaches it (a Debug build asserts once a scheme, newControlBarScheme)
+	ini.load( AsciiString( "Data\\INI\\ControlBarProReforged.ini" ), INI_LOAD_OVERWRITE, NULL );
 	// -modfactions: each mod's own bars, "M<n>~" names, worn only by that mod's factions
 	INI::loadModPasses( "Data\\INI\\ControlBarScheme.ini", NULL );
 	readModWindowRects();
@@ -1085,6 +1085,11 @@ ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( const AsciiStri
 Int ControlBarSchemeManager::getCurrentSchemeMod( void ) const
 {
 	return m_currentScheme ? schemeModIndex( m_currentScheme->m_name ) : -1;
+}
+
+Bool ControlBarSchemeManager::isCurrentSchemePainted( void ) const
+{
+	return m_currentScheme != NULL;
 }
 
 //-----------------------------------------------------------------------------

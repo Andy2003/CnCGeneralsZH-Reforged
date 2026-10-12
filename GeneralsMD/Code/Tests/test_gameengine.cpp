@@ -12429,58 +12429,101 @@ TEST(every_side_has_three_plates_and_every_general_wears_its_sides)
 	CHECK( ControlBarPlateForSide( AsciiString( "America" ), ControlBar::CB_PANEL_COUNT ) == NULL );
 }
 
-TEST(the_three_panels_are_one_bar_at_4x3_and_pull_apart_on_a_wide_screen)
+TEST(control_bar_pro_is_three_pieces_at_the_screens_height)
 {
-	/* Every window and every plate goes through this one piece of arithmetic, so it is where a
-		 misplaced money slot or a smeared cameo would come from.  Two things have to hold: at 4:3 it
-		 reproduces what the .wnd loader would have done, which is what makes the three plates slide
-		 back into the one strip EA drew; and above 4:3 it scales by one factor for both axes and
-		 opens the two gaps rather than stretching to fill them. */
-	IRegion2D whole;			// the whole authored bar
-	whole.lo.x = 0;
-	whole.lo.y = 408;
-	whole.hi.x = 800;
-	whole.hi.y = 600;
+	/* ControlBar Pro was painted at 1920x1080.  Its three pieces, measured off its ControlBar.wnd
+		 (radar 0,740-340,1080; command grid and money 592,870-1326,1080; selection, upgrades and the
+		 general's button 1625,794-1920,1080) and taken to 800x600 design units the way layoutPanels
+		 takes the loader's stretch back out: x times 800/1920, y times 600/1080.  On every screen
+		 each piece is drawn at the height over 1080 alone, so it keeps that shape, sits on its own
+		 anchor and stays clear of the others. */
+	static const IRegion2D pieces[ ControlBar::CB_PANEL_COUNT ] =
+	{
+		{ {   0, 411 }, { 142, 600 } },
+		{ { 247, 483 }, { 553, 600 } },
+		{ { 677, 441 }, { 800, 600 } },
+	};
+	struct Screen { Int w, h; };
+	static const Screen screens[] = { { 1280, 720 }, { 1920, 1080 }, { 2560, 1080 }, { 3840, 1080 }, { 1024, 768 } };
 
-	IRegion2D left, centre, right;
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_LEFT,   &whole, 800, 600, &left ) );
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_CENTER, &whole, 800, 600, &centre ) );
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_RIGHT,  &whole, 800, 600, &right ) );
+	// ControlBar.wnd's own rectangles and the American scheme's UL/LR, in the painting's pixels
+	struct PaintedWindow { const char *what; Int piece; Int x0, y0, x1, y1; };
+	static const PaintedWindow painted[] =
+	{
+		{ "LeftHUD",						ControlBar::CB_PANEL_LEFT,		   5, 753,  327, 1075 },
+		{ "WinUAttack",					ControlBar::CB_PANEL_LEFT,		 276, 740,  340,  804 },
+		{ "CommandWindow",			ControlBar::CB_PANEL_CENTER,	 592, 894, 1326, 1080 },
+		{ "BeaconWindow",				ControlBar::CB_PANEL_CENTER,	 600, 902, 1318, 1080 },
+		{ "MoneyDisplay",				ControlBar::CB_PANEL_CENTER,	 894, 879, 1026,  904 },
+		{ "PowerWindow",				ControlBar::CB_PANEL_CENTER,	 605, 906, 1313,  916 },
+		{ "ButtonOptions",			ControlBar::CB_PANEL_CENTER,	 609, 925,  663,  960 },
+		{ "ButtonIdleWorker",		ControlBar::CB_PANEL_CENTER,	 609, 962,  663,  997 },
+		{ "ButtonPlaceBeacon",	ControlBar::CB_PANEL_CENTER,	 609, 999,  663, 1034 },
+		{ "PopupCommunicator",	ControlBar::CB_PANEL_CENTER,	 609, 1036, 663, 1071 },
+		{ "RightHUD",						ControlBar::CB_PANEL_RIGHT,		1642, 887, 1871, 1071 },
+		{ "GeneralsExp",				ControlBar::CB_PANEL_RIGHT,		1880, 923, 1906, 1063 },
+		{ "ExpBarForeground",		ControlBar::CB_PANEL_RIGHT,		1875, 887, 1911, 1071 },
+		{ "ButtonGeneral",			ControlBar::CB_PANEL_RIGHT,		1829, 840, 1920,  871 },
+		{ "ButtonLarge",				ControlBar::CB_PANEL_RIGHT,		1829, 802, 1920,  833 },
+		{ NULL, 0, 0, 0, 0, 0 }
+	};
 
-	// at the authored size all three anchors land on the authored rectangle itself
-	CHECK_EQ( left.lo.x, 0 );		CHECK_EQ( left.hi.x, 800 );
-	CHECK_EQ( centre.lo.x, 0 );	CHECK_EQ( centre.hi.x, 800 );
-	CHECK_EQ( right.lo.x, 0 );	CHECK_EQ( right.hi.x, 800 );
-	CHECK_EQ( left.lo.y, 408 );	CHECK_EQ( left.hi.y, 600 );
+	for( Int i = 0; i < (Int)( sizeof( screens ) / sizeof( screens[ 0 ] ) ); i++ )
+	{
+		const Int w = screens[ i ].w;
+		const Int h = screens[ i ].h;
+		const Real k = h / 1080.0f;		// screen lines to one of the painting's
+		IRegion2D rect[ ControlBar::CB_PANEL_COUNT ];
+		for( Int p = 0; p < ControlBar::CB_PANEL_COUNT; p++ )
+		{
+			CHECK( ControlBarPanelDesignToScreen( p, &pieces[ p ], w, h, &rect[ p ] ) );
 
-	/* 1920x1080 is 1.8 times the authored height and 2.4 times its width; the smaller one wins, so
-		 a square cameo stays square instead of coming out a third wider than it is tall */
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_LEFT,   &whole, 1920, 1080, &left ) );
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_CENTER, &whole, 1920, 1080, &centre ) );
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_RIGHT,  &whole, 1920, 1080, &right ) );
+			// inside the screen, on its bottom edge
+			CHECK( rect[ p ].lo.x >= 0 && rect[ p ].hi.x <= w && rect[ p ].lo.y >= 0 );
+			CHECK_EQ( rect[ p ].hi.y, h );
 
-	CHECK_NEAR( (Real)left.width(), 800.0f * 1.8f, 1.5f );
-	CHECK_NEAR( (Real)left.height(), 192.0f * 1.8f, 1.5f );
+			// its painted shape at the screen's height: as many of the painting's pixels across as down
+			CHECK_NEAR( (Real)rect[ p ].width(), pieces[ p ].width() * 1920.0f / 800.0f * k, 2.0f );
+			CHECK_NEAR( (Real)rect[ p ].height(), pieces[ p ].height() * 1080.0f / 600.0f * k, 2.0f );
+		}
 
-	// left edge to left edge, right edge to right edge, and the middle one centred between them
-	CHECK_EQ( left.lo.x, 0 );
-	CHECK_EQ( right.hi.x, 1920 );
-	CHECK_NEAR( (Real)( centre.lo.x + centre.hi.x ) * 0.5f, 960.0f, 2.0f );
+		// radar on the left edge, selection on the right, grid on the middle of the screen
+		CHECK_EQ( rect[ ControlBar::CB_PANEL_LEFT ].lo.x, 0 );
+		CHECK_EQ( rect[ ControlBar::CB_PANEL_RIGHT ].hi.x, w );
+		CHECK_NEAR( ( rect[ ControlBar::CB_PANEL_CENTER ].lo.x + rect[ ControlBar::CB_PANEL_CENTER ].hi.x ) * 0.5f,
+								w * 0.5f + ( ( 247 + 553 ) * 0.5f - 400.0f ) * 1920.0f / 800.0f * k, 2.0f );
 
-	// and every panel still sits on the bottom edge of the screen
-	CHECK_EQ( left.hi.y, 1080 );
-	CHECK_EQ( centre.hi.y, 1080 );
-	CHECK_EQ( right.hi.y, 1080 );
+		// and the world between them, never one piece over another
+		CHECK( rect[ ControlBar::CB_PANEL_LEFT ].hi.x < rect[ ControlBar::CB_PANEL_CENTER ].lo.x );
+		CHECK( rect[ ControlBar::CB_PANEL_CENTER ].hi.x < rect[ ControlBar::CB_PANEL_RIGHT ].lo.x );
 
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_COUNT, &whole, 1920, 1080, &left ) == FALSE );
-	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_LEFT, &whole, 0, 0, &left ) == FALSE );
+		// every window the bar paints goes to the piece it was painted on, and stays inside it
+		for( const PaintedWindow *pw = painted; pw->what; pw++ )
+		{
+			IRegion2D design;
+			design.lo.x = ( pw->x0 * 800 + 960 ) / 1920;
+			design.lo.y = ( pw->y0 * 600 + 540 ) / 1080;
+			design.hi.x = ( pw->x1 * 800 + 960 ) / 1920;
+			design.hi.y = ( pw->y1 * 600 + 540 ) / 1080;
+			const Int piece = ControlBarHudPieceForDesignX( ( design.lo.x + design.hi.x ) * 0.5f );
+			CHECK_EQ( piece, pw->piece );
+
+			IRegion2D got;
+			CHECK( ControlBarPanelDesignToScreen( piece, &design, w, h, &got ) );
+			CHECK( got.lo.x >= rect[ piece ].lo.x - 1 && got.hi.x <= rect[ piece ].hi.x + 1 );
+			CHECK( got.lo.y >= rect[ piece ].lo.y - 1 && got.hi.y <= rect[ piece ].hi.y + 1 );
+		}
+	}
+
+	IRegion2D unused;
+	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_COUNT, &pieces[ 0 ], 1920, 1080, &unused ) == FALSE );
+	CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_LEFT, &pieces[ 0 ], 0, 0, &unused ) == FALSE );
 }
 
-TEST(the_classic_bar_is_three_plates_on_the_screen_edges_at_one_scale)
+TEST(the_menus_keep_the_4x3_box)
 {
-	/* The menus keep the 4:3 box.  The Classic bar is the three plates Reforged's arithmetic puts on
-		 the screen's edges, at every shape of screen: radar on the left edge, grid centred, selection
-		 on the right edge, every one of them the same scale across as down. */
+	/* The menus keep the 4:3 box; the bar under them is ControlBar Pro's three pieces
+		 (control_bar_pro_is_three_pieces_at_the_screens_height). */
 	CHECK_EQ( UIRectForScreen( 1920, 1080 ).x, 240 );
 	CHECK_EQ( UIRectForScreen( 1920, 1080 ).w, 1440 );
 	CHECK_EQ( UIRectForScreen( 1920, 1080 ).h, 1080 );
@@ -12488,48 +12531,6 @@ TEST(the_classic_bar_is_three_plates_on_the_screen_edges_at_one_scale)
 	CHECK_EQ( UIRectForScreen( 1024, 768 ).x, 0 );
 	CHECK_EQ( UIRectForScreen( 1024, 768 ).w, 1024 );
 	CHECK_EQ( UIRectForScreen( 1280, 1024 ).y, 64 );		// narrower than 4:3: full width, on the bottom with the bar
-
-	GlobalData *saved = TheWritableGlobalData;
-	TheWritableGlobalData = NEW GlobalData;
-
-	static const Int screens[][ 2 ] =
-	{
-		{ 1024, 768 }, { 1280, 1024 }, { 1680, 1050 }, { 1920, 1080 }, { 1920, 1200 }, { 2560, 1440 },
-		{ 3840, 2160 }, { 2560, 1080 }, { 3440, 1440 }, { 5120, 1440 }
-	};
-	const IRegion2D *radar = &ControlBarPlateForSide( "America", ControlBar::CB_PANEL_LEFT )->design;
-	const IRegion2D *grid = &ControlBarPlateForSide( "America", ControlBar::CB_PANEL_CENTER )->design;
-	const IRegion2D *selection = &ControlBarPlateForSide( "America", ControlBar::CB_PANEL_RIGHT )->design;
-	for( Int i = 0; i < (Int)( sizeof( screens ) / sizeof( screens[ 0 ] ) ); i++ )
-	{
-		const Int w = screens[ i ][ 0 ];
-		const Int h = screens[ i ][ 1 ];
-		const Real s = ControlBarUniformScaleFor( w, h );
-		IRegion2D left, centre, right;
-		CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_LEFT, radar, w, h, &left ) );
-		CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_CENTER, grid, w, h, &centre ) );
-		CHECK( ControlBarPanelDesignToScreen( ControlBar::CB_PANEL_RIGHT, selection, w, h, &right ) );
-
-		// the radar on the left edge, the selection on the right, the grid in the middle
-		CHECK_EQ( left.lo.x, 0 );
-		CHECK_EQ( right.hi.x, w );
-		CHECK_NEAR( ( centre.lo.x + centre.hi.x ) * 0.5f, w * 0.5f + ( ( grid->lo.x + grid->hi.x ) * 0.5f - 400.0f ) * s, 2.0f );
-		CHECK_EQ( left.hi.y, h );
-		CHECK_EQ( centre.hi.y, h );
-		CHECK_EQ( right.hi.y, h );
-
-		// nothing stretched: the grid plate is as many times its design width across as down, down
-		// being to the screen's bottom edge, which the plate is snapped onto
-		CHECK_NEAR( (Real)centre.width() / grid->width(), (Real)centre.height() / ( 600 - grid->lo.y ), 0.02f );
-		CHECK_NEAR( (Real)centre.width() / grid->width(), s, 0.02f );
-
-		// the three never overlap past the seams the art already shares at 4:3
-		CHECK( left.hi.x <= centre.lo.x + REAL_TO_INT_CEIL( 4.0f * s ) );
-		CHECK( centre.hi.x <= right.lo.x + REAL_TO_INT_CEIL( 14.0f * s ) );
-	}
-
-	delete TheWritableGlobalData;
-	TheWritableGlobalData = saved;
 }
 
 TEST(a_plate_covers_the_windows_its_panel_is_responsible_for)
@@ -12894,12 +12895,13 @@ TEST(the_hud_is_measured_at_the_command_bars_own_scale)
 		{ 800, 600 }, { 1024, 768 }, { 1280, 720 }, { 1920, 1080 }, { 2560, 1080 }, { 3840, 2160 },
 	};
 
-	// a design rectangle 100 units wide and 100 tall, so the width and height of what comes back
-	// out of the panel transform *is* the scale it was put through
+	// ControlBar Pro was drawn at 1920x1080 and loaded through the 800x600 design box, so one of its
+	// design units is a third wider than it is tall: 75 by 100 of them is a square on the screen,
+	// and its side *is* the scale it was put through
 	IRegion2D square;
 	square.lo.x = 300;
 	square.lo.y = 480;
-	square.hi.x = 400;
+	square.hi.x = 375;
 	square.hi.y = 580;
 
 	for( Int i = 0; i < (Int)( sizeof( screens ) / sizeof( screens[ 0 ] ) ); i++ )

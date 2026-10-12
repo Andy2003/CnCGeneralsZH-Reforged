@@ -282,6 +282,8 @@ public:
 	/// a mod's bar brings its own painting
 	Int getCurrentSchemeMod( void ) const;
 	Bool isCurrentSchemeMod( void ) const { return getCurrentSchemeMod() >= 0; }
+	/// the bar on screen wears its scheme's own painting: a mod's, or ControlBar Pro's on every other side
+	Bool isCurrentSchemePainted( void ) const;
 	/// a mod scheme's painting, cut at the panel seams and each piece drawn where its panel stands
 	void drawModPainting( ICoord2D offset, Bool foreground );
 	/// where the mod's own ControlBar.wnd puts the window with this decorated name, in 800x600 design

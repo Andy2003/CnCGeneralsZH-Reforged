@@ -1604,10 +1604,48 @@ static Int barModIndex( void )
 	return TheControlBar->getControlBarSchemeManager()->getCurrentSchemeMod();
 }
 
-/// Where a panel's design x 0 lands on screen.
-static Real panelOriginX( Int panel, Real dispW, Real s )
+//-------------------------------------------------------------------------------------------------
+/** ControlBar Pro's bar (xezon and FAS, MIT; Data/Window/ControlBarPro.txt), the bar of every side but
+	* a mod faction's.  It was painted at 1920x1080 and goes on screen in three pieces: the radar
+	* pinned bottom left, the command grid bottom centre and the selection with the general's buttons
+	* bottom right.  Each is drawn at the screen's height alone, 1080 lines to one, so it keeps the
+	* painting's shape and never stretches across the width, and from 4:3 to 32:9 the world shows
+	* between them.  The pieces are the three panels with their anchors (thePanelAnchorFraction,
+	* thePanelAnchorDesignX); a window goes to a piece by which side of the seams its middle lies, and
+	* drawModPainting cuts the painting at the same seams, which fall in the gaps of every side's art.
+	* Fills the transform from 800x600 design units, where the .wnd loader's stretch is taken back to,
+	* to the screen.  Not static: the test calls it. */
+//-------------------------------------------------------------------------------------------------
+static const Real HUD_ART_ASPECT = 1920.0f / 1080.0f;		///< what ControlBar Pro was painted at
+static const Real theHudSeamDesignX[ ControlBar::CB_PANEL_COUNT - 1 ] = { 182.0f, 616.0f };	///< drawModPainting's seams
+
+void ControlBarHudPieceTransform( Int panel, Real dispW, Real dispH, Real *sx, Real *sy, Real *originX )
 {
-	return dispW * thePanelAnchorFraction[ panel ] - thePanelAnchorDesignX[ panel ] * s;
+	*sy = dispH / CONTROL_BAR_DESIGN_H;
+	*sx = *sy * HUD_ART_ASPECT * CONTROL_BAR_DESIGN_H / CONTROL_BAR_DESIGN_W;
+	*originX = dispW * thePanelAnchorFraction[ panel ] - thePanelAnchorDesignX[ panel ] * *sx;
+}
+
+/// the piece of ControlBar Pro's bar a window whose middle is at this design x belongs to
+Int ControlBarHudPieceForDesignX( Real designCenterX )
+{
+	if( designCenterX < theHudSeamDesignX[ 0 ] )
+		return ControlBar::CB_PANEL_LEFT;
+	return designCenterX > theHudSeamDesignX[ 1 ] ? ControlBar::CB_PANEL_RIGHT : ControlBar::CB_PANEL_CENTER;
+}
+
+/// Design units to the screen for the bar that is up: a mod's bar keeps the loader's stretch
+/// (barModIndex), ours is ControlBar Pro's pieces
+static void barTransform( Int panel, Real dispW, Real dispH, Real *sx, Real *sy, Real *originX )
+{
+	if( barModIndex() >= 0 )
+	{
+		*sx = dispW / CONTROL_BAR_DESIGN_W;
+		*sy = dispH / CONTROL_BAR_DESIGN_H;
+		*originX = 0.0f;
+		return;
+	}
+	ControlBarHudPieceTransform( panel, dispW, dispH, sx, sy, originX );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1661,7 +1699,7 @@ Real ControlBarHudScale( void )
 	* Positions are relative to the parent, so both the parent's old and its new screen origin travel
 	* down the recursion - the same walk placeInPanel does, without the panels and the plate art. */
 //-------------------------------------------------------------------------------------------------
-static void layoutUniformWindow( GameWindow *win, Real originX, Real originY, Real s,
+static void layoutUniformWindow( GameWindow *win, Real originX, Real originY, Real sx, Real sy,
 																 Real loadScaleX, Real loadScaleY,
 																 Int oldParentX, Int oldParentY,
 																 Int newParentX, Int newParentY )
@@ -1679,14 +1717,14 @@ static void layoutUniformWindow( GameWindow *win, Real originX, Real originY, Re
 	const Real designW = size.x / loadScaleX;
 	const Real designH = size.y / loadScaleY;
 
-	const Int newX = REAL_TO_INT_FLOOR( originX + designX * s );
-	const Int newY = REAL_TO_INT_FLOOR( originY + designY * s );
+	const Int newX = REAL_TO_INT_FLOOR( originX + designX * sx );
+	const Int newY = REAL_TO_INT_FLOOR( originY + designY * sy );
 
 	win->winSetPosition( newX - newParentX, newY - newParentY );
-	win->winSetSize( REAL_TO_INT_CEIL( designW * s ), REAL_TO_INT_CEIL( designH * s ) );
+	win->winSetSize( REAL_TO_INT_CEIL( designW * sx ), REAL_TO_INT_CEIL( designH * sy ) );
 
 	for( GameWindow *child = win->winGetChild(); child; child = child->winGetNext() )
-		layoutUniformWindow( child, originX, originY, s, loadScaleX, loadScaleY,
+		layoutUniformWindow( child, originX, originY, sx, sy, loadScaleX, loadScaleY,
 												 oldX, oldY, newX, newY );
 }
 
@@ -1704,15 +1742,23 @@ void ControlBarLayoutUniform( GameWindow *root, Real anchorFracX, Real anchorFra
 	// what the loader already multiplied every coordinate by, so it can be divided back out
 	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
-	const Real s = ControlBarUniformScale();
+
+	// ControlBar Pro's rank screen and power bars at its pieces' scale, a mod's at one scale
+	Real sx = ControlBarUniformScale();
+	Real sy = sx;
+	if( barModIndex() < 0 )
+	{
+		Real unusedOriginX;
+		ControlBarHudPieceTransform( ControlBar::CB_PANEL_RIGHT, dispW, dispH, &sx, &sy, &unusedOriginX );
+	}
 
 	//
 	// The anchor is a point that does not move: the same fraction of the screen and of the design
 	// space.  (1,1) keeps the bottom right corner where it was however wide the screen is, which is
 	// what a bar hanging off the right edge above the command bar wants.
 	//
-	const Real originX = dispW * anchorFracX - CONTROL_BAR_DESIGN_W * anchorFracX * s;
-	const Real originY = dispH * anchorFracY - CONTROL_BAR_DESIGN_H * anchorFracY * s;
+	const Real originX = dispW * anchorFracX - CONTROL_BAR_DESIGN_W * anchorFracX * sx;
+	const Real originY = dispH * anchorFracY - CONTROL_BAR_DESIGN_H * anchorFracY * sy;
 
 	ICoord2D rootOrigin;
 	root->winGetScreenPosition( &rootOrigin.x, &rootOrigin.y );
@@ -1727,7 +1773,7 @@ void ControlBarLayoutUniform( GameWindow *root, Real anchorFracX, Real anchorFra
 	if( parent )
 		parent->winGetScreenPosition( &parentPos.x, &parentPos.y );
 
-	layoutUniformWindow( root, originX, originY, s, loadScaleX, loadScaleY,
+	layoutUniformWindow( root, originX, originY, sx, sy, loadScaleX, loadScaleY,
 											 parentPos.x, parentPos.y, parentPos.x, parentPos.y );
 }
 
@@ -1750,15 +1796,9 @@ Bool ControlBarPanelDesignToScreen( Int panel, const IRegion2D *design,
 	// stretching to fill it.  ControlBarUniformScale() is this same number for the display that is
 	// actually up; here the size is a parameter, because the tests ask about screens we are not on.
 	//
-	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
-	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
-	const Real s = loadScaleX < loadScaleY ? loadScaleX : loadScaleY;
-
-	// a mod's bar keeps the loader's stretch, panels and all (barModIndex)
-	const Bool stretch = barModIndex() >= 0;
-	const Real sx = stretch ? loadScaleX : s;
-	const Real sy = stretch ? loadScaleY : s;
-	const Real originX = stretch ? 0.0f : panelOriginX( panel, dispW, s );
+	// a mod's bar keeps the loader's stretch, panels and all; ours is ControlBar Pro's pieces
+	Real sx, sy, originX;
+	barTransform( panel, dispW, dispH, &sx, &sy, &originX );
 
 	rectOut->lo.x = REAL_TO_INT_FLOOR( originX + design->lo.x * sx );
 	rectOut->hi.x = REAL_TO_INT_CEIL ( originX + design->hi.x * sx );
@@ -1818,6 +1858,11 @@ static Int panelForWindow( const char *shortName, Real designCenterX )
 		"RightHUD", "GeneralsExp", "ExpBarForeground", "ButtonGeneral",
 		"ButtonSmall", "ButtonMedium", "ButtonLarge", NULL
 	};
+
+	// ControlBar Pro's bar: a window goes by its middle, and the observer's panes with the radar they
+	// are drawn beside
+	if( barModIndex() < 0 )
+		return strncmp( shortName, "ObserverPlayer", 14 ) == 0 ? ControlBar::CB_PANEL_LEFT : ControlBarHudPieceForDesignX( designCenterX );
 
 	if( shortName[ 0 ] == 0 )
 	{
@@ -1925,8 +1970,10 @@ const ControlBarPlate *ControlBarPlateForSide( const AsciiString& side, Int pane
 		return NULL;
 
 	// -modfactions: a mod's bar wears the mod's own painting (drawModPainting), never our plates,
-	// so nothing shifts its windows off the mod's layout or masks its clicks with our art
-	if( barModIndex() >= 0 )
+	// so nothing shifts its windows off the mod's layout or masks its clicks with our art.  Ours is
+	// ControlBar Pro's, its scheme's painting too, so a bar that is up wears no plate; the plates are
+	// only the tests' to measure now
+	if( TheControlBar != NULL )
 		return NULL;
 
 	// the boss bar is Chinese and the observer bar is American - EA built each out of that art
@@ -2148,9 +2195,8 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
 	const Real s = ControlBarUniformScale();
 	const Int mod = barModIndex();
-	const Real sx = mod >= 0 ? loadScaleX : s;
-	const Real sy = mod >= 0 ? loadScaleY : s;
-	const Real originX = mod >= 0 ? 0.0f : panelOriginX( panel, dispW, s );
+	Real sx, sy, originX;
+	barTransform( panel, dispW, dispH, &sx, &sy, &originX );
 
 	ICoord2D rel, size;
 	win->winGetPosition( &rel.x, &rel.y );
@@ -2171,6 +2217,10 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	}
 
 	const char *shortName = shortWindowName( win );
+
+	// ControlBar Pro's own input panes and overlays belong to its painting, not to a mod's
+	if( strncmp( shortName, "ControlBarPro", 13 ) == 0 )
+		win->winHide( mod >= 0 );
 
 	//
 	// Under a mod's bar a window the mod's own ControlBar.wnd places goes where that file says, since
@@ -2219,8 +2269,9 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	// bar out of the world, so they become exactly their panel.  CenterBackground blocks input as
 	// well as holding the command windows, and is authored full width, so it gets the same
 	// treatment - left alone it would swallow every click over the gaps we just opened up.
+	// ControlBar Pro's panes are its own, one per piece, and stay as its file draws them.
 	//
-	if( shortName[ 0 ] == 0 || strcmp( shortName, "CenterBackground" ) == 0 )
+	if( mod >= 0 && ( shortName[ 0 ] == 0 || strcmp( shortName, "CenterBackground" ) == 0 ) )
 	{
 		newX = m_panelRect[ panel ].lo.x;
 		newW = m_panelRect[ panel ].width();
@@ -2404,13 +2455,6 @@ void ControlBar::layoutPanels( void )
 	// what the .wnd loader already multiplied every x coordinate by, so we can divide it back out
 	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
 
-	//
-	// One scale for both axes, the smaller of the two so the three panels always fit side by side.
-	// At 4:3 that is exactly the old scale and the panels still meet; at anything wider they shrink
-	// together and leave the middle of the screen bottom open instead of stretching to fill it.
-	//
-	const Real s = ControlBarUniformScale();
-
 	Int p;
 	for( p = 0; p < CB_PANEL_COUNT; p++ )
 		ControlBarPanelDesignToScreen( p, &thePanelDesignRect[ p ],
@@ -2422,7 +2466,8 @@ void ControlBar::layoutPanels( void )
 	parent->winGetScreenPosition( &barOrigin.x, &barOrigin.y );
 
 	// the frame itself stays full width - it draws nothing and passes input through
-	const Real sy = barModIndex() >= 0 ? dispH / CONTROL_BAR_DESIGN_H : s;		// a mod's bar is stretched
+	Real sx, sy, originX;
+	barTransform( CB_PANEL_LEFT, dispW, dispH, &sx, &sy, &originX );		// the same height for every piece
 	const Int parentTop =
 		REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - CONTROL_BAR_DESIGN_TOP ) * sy );
 	parent->winSetPosition( 0, parentTop );
@@ -2439,22 +2484,25 @@ void ControlBar::layoutPanels( void )
 
 	for( GameWindow *child = parent->winGetChild(); child; child = child->winGetNext() )
 	{
-		// the nameless panes go by where they were authored, so ask the cache before it is rewritten
+		//
+		// A window we placed and nobody has moved since goes by where it was authored, which the cache
+		// holds.  One somebody has moved goes by where it is now: the windows ControlBarScheme::init
+		// puts at its UL/LR are authored at 0,0 and were first seen there, before the scheme ran.
+		//
+		ICoord2D rel, size;
+		child->winGetPosition( &rel.x, &rel.y );
+		child->winGetSize( &size.x, &size.y );
+		const Int liveX = barOrigin.x + rel.x;
+		const Int liveY = barOrigin.y + rel.y;
 		ControlBarPanelPlacementMap::const_iterator it = theControlBarPlacement.find( child );
-		Real designCenterX;
-		if( it != theControlBarPlacement.end() && it->second.known )
+		Real designCenterX = ( liveX + size.x * 0.5f ) / loadScaleX;
+		if( it != theControlBarPlacement.end() && it->second.known &&
+				liveX == it->second.placedX && liveY == it->second.placedY &&
+				size.x == it->second.placedW && size.y == it->second.placedH )
 			designCenterX = it->second.designX + it->second.designW * 0.5f;
-		else
-		{
-			ICoord2D rel, size;
-			child->winGetPosition( &rel.x, &rel.y );
-			child->winGetSize( &size.x, &size.y );
-			designCenterX = ( barOrigin.x + rel.x + size.x * 0.5f ) / loadScaleX;
-		}
 
 		placeInPanel( child, panelForWindow( shortWindowName( child ), designCenterX ),
-									barOrigin.x, barOrigin.y, 0, parentTop );
-	}
+									barOrigin.x, barOrigin.y, 0, parentTop );	}
 
 }  // end layoutPanels
 

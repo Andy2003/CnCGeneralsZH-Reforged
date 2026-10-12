@@ -1457,6 +1457,13 @@ extern Bool ControlBarPanelDesignToScreen( Int panel, const IRegion2D *design,
 																					 Int displayWidth, Int displayHeight,
 																					 IRegion2D *rectOut );
 
+/** ControlBar Pro's bar in three pieces, each at the screen's height alone and pinned to its own
+	* anchor: 800x600 design units to the screen for 'panel' (CB_PANEL_LEFT, _CENTER, _RIGHT). */
+extern void ControlBarHudPieceTransform( Int panel, Real dispW, Real dispH, Real *sx, Real *sy, Real *originX );
+
+/// which of those pieces a window whose middle is at this design x belongs to
+extern Int ControlBarHudPieceForDesignX( Real designCenterX );
+
 /** The one scale the whole HUD is drawn at: the display over the 800x600 everything was authored
 	* at, the smaller of the two axes so nothing is distorted.  The .wnd loader multiplies x and y
 	* separately, which on a 16:9 screen is a 1.33x horizontal smear; anything that wants to sit
