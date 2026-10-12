@@ -56,7 +56,6 @@
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
-#include "Common/INI.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
 #include "Common/PerfTimer.h"
@@ -2639,6 +2638,14 @@ Bool Player::hasPrereqsForScience(ScienceType t) const
 }
 
 //=============================================================================
+/** The rank table a player climbs: under -modfactions a mod faction's is its own mod's Rank.ini, so
+	* it gets that mod's ranks, points and rank sciences ("M<n>~SCIENCE_Rank3") and nothing of retail's. */
+static Int rankMod(const Player *player)
+{
+	return player->getPlayerTemplate() ? player->getPlayerTemplate()->getModIndex() : -1;
+}
+
+//=============================================================================
 /// returns TRUE if the player gained/lost levels as a result.
 Bool Player::addSkillPoints(Int delta)
 {
@@ -2647,8 +2654,8 @@ Bool Player::addSkillPoints(Int delta)
 	if( delta == 0 )
 		return false;
 
-	Int levelCap = min( TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount() );
-	Int pointCap = TheRankInfoStore->getRankInfo(levelCap)->m_skillPointsNeeded; // Cap at lowest point of cap level, not highest.
+	Int levelCap = min( TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount(rankMod(this)) );
+	Int pointCap = TheRankInfoStore->getRankInfo(levelCap, rankMod(this))->m_skillPointsNeeded; // Cap at lowest point of cap level, not highest.
 
 	Bool levelGained = FALSE;
 	m_skillPoints = min( pointCap, (m_skillPoints + delta) );
@@ -2690,35 +2697,18 @@ void Player::resetSciences()
 
 	for (Int i = 1; i <= m_rankLevel; ++i)
 	{
-		const RankInfo* rank = TheRankInfoStore->getRankInfo(i);
+		const RankInfo* rank = TheRankInfoStore->getRankInfo(i, rankMod(this));
 		if (rank)
 		{
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
 			{
-				addRankScience(*it);
+				addScience(*it);
 			}
 		}
 	}
 
 	for (ScienceVec::const_iterator it = m_sciences.begin(); it != m_sciences.end(); ++it)
 		TheScriptEngine->notifyOfAcquiredScience(getPlayerIndex(), *it);
-}
-
-//=============================================================================
-/** Rank.ini is retail's and grants retail's SCIENCE_Rank<n>.  Under -modfactions a mod that defines its
-	* own rank sciences has every science of its generals ask for those, "M<n>~SCIENCE_Rank3", so a
-	* player of that mod's faction gets the mod's copy beside retail's or none of the mod's promotions
-	* ever has its prerequisites. */
-void Player::addRankScience(ScienceType science)
-{
-	addScience(science);
-	const Int mod = getPlayerTemplate() ? getPlayerTemplate()->getModIndex() : -1;
-	const AsciiString name = TheScienceStore->getInternalNameForScience(science);
-	if (!TheModNamespace.defines(mod, MODNAME_SCIENCE, name))
-		return;
-	AsciiString modName;
-	modName.format("M%d~%s", mod + 1, name.str());
-	addScience(TheScienceStore->getScienceFromInternalName(modName));
 }
 
 //=============================================================================
@@ -2871,12 +2861,12 @@ void Player::resetRank()
 {
 	m_rankLevel = 1;
 	m_skillPoints = 0;
-	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1);
+	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1, rankMod(this));
 	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
 	m_levelDown = 0;
 	m_sciences.clear();
 	m_sciencePurchasePoints = getPlayerTemplate() ? getPlayerTemplate()->getIntrinsicSciencePurchasePoints() : 0;
-	const RankInfo* curRank = TheRankInfoStore->getRankInfo(m_rankLevel);
+	const RankInfo* curRank = TheRankInfoStore->getRankInfo(m_rankLevel, rankMod(this));
 	m_sciencePurchasePoints += curRank ? curRank->m_sciencePurchasePointsGranted : 0;
 	m_generalName = TheGameText? TheGameText->fetch("SCIENCE:GeneralName"):UnicodeString::TheEmptyString;
 	resetSciences();
@@ -2888,8 +2878,8 @@ Bool Player::setRankLevel(Int newLevel)
 {
 	if (newLevel < 1) 
 		newLevel = 1;
-	else if (newLevel > TheRankInfoStore->getRankLevelCount())
-		newLevel = TheRankInfoStore->getRankLevelCount();
+	else if (newLevel > TheRankInfoStore->getRankLevelCount(rankMod(this)))
+		newLevel = TheRankInfoStore->getRankLevelCount(rankMod(this));
 
 	if (newLevel > TheGameLogic->getRankLevelLimit())
 		newLevel = TheGameLogic->getRankLevelLimit();
@@ -2909,7 +2899,7 @@ Bool Player::setRankLevel(Int newLevel)
 
 	for (Int i = m_rankLevel + 1; i <= newLevel; ++i)
 	{
-		const RankInfo* rank = TheRankInfoStore->getRankInfo(i);
+		const RankInfo* rank = TheRankInfoStore->getRankInfo(i, rankMod(this));
 		DEBUG_ASSERTCRASH(rank, ("rank should never be null here"));
 		if (rank)
 		{
@@ -2924,14 +2914,14 @@ Bool Player::setRankLevel(Int newLevel)
 
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
 			{
-				addRankScience(*it);
+				addScience(*it);
 			}
 
 			m_levelDown = rank->m_skillPointsNeeded;
 		}
 	}
 
-	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1);
+	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1, rankMod(this));
 	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
 	m_rankLevel = newLevel;
 
