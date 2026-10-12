@@ -472,7 +472,7 @@ const char *const ModNamespace::FactionFiles[] =
 	"Data\\INI\\ObjectCreationList.ini", "Data\\INI\\Locomotor.ini", "Data\\INI\\SpecialPower.ini",
 	"Data\\INI\\DamageFX.ini", "Data\\INI\\Armor.ini", "Data\\INI\\Object", "Data\\INI\\Upgrade.ini",
 	"Data\\INI\\CommandButton.ini", "Data\\INI\\CommandSet.ini", "Data\\INI\\ParticleSystem.ini",
-	"Data\\INI\\MappedImages", "Data\\INI\\ControlBarScheme.ini", "Data\\INI\\Music.ini",
+	"Data\\INI\\MappedImages", "Data\\INI\\Music.ini",
 	"Data\\INI\\SoundEffects.ini", "Data\\INI\\Speech.ini", "Data\\INI\\Voice.ini",
 	NULL
 };
@@ -489,7 +489,7 @@ static const struct { const char *keyword; ModNameType type; } ModBlockTypes[] =
 	{ "CommandSet", MODNAME_COMMANDSET }, { "CommandButton", MODNAME_COMMANDBUTTON }, { "FXList", MODNAME_FXLIST },
 	{ "ObjectCreationList", MODNAME_OCL }, { "ParticleSystem", MODNAME_PARTICLESYSTEM },
 	{ "Locomotor", MODNAME_LOCOMOTOR }, { "PlayerTemplate", MODNAME_PLAYERTEMPLATE },
-	{ "MappedImage", MODNAME_MAPPEDIMAGE }, { "ControlBarScheme", MODNAME_CONTROLBARSCHEME },
+	{ "MappedImage", MODNAME_MAPPEDIMAGE },
 	{ "AudioEvent", MODNAME_AUDIOEVENT }, { "DialogEvent", MODNAME_AUDIOEVENT }, { "MusicTrack", MODNAME_AUDIOEVENT },
 };
 

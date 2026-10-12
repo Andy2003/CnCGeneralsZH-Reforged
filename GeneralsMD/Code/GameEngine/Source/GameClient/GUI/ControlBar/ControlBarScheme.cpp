@@ -55,9 +55,6 @@
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 #include "Lib/Clock.h"
-#include <string>
-#include "Common/file.h"
-#include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
 
@@ -937,11 +934,9 @@ void ControlBarSchemeManager::init( void )
 	// the fork's edits to EA's schemes, each block naming only what it changes
 	ini.load( AsciiString( "Data\\INI\\ControlBarSchemeReforged.ini" ), INI_LOAD_MULTIFILE, NULL );
 	// ControlBar Pro's schemes, the bar every side wears: each replaces EA's of the same name whole,
-	// so nothing above reaches it (a Debug build asserts once a scheme, newControlBarScheme)
+	// and under a single -mod the mod's of that name, so nothing above reaches it (a Debug build
+	// asserts once a scheme, newControlBarScheme).  -modfactions loads no mod's schemes at all.
 	ini.load( AsciiString( "Data\\INI\\ControlBarProReforged.ini" ), INI_LOAD_OVERWRITE, NULL );
-	// -modfactions: each mod's own bars, "M<n>~" names, worn only by that mod's factions
-	INI::loadModPasses( "Data\\INI\\ControlBarScheme.ini", NULL );
-	readModWindowRects();
 
 //	//Load the user modified control bar schemes
 //	WIN32_FIND_DATA findData;
@@ -1050,24 +1045,13 @@ AsciiString ControlBarSchemeManager::getCurrentArtTwinSide( void ) const
 /** The side's widest scheme, as EA picked.  Neither interface draws a scheme's painting; the plates
 	* stand in for it (ControlBarPlateForSide), and the scheme only places the bar's own windows. */
 //-----------------------------------------------------------------------------
-/// -modfactions: the mod (0-based) a scheme's "M<n>~" name says it came from, -1 for ours
-static Int schemeModIndex( const AsciiString& name )
-{
-	const char *text = name.str();
-	if( text[ 0 ] != 'M' && text[ 0 ] != 'm' )
-		return -1;
-	char *tilde = NULL;
-	const long mod = strtol( text + 1, &tilde, 10 );
-	return ( tilde != text + 1 && *tilde == '~' && mod >= 1 ) ? (Int)mod - 1 : -1;
-}
-
-ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side, Int mod ) const
+ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side ) const
 {
 	ControlBarScheme *best = NULL;
 	for( ControlBarSchemeList::const_iterator it = m_schemeList.begin(); it != m_schemeList.end(); ++it )
 	{
 		ControlBarScheme *scheme = *it;
-		if( scheme->m_side.compareNoCase( side ) != 0 || schemeModIndex( scheme->m_name ) != mod )
+		if( scheme->m_side.compareNoCase( side ) != 0 )
 			continue;
 		if( best == NULL || scheme->m_ScreenCreationRes.x > best->m_ScreenCreationRes.x )
 			best = scheme;
@@ -1075,16 +1059,28 @@ ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString&
 	return best;
 }
 
-/// a mod faction wears its mod's bar for the side, ours where the mod has none; ours never a mod's
-ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( const AsciiString& side, Int mod ) const
+//-----------------------------------------------------------------------------
+/** The owner's call: a mod's faction plays on our bar, ControlBar Pro's American one, whatever its
+	* side and whatever bar the mod ships.  Its buttons, cameos and portrait are still the mod's.  Under
+	* -modfactions that is a faction with a mod index; under a single -mod every faction is the mod's.
+	* The observer keeps its own bar. */
+//-----------------------------------------------------------------------------
+Bool ControlBarIsModFaction( const PlayerTemplate *pt )
 {
-	ControlBarScheme *scheme = mod >= 0 ? findSchemeForSide( side, mod ) : NULL;
-	return scheme ? scheme : findSchemeForSide( side, -1 );
+	if( pt == NULL || pt->getSide().isEmpty() || pt->getSide().compareNoCase( "Observer" ) == 0 )
+		return FALSE;
+	return pt->getModIndex() >= 0 || ( !TheGlobalData->m_mods.empty() && !TheGlobalData->m_modFactions );
 }
 
-Int ControlBarSchemeManager::getCurrentSchemeMod( void ) const
+ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( AsciiString side, const PlayerTemplate *pt, Bool useSmall ) const
 {
-	return m_currentScheme ? schemeModIndex( m_currentScheme->m_name ) : -1;
+	if( ControlBarIsModFaction( pt ) )
+	{
+		side.set( "America" );
+		if( useSmall )
+			side.concat( "Small" );
+	}
+	return findSchemeForSide( side );
 }
 
 Bool ControlBarSchemeManager::isCurrentSchemePainted( void ) const
@@ -1093,73 +1089,10 @@ Bool ControlBarSchemeManager::isCurrentSchemePainted( void ) const
 }
 
 //-----------------------------------------------------------------------------
-/** A mod's bar is painted for the window rectangles of the mod's own ControlBar.wnd: ShockWave's are
-	* EA's (the same 96 rectangles as ours, at 800x600), The End of Days' are a 1920x1080 layout of its
-	* own with the command grid at 668-1308 and the radar at 5-327.  The windows stay ours, but under a
-	* mod's bar layoutPanels gives each the rectangle the mod's file names for it (findModWindowRect).
-	* Only SCREENRECT and NAME are read; nothing of the mod's callbacks or draw data is. */
+/** ControlBar Pro's painting, cut at the seams below and each piece drawn where its panel stands
+	* (ControlBarPanelDesignToScreen).  The seams fall in the gaps of every side's art. */
 //-----------------------------------------------------------------------------
-void ControlBarSchemeManager::readModWindowRects( void )
-{
-	m_modWindowRects.clear();
-	if( TheGlobalData == NULL || !TheGlobalData->m_modFactions )
-		return;
-
-	m_modWindowRects.resize( TheGlobalData->m_mods.size() );
-	for( Int mod = 0; mod < (Int)TheGlobalData->m_mods.size(); ++mod )
-	{
-		TheFileSystem->setFocus( mod );
-		File *file = TheFileSystem->openFile( "Window\\ControlBar.wnd" );
-		TheFileSystem->setFocus( FILE_FOCUS_ALL );
-		if( file == NULL )
-			continue;
-		const Int length = file->size();
-		char *raw = file->readEntireAndClose();
-		const std::string text( raw, length );		// the read is not terminated
-		delete [] raw;
-
-		// SCREENRECT = UPPERLEFT: x y, BOTTOMRIGHT: x y, CREATIONRESOLUTION: w h; NAME = "...";
-		for( const char *rect = strstr( text.c_str(), "SCREENRECT" ); rect; rect = strstr( rect + 1, "SCREENRECT" ) )
-		{
-			Int ulx, uly, lrx, lry, resx, resy;
-			char name[ 128 ];
-			if( sscanf( rect, "SCREENRECT = UPPERLEFT: %d %d , BOTTOMRIGHT: %d %d , CREATIONRESOLUTION: %d %d ; NAME = \"%127[^\"]\"",
-									&ulx, &uly, &lrx, &lry, &resx, &resy, name ) != 7 || resx <= 0 || resy <= 0 )
-				continue;
-
-			ModWindowRect r;
-			r.x = ulx * 800.0f / resx;
-			r.y = uly * 600.0f / resy;
-			r.w = ( lrx - ulx ) * 800.0f / resx;
-			r.h = ( lry - uly ) * 600.0f / resy;
-			m_modWindowRects[ mod ][ TheNameKeyGenerator->nameToKey( AsciiString( name ) ) ] = r;
-		}
-		DEBUG_LOG(( "MODNS M%d~ ControlBar.wnd: %d windows\n", mod + 1, (Int)m_modWindowRects[ mod ].size() ));
-	}
-}
-
-Bool ControlBarSchemeManager::findModWindowRect( Int mod, const AsciiString& decoratedName,
-																								 Real *x, Real *y, Real *w, Real *h ) const
-{
-	if( mod < 0 || mod >= (Int)m_modWindowRects.size() )
-		return FALSE;
-	ModWindowRectMap::const_iterator it = m_modWindowRects[ mod ].find( TheNameKeyGenerator->nameToKey( decoratedName ) );
-	if( it == m_modWindowRects[ mod ].end() )
-		return FALSE;
-	*x = it->second.x;
-	*y = it->second.y;
-	*w = it->second.w;
-	*h = it->second.h;
-	return TRUE;
-}
-
-//-----------------------------------------------------------------------------
-/** A mod's bar is laid out EA's way, one stretch per axis over the whole screen (see
-	* ControlBarPanelDesignToScreen), so the three panel transforms are one and the same and the
-	* painting goes back together at the seams below.  The seams lie in the gaps of The End of Days' painting (radar to 142, middle 247-552,
-	* right from 677, in design units) and inside ShockWave's one-piece one. */
-//-----------------------------------------------------------------------------
-void ControlBarSchemeManager::drawModPainting( ICoord2D offset, Bool foreground )
+void ControlBarSchemeManager::drawPainting( ICoord2D offset, Bool foreground )
 {
 	// where the left and centre, and the centre and right panels meet, in 800x600 design units
 	static const Int seams[ ControlBar::CB_PANEL_COUNT + 1 ] = { 0, 182, 616, 800 };
@@ -1222,7 +1155,7 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayerTemplate( const PlayerT
 		side.set("Observer");
 	// picked again every time, even for the side on screen: a new resolution can want a different
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
-	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt->getModIndex() );
+	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt, useSmall );
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
 
 	if(tempScheme)
@@ -1265,7 +1198,7 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
 	// the neutral and civilian players have no template, and wear ours
 	const PlayerTemplate *pt = p->getPlayerTemplate();
-	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt ? pt->getModIndex() : -1 );
+	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt, FALSE );
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
 
 	if(tempScheme)

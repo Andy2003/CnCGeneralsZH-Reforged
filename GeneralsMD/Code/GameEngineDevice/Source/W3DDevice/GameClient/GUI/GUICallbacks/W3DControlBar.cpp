@@ -711,11 +711,10 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 		offset.y = now.y - TheControlBar->getPanelOrigin()->y;
 	}
 
-	// -modfactions: a mod faction's bar is the mod's own painting, not our plates or our page, and so
-	// is a HUD addon's
+	// the bar is ControlBar Pro's painting, a mod faction's too, not our plates
 	if( man->isCurrentSchemePainted() )
 	{
-		man->drawModPainting( offset, FALSE );
+		man->drawPainting( offset, FALSE );
 		return;
 	}
 
@@ -741,8 +740,7 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 
 void W3DCommandBarForegroundDraw( GameWindow *window, WinInstanceData *instData )
 {
-	// nothing sits on top of the plates - see W3DCommandBarBackgroundDraw.  A mod's bar keeps its
-	// scheme's foreground layers, moved with the bar the same way, and a HUD addon's bar too
+	// the scheme's foreground layers, moved with the bar the same way as W3DCommandBarBackgroundDraw's
 	ControlBarSchemeManager *man = TheControlBar ? TheControlBar->getControlBarSchemeManager() : NULL;
 	if( man == NULL || TheDisplay == NULL || !man->isCurrentSchemePainted() )
 		return;
@@ -757,7 +755,7 @@ void W3DCommandBarForegroundDraw( GameWindow *window, WinInstanceData *instData 
 		offset.x = now.x - TheControlBar->getPanelOrigin()->x;
 		offset.y = now.y - TheControlBar->getPanelOrigin()->y;
 	}
-	man->drawModPainting( offset, TRUE );
+	man->drawPainting( offset, TRUE );
 }
 
 void W3DNoDraw( GameWindow *window, WinInstanceData *instData )

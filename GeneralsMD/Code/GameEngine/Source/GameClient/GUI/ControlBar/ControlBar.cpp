@@ -621,8 +621,8 @@ void ControlBar::watchPlayer( Player *player )
 
 	const PlayerTemplate *wear = player ? player->getPlayerTemplate()
 																			: ThePlayerList->getLocalPlayer()->getPlayerTemplate();
-	// by template name rather than side: under -modfactions a mod's America and ours share the side
-	// and not the bar
+	// by template name rather than side: under -modfactions a mod's GLA wears the American bar and
+	// ours the GLA one, the same side and not the same bar
 	if( m_controlBarSchemeManager && wear && wear->getName().compare( m_watchedSide ) != 0 )
 	{
 		// a scheme lays the whole bar out again, so it is set when the side really changes and not
@@ -1594,30 +1594,20 @@ static const Real thePanelAnchorFraction[ ControlBar::CB_PANEL_COUNT ] = { 0.0f,
 /// ...and which authored x that anchor is, so at 4:3 the three plates reassemble the shipped bar
 static const Real thePanelAnchorDesignX[ ControlBar::CB_PANEL_COUNT ] = { 0.0f, 400.0f, 800.0f };
 
-/// -modfactions: a mod's bar is up.  Its painting was made for EA's layout, one stretch per axis over
-/// the whole screen, so under it the panels are not at one scale and not pulled apart: the three
-/// transforms below are the loader's own, and the windows go where the mod authored them.
-static Int barModIndex( void )
-{
-	if( TheControlBar == NULL || TheControlBar->getControlBarSchemeManager() == NULL )
-		return -1;
-	return TheControlBar->getControlBarSchemeManager()->getCurrentSchemeMod();
-}
-
 //-------------------------------------------------------------------------------------------------
-/** ControlBar Pro's bar (xezon and FAS, MIT; Data/Window/ControlBarPro.txt), the bar of every side but
-	* a mod faction's.  It was painted at 1920x1080 and goes on screen in three pieces: the radar
-	* pinned bottom left, the command grid bottom centre and the selection with the general's buttons
+/** ControlBar Pro's bar (xezon and FAS, MIT; Data/Window/ControlBarPro.txt), the bar of every side,
+	* a mod faction's too (ControlBarIsModFaction).  It was painted at 1920x1080 and goes on screen in
+	* three pieces: the radar pinned bottom left, the command grid bottom centre and the selection with the general's buttons
 	* bottom right.  Each is drawn at the screen's height alone, 1080 lines to one, so it keeps the
 	* painting's shape and never stretches across the width, and from 4:3 to 32:9 the world shows
 	* between them.  The pieces are the three panels with their anchors (thePanelAnchorFraction,
 	* thePanelAnchorDesignX); a window goes to a piece by which side of the seams its middle lies, and
-	* drawModPainting cuts the painting at the same seams, which fall in the gaps of every side's art.
+	* drawPainting cuts the painting at the same seams, which fall in the gaps of every side's art.
 	* Fills the transform from 800x600 design units, where the .wnd loader's stretch is taken back to,
 	* to the screen.  Not static: the test calls it. */
 //-------------------------------------------------------------------------------------------------
 static const Real HUD_ART_ASPECT = 1920.0f / 1080.0f;		///< what ControlBar Pro was painted at
-static const Real theHudSeamDesignX[ ControlBar::CB_PANEL_COUNT - 1 ] = { 182.0f, 616.0f };	///< drawModPainting's seams
+static const Real theHudSeamDesignX[ ControlBar::CB_PANEL_COUNT - 1 ] = { 182.0f, 616.0f };	///< drawPainting's seams
 
 void ControlBarHudPieceTransform( Int panel, Real dispW, Real dispH, Real *sx, Real *sy, Real *originX )
 {
@@ -1632,20 +1622,6 @@ Int ControlBarHudPieceForDesignX( Real designCenterX )
 	if( designCenterX < theHudSeamDesignX[ 0 ] )
 		return ControlBar::CB_PANEL_LEFT;
 	return designCenterX > theHudSeamDesignX[ 1 ] ? ControlBar::CB_PANEL_RIGHT : ControlBar::CB_PANEL_CENTER;
-}
-
-/// Design units to the screen for the bar that is up: a mod's bar keeps the loader's stretch
-/// (barModIndex), ours is ControlBar Pro's pieces
-static void barTransform( Int panel, Real dispW, Real dispH, Real *sx, Real *sy, Real *originX )
-{
-	if( barModIndex() >= 0 )
-	{
-		*sx = dispW / CONTROL_BAR_DESIGN_W;
-		*sy = dispH / CONTROL_BAR_DESIGN_H;
-		*originX = 0.0f;
-		return;
-	}
-	ControlBarHudPieceTransform( panel, dispW, dispH, sx, sy, originX );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1743,14 +1719,9 @@ void ControlBarLayoutUniform( GameWindow *root, Real anchorFracX, Real anchorFra
 	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
 
-	// ControlBar Pro's rank screen and power bars at its pieces' scale, a mod's at one scale
-	Real sx = ControlBarUniformScale();
-	Real sy = sx;
-	if( barModIndex() < 0 )
-	{
-		Real unusedOriginX;
-		ControlBarHudPieceTransform( ControlBar::CB_PANEL_RIGHT, dispW, dispH, &sx, &sy, &unusedOriginX );
-	}
+	// the rank screen and power bars at ControlBar Pro's pieces' scale
+	Real sx, sy, unusedOriginX;
+	ControlBarHudPieceTransform( ControlBar::CB_PANEL_RIGHT, dispW, dispH, &sx, &sy, &unusedOriginX );
 
 	//
 	// The anchor is a point that does not move: the same fraction of the screen and of the design
@@ -1796,9 +1767,9 @@ Bool ControlBarPanelDesignToScreen( Int panel, const IRegion2D *design,
 	// stretching to fill it.  ControlBarUniformScale() is this same number for the display that is
 	// actually up; here the size is a parameter, because the tests ask about screens we are not on.
 	//
-	// a mod's bar keeps the loader's stretch, panels and all; ours is ControlBar Pro's pieces
+	// ControlBar Pro's pieces
 	Real sx, sy, originX;
-	barTransform( panel, dispW, dispH, &sx, &sy, &originX );
+	ControlBarHudPieceTransform( panel, dispW, dispH, &sx, &sy, &originX );
 
 	rectOut->lo.x = REAL_TO_INT_FLOOR( originX + design->lo.x * sx );
 	rectOut->hi.x = REAL_TO_INT_CEIL ( originX + design->hi.x * sx );
@@ -1839,49 +1810,12 @@ typedef std::map< GameWindow *, ControlBarPanelPlacement > ControlBarPanelPlacem
 static ControlBarPanelPlacementMap theControlBarPlacement;
 
 //-------------------------------------------------------------------------------------------------
-/** Which panel a direct child of ControlBarParent belongs to.  Everything not named here rides in
-	* the middle, which is where the .wnd already puts the money, power and command windows - and
-	* where the plate art puts the column of worker/beacon/chat/options slots.
-	*
-	* The three GameWinBlockInput panes have no name at all, and one of them sits over each panel in
-	* the authored layout, so they go by where they were drawn: the pane that used to cover the radar
-	* keeps covering the radar. */
+/** Which piece of ControlBar Pro's bar a direct child of ControlBarParent belongs to: a window goes
+	* by its middle, and the observer's panes with the radar they are drawn beside. */
 //-------------------------------------------------------------------------------------------------
 static Int panelForWindow( const char *shortName, Real designCenterX )
 {
-	static const char *leftNames[] =
-	{
-		"LeftHUD", "WinUAttack", "BackgroundMarker", "ForegroundMarker", "OnTopDraw", NULL
-	};
-	static const char *rightNames[] =
-	{
-		"RightHUD", "GeneralsExp", "ExpBarForeground", "ButtonGeneral",
-		"ButtonSmall", "ButtonMedium", "ButtonLarge", NULL
-	};
-
-	// ControlBar Pro's bar: a window goes by its middle, and the observer's panes with the radar they
-	// are drawn beside
-	if( barModIndex() < 0 )
-		return strncmp( shortName, "ObserverPlayer", 14 ) == 0 ? ControlBar::CB_PANEL_LEFT : ControlBarHudPieceForDesignX( designCenterX );
-
-	if( shortName[ 0 ] == 0 )
-	{
-		for( Int p = 0; p < ControlBar::CB_PANEL_COUNT; p++ )
-			if( designCenterX >= thePanelDesignRect[ p ].lo.x &&
-					designCenterX <= thePanelDesignRect[ p ].hi.x )
-				return p;
-		return ControlBar::CB_PANEL_CENTER;
-	}
-
-	for( const char **n = leftNames; *n; n++ )
-		if( strcmp( shortName, *n ) == 0 )
-			return ControlBar::CB_PANEL_LEFT;
-
-	for( const char **n = rightNames; *n; n++ )
-		if( strcmp( shortName, *n ) == 0 )
-			return ControlBar::CB_PANEL_RIGHT;
-
-	return ControlBar::CB_PANEL_CENTER;
+	return strncmp( shortName, "ObserverPlayer", 14 ) == 0 ? ControlBar::CB_PANEL_LEFT : ControlBarHudPieceForDesignX( designCenterX );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1969,10 +1903,8 @@ const ControlBarPlate *ControlBarPlateForSide( const AsciiString& side, Int pane
 	if( side.isEmpty() || panel < 0 || panel >= ControlBar::CB_PANEL_COUNT )
 		return NULL;
 
-	// -modfactions: a mod's bar wears the mod's own painting (drawModPainting), never our plates,
-	// so nothing shifts its windows off the mod's layout or masks its clicks with our art.  Ours is
-	// ControlBar Pro's, its scheme's painting too, so a bar that is up wears no plate; the plates are
-	// only the tests' to measure now
+	// the bar is ControlBar Pro's, its scheme's painting (drawPainting), so a bar that is up wears no
+	// plate; the plates are only the tests' to measure now
 	if( TheControlBar != NULL )
 		return NULL;
 
@@ -1997,20 +1929,6 @@ static const char *shortWindowName( GameWindow *win )
 	const char *name = win->winGetInstanceData()->m_decoratedNameString.str();
 	const char *colon = strchr( name, ':' );
 	return colon ? colon + 1 : name;
-}
-
-/// The windows ControlBarScheme::init puts at the scheme's own UL/LR rather than where the .wnd has them.
-static Bool isSchemePlacedWindow( const char *shortName )
-{
-	static const char *names[] =
-	{
-		"PopupCommunicator", "ButtonIdleWorker", "ButtonOptions", "ButtonPlaceBeacon", "MoneyDisplay",
-		"PowerWindow", "ButtonGeneral", "ButtonLarge", "WinUAttack", NULL
-	};
-	for( const char **n = names; *n; n++ )
-		if( strcmp( shortName, *n ) == 0 )
-			return TRUE;
-	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2194,9 +2112,8 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
 	const Real s = ControlBarUniformScale();
-	const Int mod = barModIndex();
 	Real sx, sy, originX;
-	barTransform( panel, dispW, dispH, &sx, &sy, &originX );
+	ControlBarHudPieceTransform( panel, dispW, dispH, &sx, &sy, &originX );
 
 	ICoord2D rel, size;
 	win->winGetPosition( &rel.x, &rel.y );
@@ -2218,25 +2135,10 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 
 	const char *shortName = shortWindowName( win );
 
-	// ControlBar Pro's own input panes and overlays belong to its painting, not to a mod's
-	if( strncmp( shortName, "ControlBarPro", 13 ) == 0 )
-		win->winHide( mod >= 0 );
-
-	//
-	// Under a mod's bar a window the mod's own ControlBar.wnd places goes where that file says, since
-	// that is what the painting was made around.  Not the ones ControlBarScheme::init has just put at
-	// the scheme's UL/LR (the mod's file leaves those at 0,0 100x100), and not the nameless panes.
-	// place.design* stays ours, so the window comes back to our layout when our bar does.
-	//
-	Real designX = place.designX, designY = place.designY, designW = place.designW, designH = place.designH;
-	if( mod >= 0 && shortName[ 0 ] != 0 && !isSchemePlacedWindow( shortName ) )
-		m_controlBarSchemeManager->findModWindowRect( mod, win->winGetInstanceData()->m_decoratedNameString,
-																									&designX, &designY, &designW, &designH );
-
-	Int newX = REAL_TO_INT_FLOOR( originX + designX * sx );
-	Int newY = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - designY ) * sy );
-	Int newW = REAL_TO_INT_CEIL( designW * sx );
-	Int newH = REAL_TO_INT_CEIL( designH * sy );
+	Int newX = REAL_TO_INT_FLOOR( originX + place.designX * sx );
+	Int newY = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - place.designY ) * sy );
+	Int newW = REAL_TO_INT_CEIL( place.designW * sx );
+	Int newH = REAL_TO_INT_CEIL( place.designH * sy );
 
 	//
 	// A plate is its side's own painting rather than a cut of the shipped one, so where it draws the
@@ -2263,24 +2165,6 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	Int childShiftX = shiftX;
 	if( strcmp( shortName, "CenterBackground" ) == 0 )
 		childShiftX = plate ? REAL_TO_INT_FLOOR( plate->gridShiftX * s ) : 0;
-
-	//
-	// The unnamed children are the GameWinBlockInput panes: their only job is to keep clicks on the
-	// bar out of the world, so they become exactly their panel.  CenterBackground blocks input as
-	// well as holding the command windows, and is authored full width, so it gets the same
-	// treatment - left alone it would swallow every click over the gaps we just opened up.
-	// ControlBar Pro's panes are its own, one per piece, and stay as its file draws them.
-	//
-	if( mod >= 0 && ( shortName[ 0 ] == 0 || strcmp( shortName, "CenterBackground" ) == 0 ) )
-	{
-		newX = m_panelRect[ panel ].lo.x;
-		newW = m_panelRect[ panel ].width();
-		if( shortName[ 0 ] == 0 )
-		{
-			newY = m_panelRect[ panel ].lo.y;
-			newH = m_panelRect[ panel ].height();
-		}
-	}
 
 	win->winSetPosition( newX - newParentX, newY - newParentY );
 	win->winSetSize( newW, newH );
@@ -2467,7 +2351,7 @@ void ControlBar::layoutPanels( void )
 
 	// the frame itself stays full width - it draws nothing and passes input through
 	Real sx, sy, originX;
-	barTransform( CB_PANEL_LEFT, dispW, dispH, &sx, &sy, &originX );		// the same height for every piece
+	ControlBarHudPieceTransform( CB_PANEL_LEFT, dispW, dispH, &sx, &sy, &originX );		// the same height for every piece
 	const Int parentTop =
 		REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - CONTROL_BAR_DESIGN_TOP ) * sy );
 	parent->winSetPosition( 0, parentTop );
@@ -5478,7 +5362,9 @@ void ControlBar::initSpecialPowershortcutBar( Player *player)
 		return;
 	m_currentlyUsedSpecialPowersButtons = pt->getSpecialPowerShortcutButtonCount();
 	AsciiString layoutName, tempName, windowName, parentName;
-	layoutName = pt->getSpecialPowerShortcutWinName();
+	// a mod faction's tray is our American one beside our American bar, whatever .wnd the mod names;
+	// its buttons are still the mod's SpecialPowerShortcutCommandSet
+	layoutName = ControlBarIsModFaction( pt ) ? AsciiString( "GenPowersShortcutBarUS.wnd" ) : pt->getSpecialPowerShortcutWinName();
 	m_specialPowerLayout = TheWindowManager->winCreateLayout(layoutName);
 	m_specialPowerLayout->hide(TRUE);
 

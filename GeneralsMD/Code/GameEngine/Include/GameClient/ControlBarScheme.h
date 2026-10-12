@@ -51,12 +51,6 @@
 #define __CONTROL_BAR_SCHEME_H_
 
 //-----------------------------------------------------------------------------
-// SYSTEM INCLUDES ////////////////////////////////////////////////////////////
-//-----------------------------------------------------------------------------
-#include <map>
-#include <vector>
-
-//-----------------------------------------------------------------------------
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameClient/Color.h"
@@ -278,17 +272,10 @@ public:
 		* is really showing.  Empty when nothing else shares it. */
 	AsciiString getCurrentArtTwinSide( void ) const;
 
-	/// -modfactions: the mod (0-based) whose own bar ("M<n>~" scheme) is on screen, -1 for ours;
-	/// a mod's bar brings its own painting
-	Int getCurrentSchemeMod( void ) const;
-	Bool isCurrentSchemeMod( void ) const { return getCurrentSchemeMod() >= 0; }
-	/// the bar on screen wears its scheme's own painting: a mod's, or ControlBar Pro's on every other side
+	/// the bar on screen wears its scheme's own painting, ControlBar Pro's
 	Bool isCurrentSchemePainted( void ) const;
-	/// a mod scheme's painting, cut at the panel seams and each piece drawn where its panel stands
-	void drawModPainting( ICoord2D offset, Bool foreground );
-	/// where the mod's own ControlBar.wnd puts the window with this decorated name, in 800x600 design
-	/// units; FALSE when the mod ships no ControlBar.wnd or no window of that name
-	Bool findModWindowRect( Int mod, const AsciiString& decoratedName, Real *x, Real *y, Real *w, Real *h ) const;
+	/// the scheme's painting, cut at the panel seams and each piece drawn where its panel stands
+	void drawPainting( ICoord2D offset, Bool foreground );
 
 
 	// parse Functions for the INI file
@@ -304,20 +291,14 @@ public:
 	void preloadAssets( TimeOfDay timeOfDay );									///< preload the assets
 
 private:
-	ControlBarScheme *findSchemeForSide( const AsciiString& side, Int mod ) const;	///< the widest of that side's schemes from mod (-1 ours) the screen can wear
-	ControlBarScheme *findSchemeForFaction( const AsciiString& side, Int mod ) const;	///< a mod faction's own scheme, else ours
-	void readModWindowRects( void );																							///< fills m_modWindowRects
+	ControlBarScheme *findSchemeForSide( const AsciiString& side ) const;	///< the widest of that side's schemes the screen can wear
+	ControlBarScheme *findSchemeForFaction( AsciiString side, const PlayerTemplate *pt, Bool useSmall ) const;	///< a mod faction wears America's (ControlBarIsModFaction)
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
 	Coord2D m_multiplyer;																	
 	
 	typedef std::list< ControlBarScheme* > ControlBarSchemeList;			///< list of control bar schemes
 	ControlBarSchemeList m_schemeList;
-
-	/// -modfactions: each mod's ControlBar.wnd rectangles by window name key, read once in init
-	struct ModWindowRect { Real x, y, w, h; };
-	typedef std::map< UnsignedInt, ModWindowRect > ModWindowRectMap;
-	std::vector< ModWindowRectMap > m_modWindowRects;
 
 };
 
@@ -328,5 +309,7 @@ private:
 //-----------------------------------------------------------------------------
 // EXTERNALS //////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+/// a mod's faction, which wears our American bar and tray whatever bar the mod ships (owner's call)
+Bool ControlBarIsModFaction( const PlayerTemplate *pt );
 
 #endif // __CONTROL_BAR_SCHEME_H_
