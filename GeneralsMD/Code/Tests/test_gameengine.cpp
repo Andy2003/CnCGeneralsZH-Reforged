@@ -834,7 +834,7 @@ TEST(patch_of_a_missing_object_is_skipped)
 	 The explosion pass added 22 more of EA's, from the structure deaths to the nukes, each with
 	 the light it lacked, and the point defense lasers' missile burst one of the fork's own.
 	 The gunfire pass added 13 of EA's gun FXLists, wider tracers and AtTarget impacts, all of
-	 which already had a muzzle light. */
+	 which already had a muzzle light, and the faster tracers six more, each with EA's own light. */
 static const char *const s_unlitReforgedFXList = "FXList SupW_FX_ParticleUplinkDeathInitial";
 
 TEST(fxlist_reforged_ini_parses_and_keeps_its_light)
@@ -883,7 +883,7 @@ TEST(fxlist_reforged_ini_parses_and_keeps_its_light)
 	}
 	fclose( fp );
 
-	CHECK_EQ( blocks, 127 );
+	CHECK_EQ( blocks, 133 );
 	CHECK_EQ( lit, blocks );
 }
 
