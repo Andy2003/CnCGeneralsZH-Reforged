@@ -22,8 +22,9 @@ SHIPPED = 128
 CENTRE = (DRAWN - 1) / 2.0
 LIGHT = (-0.45, -0.55, 0.70)	# towards the light: up and to the left in the picture, mostly overhead
 STEEL = (64, 68, 54)		# olive drab, darker than grey ballast so the plate stands off it
-SOIL = (40, 32, 22)
-SOIL_ALPHA = 0.7
+SOIL = (26, 20, 14)
+SOIL_ALPHA = 0.85		# the dark ring is what tells a mine from a stone on grass at the player's camera
+OUTLINE = 0.035			# a near-black edge round the steel, as a share of the half width
 PLATE = 0.70			# radius of the steel, as a share of the half width
 SOIL_OUT = 0.98
 BOLTS = 0.55
@@ -74,7 +75,9 @@ def main():
                 n = (-dx, -dy, 1.0)
                 nl = math.sqrt(n[0] * n[0] + n[1] * n[1] + 1.0)
                 lit = max(0.0, (n[0] * light[0] + n[1] * light[1] + n[2] * light[2]) / nl)
-                shade = 0.35 + 0.85 * lit + 0.05 * noise
+                shade = 0.25 + 1.1 * lit + 0.05 * noise
+                if r > PLATE - OUTLINE:
+                    shade *= 0.35
                 colour = tuple(min(255, max(0, int(c * shade))) for c in STEEL)
                 pixels[px, py] = colour + (255,)
             elif r < SOIL_OUT:
