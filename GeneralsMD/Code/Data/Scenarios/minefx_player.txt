@@ -1,9 +1,13 @@
 # minefx_blast.txt for the player's own camera (Cinema/minefx_player.txt): the same outpost, field
 # and American column. In minefx_blast the Battlemasters never got off the field (560,680 is not a
 # point they reach) and shot it out with the column in the middle of the mines, so at play distance a
-# mine going off could not be told from a dying tank. Here seat 0's traffic is two supply trucks and
-# the Red Guard, and every unit on both sides is on the defensive stance, so what goes off in the
-# field is the mines and the vehicles they kill.
+# mine going off could not be told from a dying tank. Here seat 0's only traffic is two supply trucks
+# that cross the field early and drive off west to 450,780 from frame 150. A headless tally keeps
+# both at full health to frame 700; sent to 600,700 at frame 300 instead, the Crusaders shot one
+# at about 440, and the Red Guard walked too slowly to leave the column's path at all. Every unit is
+# on the defensive stance, so what goes off in the field is the mines and the vehicles they kill.
+# Tallied at seed 1: EMP mines under the Crusaders 500 to 516 and 536 to 552, standard mines under
+# the Crusaders and the Humvee 568 to 604, EMP under the Paladins and the Tomahawk 660 to 672.
 #
 #   generals.exe -win -borderless -xres 1920 -yres 1080 -msaa 0 -quickstart -noshellmap
 #     -multiInstance -fps 120 -noFPSLimit -particlecap 2500
@@ -22,14 +26,10 @@
 30    spawn      0  ChinaStandardMine       1  760 860
 30    spawn      0  ChinaEMPMine            1  760 940
 
-# own traffic through the field, then away from it before the Americans come
-30    spawn      0  ChinaInfantryRedguard   6  960 860 14
+# own traffic through the field, then west and out of the column's way
 30    spawn      0  ChinaVehicleSupplyTruck 2  980 960 40
-32    stance     0  ChinaInfantryRedguard      defensive
-40    move       0  ChinaInfantryRedguard      600 880
 40    move       0  ChinaVehicleSupplyTruck    620 940
-300   move       0  ChinaVehicleSupplyTruck    600 700
-300   move       0  ChinaInfantryRedguard      540 720
+150   move       0  ChinaVehicleSupplyTruck    450 780
 
 # the American column: Crusaders and a Humvee along the north edge onto the standard mines, kept
 # 60 off the EMP field (an EMP blast disables a vehicle and it never reaches the next mine), then

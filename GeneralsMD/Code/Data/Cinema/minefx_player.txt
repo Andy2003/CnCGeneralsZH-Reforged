@@ -9,18 +9,44 @@
 #     -side 0 FactionChina -side 1 FactionAmerica -seed 1 -camera 780 900
 #     -scenario minefx_player -cinema minefx_player -video 120 720 minefx_player -maxframes 730
 
-# own traffic crossing the field, mines sitting
+# the supply trucks crossing, mines sitting; every 4 frames over 56 so each LED's 8-frame blink
+# lands in at least one still
 6.0   shot
-8.0   shot
-# the first EMP mine under the column, about frame 455
-14.8  shot
-15.1  shot
-15.4  shot
-16.0  shot
-# standard mines from about 570
-19.0  shot
+6.133 shot
+6.267 shot
+6.4   shot
+6.533 shot
+6.667 shot
+6.8   shot
+6.933 shot
+7.067 shot
+7.2   shot
+7.333 shot
+7.467 shot
+7.6   shot
+7.733 shot
+7.867 shot
+# the first EMP mines under the Crusaders, frames 500 to 516
+16.533 shot
+16.667 shot
+16.8  shot
+16.933 shot
+17.067 shot
+17.2  shot
+17.333 shot
+17.467 shot
+# standard mines under the Crusaders and the Humvee, frames 568 to 604
+18.933 shot
+19.067 shot
+19.2  shot
+19.333 shot
+19.467 shot
+19.6  shot
+19.733 shot
+19.867 shot
 20.0  shot
-21.0  shot
-21.4  shot
+20.133 shot
+20.267 shot
+# EMP under the Paladins, 660 to 672
 22.0  shot
-23.0  shot
+22.267 shot
