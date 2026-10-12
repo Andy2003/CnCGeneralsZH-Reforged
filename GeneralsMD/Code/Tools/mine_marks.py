@@ -27,11 +27,11 @@ DRAWN = 512
 SHIPPED = 128
 CENTRE = (DRAWN - 1) / 2.0
 LIGHT = (-0.45, -0.55, 0.70)	# towards the light: up and to the left in the picture, mostly overhead
-STEEL = (64, 68, 54)		# olive drab, darker than grey ballast so the plate stands off it
+STEEL = (54, 52, 40)		# dull olive steel, dark and warm so it does not read as a grey coin on sand
 SOIL = (26, 20, 14)
 SOIL_LIT = (70, 58, 42)		# dry soil smeared on the steel, before the steel's shading
 DIRT = 0.45			# how much of the steel it hides where it is thickest
-SOIL_ALPHA = 0.85		# the dark ring is what tells a mine from a stone on grass at the player's camera
+SOIL_ALPHA = 0.92		# the dark ring is what tells a mine from a stone on grass at the player's camera
 OUTLINE = 0.035			# a near-black edge round the steel, as a share of the half width
 PLATE = 0.70			# radius of the steel, as a share of the half width
 SOIL_OUT = 0.98
@@ -42,7 +42,7 @@ LED_BEZEL_OUT = 0.74		# outer edge of the dark bezel round the lens
 LED_BEZEL = (10, 8, 8)
 LED_BEZEL_ALPHA = 0.9
 GLOW_HOT = 0.12			# the light's white-hot point, as a share of the glow sprite's half width
-GLOW_FALL = 0.22		# the glow round it falls off as exp(-(r - hot) / this)
+GLOW_FALL = 0.30		# the glow round it falls off as exp(-(r - hot) / this)
 LEDS = (("Red", (255, 28, 10), (255, 235, 225)), ("Blue", (40, 110, 255), (225, 240, 255)))
 OUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Art", "Textures")
 
@@ -57,7 +57,7 @@ def height(x, y):
     pressure cap in the middle and four bolt heads."""
     r = math.hypot(x, y)
     h = 1.0 - ramp(PLATE - 0.08, PLATE, r)		# rim bevel down to the soil
-    h -= 0.25 * (ramp(0.40, 0.42, r) - ramp(0.45, 0.47, r))	# groove round the top
+    h -= 0.12 * (ramp(0.40, 0.42, r) - ramp(0.45, 0.47, r))	# groove round the top
     h += 0.35 * (1.0 - ramp(0.20, 0.25, r))		# pressure cap
     for k in range(4):
         angle = math.radians(45 + 90 * k)
@@ -112,7 +112,7 @@ def main():
                 pixels[px, py] = colour + (255,)
             elif r < reach:
                 # darkest in the hollow against the rim, fading out into the ground in clumps
-                fade = 1.0 - ramp(lip + 0.02, reach, r)
+                fade = 1.0 - ramp(lip + 0.10, reach, r)
                 lump = clumps(x, y)
                 alpha = SOIL_ALPHA * fade * min(1.0, 0.75 + 0.35 * lump + 0.1 * noise)
                 hollow = 1.0 - 0.45 * (1.0 - ramp(lip, lip + 0.10, r))
