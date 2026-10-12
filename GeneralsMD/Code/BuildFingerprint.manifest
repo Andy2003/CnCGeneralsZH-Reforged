@@ -22,7 +22,6 @@ Data/Art/Textures/ReforgedHudGlaPowers.dds
 Data/Art/Textures/ReforgedHudHelpbox.dds
 Data/Art/Textures/ReforgedHudObsCommandBar.dds
 Data/Art/Textures/ReforgedHudObsPlayerWindow.dds
-Data/Art/Textures/ReforgedHudQuitWindow.dds
 Data/Art/Textures/ReforgedLaserPink.tga
 Data/Art/Textures/ReforgedSignalAttack.tga
 Data/Art/Textures/ReforgedSignalDefend.tga
@@ -138,7 +137,6 @@ Data/INI/MappedImages/HandCreated/ReforgedHudGlaPowers.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudHelpbox.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudObsCommandBar.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudObsPlayerWindow.ini
-Data/INI/MappedImages/HandCreated/ReforgedHudQuitWindow.ini
 Data/INI/ObjectCreationListReforged.ini
 Data/INI/ParticleSystemReforged.ini
 Data/INI/ScienceReforged.ini
@@ -314,9 +312,6 @@ Data/Window/Menus/LanGameOptionsMenu.wnd
 Data/Window/Menus/LocalDefeat.wnd
 Data/Window/Menus/ObserverQuit.wnd
 Data/Window/Menus/OptionsMenuClassic.wnd
-Data/Window/Menus/QuitMenu.wnd
-Data/Window/Menus/QuitMessageBox.wnd
-Data/Window/Menus/QuitNoSave.wnd
 Data/Window/Menus/SkirmishGameOptionsMenu.wnd
 Data/Window/Menus/Victorious.wnd
 Data/Window/ReplayControl.wnd
