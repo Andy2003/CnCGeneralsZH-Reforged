@@ -644,6 +644,94 @@ Player *ControlBar::getWatchedPlayer( void )
 	return local;
 }
 
+/** True when a compact section gives this button a window: a real purchase the player could ever
+	* see.  A script-only button, a science a script hid and one whose root prerequisites the player's
+	* general never has would leave a hole. */
+static Bool isSciencePurchaseShown( const Player *player, const CommandButton *commandButton )
+{
+	if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
+		return FALSE;
+	if( commandButton->getScienceVec().empty() )
+		return TRUE;
+	ScienceType science = commandButton->getScienceVec()[ 0 ];
+	return !player->isScienceHidden( science ) && TheScienceStore->playerHasRootPrereqsForScience( player, science );
+}
+
+/** Puts one rank's purchase buttons on its windows.  The caller has hidden every window.  Retail keeps
+	* slot i on window i, gaps and all; compact takes the set's shown buttons in slot order and lays them
+	* on the windows in reading order, left to right and a row before the next.  The windows are fixed
+	* by the layout, so a rank with more buttons than windows loses the rest and the log names them. */
+void ControlBar::populatePurchaseScienceRank( Player *player, const CommandSet *commandSet, GameWindow **windows, Int windowCount, Bool compact )
+{
+	const CommandButton *placed[ MAX_COMMANDS_PER_SET ];
+	GameWindow *ordered[ MAX_COMMANDS_PER_SET ];
+	Int i;
+
+	for( i = 0; i < windowCount; i++ )
+	{
+		placed[ i ] = commandSet->getCommandButton( i );
+		ordered[ i ] = windows[ i ];
+	}
+
+	if( compact )
+	{
+		Int shownCount = 0;
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+		{
+			const CommandButton *commandButton = commandSet->getCommandButton( i );
+			if( !isSciencePurchaseShown( player, commandButton ) )
+				continue;
+			if( shownCount < windowCount )
+				placed[ shownCount ] = commandButton;
+			else
+				DEBUG_LOG(( "PROMOTION %s has %d windows, no room for %s\n", commandSet->getName().str(), windowCount, commandButton->getName().str() ));
+			shownCount++;
+		}
+		for( i = shownCount; i < windowCount; i++ )
+			placed[ i ] = NULL;
+
+		std::stable_sort( ordered, ordered + windowCount, []( GameWindow *a, GameWindow *b )
+		{
+			Int ax, ay, bx, by;
+			a->winGetScreenPosition( &ax, &ay );
+			b->winGetScreenPosition( &bx, &by );
+			return ay != by ? ay < by : ax < bx;
+		} );
+	}
+
+	for( i = 0; i < windowCount; i++ )
+	{
+		const CommandButton *commandButton = placed[ i ];
+		GameWindow *window = ordered[ i ];
+
+		if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
+			continue;
+
+		window->winHide( FALSE );
+		window->winEnable( FALSE );
+		setControlCommand( window, commandButton );
+		if( commandButton->getScienceVec().empty() )
+			continue;
+
+		ScienceType science = commandButton->getScienceVec()[ 0 ];
+		if( player->isScienceDisabled( science ) )
+			continue;
+		if( player->isScienceHidden( science ) )
+		{
+			window->winHide( TRUE );
+			continue;
+		}
+		if( !player->hasScience( science ) && TheScienceStore->playerHasPrereqsForScience( player, science ) && TheScienceStore->getSciencePurchaseCost( science ) <= player->getSciencePurchasePoints() )
+			window->winEnable( TRUE );
+		if( player->hasScience( science ) )
+			window->winSetStatus( WIN_STATUS_ALWAYS_COLOR );
+		else
+			window->winClearStatus( WIN_STATUS_ALWAYS_COLOR );
+		if( !TheScienceStore->playerHasRootPrereqsForScience( player, science ) )
+			window->winHide( TRUE );
+	}
+}
+
 void ControlBar::populatePurchaseScience( Player* player )
 {
 //	TheInGameUI->deselectAllDrawables();
@@ -677,188 +765,12 @@ void ControlBar::populatePurchaseScience( Player* player )
 			commandSet8 == NULL )
 		return;
 
-	// populate the button with commands defined
-	const CommandButton *commandButton;
-	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_1; i++ )
-	{
-
-		// get command button
-		commandButton = commandSet1->getCommandButton(i);
-
-		// if button is not present, just hide the window
-		if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
-		{
-			// hide window on interface
-			m_sciencePurchaseWindowsRank1[ i ]->winHide( TRUE );
-		}  // end if
-		else
-		{
-			// make sure the window is not hidden
-			m_sciencePurchaseWindowsRank1[ i ]->winHide( FALSE );
-
-			// Disable by default
-			m_sciencePurchaseWindowsRank1[ i ]->winEnable( FALSE );
-
-			// populate the visible button with data from the command button
-
-			setControlCommand( m_sciencePurchaseWindowsRank1[ i ], commandButton );
-			if (!commandButton->getScienceVec().empty())
-			{
-				ScienceType	st = commandButton->getScienceVec()[ 0 ];
-
-				if( player->isScienceDisabled( st ) )
-				{
-					//A script has deemed this science disabled.
-					m_sciencePurchaseWindowsRank1[ i ]->winEnable( FALSE );
-				}
-				else if( player->isScienceHidden( st ) )
-				{
-					//A script has deemed this science unavailable, thus hidden
-					m_sciencePurchaseWindowsRank1[ i ]->winHide( TRUE );
-				}
-				else
-				{
-					//Handle normal game logic cases!
-					if(!player->hasScience(st) && TheScienceStore->playerHasPrereqsForScience(player, st) && TheScienceStore->getSciencePurchaseCost(st) <= player->getSciencePurchasePoints())
-					{
-						m_sciencePurchaseWindowsRank1[ i ]->winEnable( TRUE );
-					}
-					if(player->hasScience(st))
-					{
-						m_sciencePurchaseWindowsRank1[ i ]->winSetStatus(WIN_STATUS_ALWAYS_COLOR);
-					}
-					else
-					{
-						m_sciencePurchaseWindowsRank1[ i ]->winClearStatus(WIN_STATUS_ALWAYS_COLOR);
-					}
-					if(!TheScienceStore->playerHasRootPrereqsForScience(player, st))
-						m_sciencePurchaseWindowsRank1[ i ]->winHide(TRUE);
-				}
-			}
-		}  // end else
-
-	}  // end for
-
-	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_3; i++ )
-	{
-
-		// get command button
-		commandButton = commandSet3->getCommandButton(i);
-
-		// if button is not present, just hide the window
-		if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
-		{
-			// hide window on interface
-			m_sciencePurchaseWindowsRank3[ i ]->winHide( TRUE );
-		}  // end if
-		else
-		{
-			// make sure the window is not hidden
-			m_sciencePurchaseWindowsRank3[ i ]->winHide( FALSE );
-
-			// Disable by default
-			m_sciencePurchaseWindowsRank3[ i ]->winEnable( FALSE );
-
-			// populate the visible button with data from the command button
-
-			setControlCommand( m_sciencePurchaseWindowsRank3[ i ], commandButton );
-			ScienceType	st = SCIENCE_INVALID; 
-			ScienceVec sv = commandButton->getScienceVec();
-			if (! sv.empty())
-			{
-				st = sv[ 0 ];
-			}
-
-			if( player->isScienceDisabled( st ) )
-			{
-				//A script has deemed this science disabled.
-				m_sciencePurchaseWindowsRank3[ i ]->winEnable( FALSE );
-			}
-			else if( player->isScienceHidden( st ) )
-			{
-				//A script has deemed this science unavailable, thus hidden
-				m_sciencePurchaseWindowsRank3[ i ]->winHide( TRUE );
-			}
-			else
-			{
-				//Handle normal game logic cases!
-				if(!player->hasScience(st) && TheScienceStore->playerHasPrereqsForScience(player, st) && TheScienceStore->getSciencePurchaseCost(st) <= player->getSciencePurchasePoints())
-				{
-					m_sciencePurchaseWindowsRank3[ i ]->winEnable( TRUE );
-				}
-				if(player->hasScience(st))
-				{
-					m_sciencePurchaseWindowsRank3[ i ]->winSetStatus(WIN_STATUS_ALWAYS_COLOR);
-				}
-				else
-				{
-					m_sciencePurchaseWindowsRank3[ i ]->winClearStatus(WIN_STATUS_ALWAYS_COLOR);
-				}
-				if(!TheScienceStore->playerHasRootPrereqsForScience(player, st))
-					m_sciencePurchaseWindowsRank3[ i ]->winHide(TRUE);
-			}
-
-		}  // end else
-
-	}  // end for
-
-	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_8; i++ )
-	{
-
-		// get command button
-		commandButton = commandSet8->getCommandButton(i);
-
-		// if button is not present, just hide the window
-		if( commandButton == NULL || BitTest( commandButton->getOptions(), SCRIPT_ONLY ) )
-		{
-			// hide window on interface
-			m_sciencePurchaseWindowsRank8[ i ]->winHide( TRUE );
-		}  // end if
-		else
-		{
-			// make sure the window is not hidden
-			m_sciencePurchaseWindowsRank8[ i ]->winHide( FALSE );
-
-			// Disable by default
-			m_sciencePurchaseWindowsRank8[ i ]->winEnable( FALSE );
-
-			// populate the visible button with data from the command button
-
-			setControlCommand( m_sciencePurchaseWindowsRank8[ i ], commandButton );
-			ScienceType	st = SCIENCE_INVALID; 
-			st = commandButton->getScienceVec()[ 0 ];
-			if( player->isScienceDisabled( st ) )
-			{
-				//A script has deemed this science disabled.
-				m_sciencePurchaseWindowsRank8[ i ]->winEnable( FALSE );
-			}
-			else if( player->isScienceHidden( st ) )
-			{
-				//A script has deemed this science unavailable, thus hidden
-				m_sciencePurchaseWindowsRank8[ i ]->winHide( TRUE );
-			}
-			else
-			{
-				//Handle normal game logic cases!
-				if(!player->hasScience(st) && TheScienceStore->playerHasPrereqsForScience(player, st) && TheScienceStore->getSciencePurchaseCost(st) <= player->getSciencePurchasePoints())
-				{
-					m_sciencePurchaseWindowsRank8[ i ]->winEnable( TRUE );
-				}
-				if(player->hasScience(st))
-				{
-					m_sciencePurchaseWindowsRank8[ i ]->winSetStatus(WIN_STATUS_ALWAYS_COLOR);
-				}
-				else
-				{
-					m_sciencePurchaseWindowsRank8[ i ]->winClearStatus(WIN_STATUS_ALWAYS_COLOR);
-				}
-				if(!TheScienceStore->playerHasRootPrereqsForScience(player, st))
-					m_sciencePurchaseWindowsRank8[ i ]->winHide(TRUE);
-			}
-
-		}  // end else
-
-	}  // end for
+	// a mod's command sets were laid out for the mod's own screen and leave gaps in ours; retail's
+	// keep their slots, gaps and all, as Zero Hour shipped them
+	const Bool compact = ControlBarIsModFaction( player->getPlayerTemplate() );
+	populatePurchaseScienceRank( player, commandSet1, m_sciencePurchaseWindowsRank1, MAX_PURCHASE_SCIENCE_RANK_1, compact );
+	populatePurchaseScienceRank( player, commandSet3, m_sciencePurchaseWindowsRank3, MAX_PURCHASE_SCIENCE_RANK_3, compact );
+	populatePurchaseScienceRank( player, commandSet8, m_sciencePurchaseWindowsRank8, MAX_PURCHASE_SCIENCE_RANK_8, compact );
 
 	//
 	// Somebody else's screen is a read-out, not a shop: a watcher sees what that general has bought
