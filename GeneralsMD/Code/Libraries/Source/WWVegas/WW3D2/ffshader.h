@@ -519,20 +519,22 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float seed = DrawEffectParameters.z;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
 	"    float3 cold = grey * float3(0.80, 0.88, 1.0);\n" \
-	"    float stutter = effect_hash(float3(floor(t * 9.0 + seed * 31.0), seed * 97.0, 1.0));\n" \
-	"    float sag = 0.60 + 0.07 * sin(t * 1.7 + seed * 6.2832);\n" \
-	"    float dip = (stutter > 0.92) ? 0.6 : 1.0;\n" \
-	"    float relit = (stutter > 0.975) ? 1.0 : 0.0;\n" \
-	"    float lamp = smoothstep(0.55, 0.9, max(current.r, max(current.g, current.b)));\n" \
-	"    float3 dark = cold * sag * dip * (1.0 - 0.8 * lamp * (1.0 - relit));\n" \
-	"    float3 cell = floor(world * 0.25);\n" \
-	"    float3 inside = frac(world * 0.25) - 0.5;\n" \
-	"    float slot = floor(t * 6.0 + seed * 7.0);\n" \
-	"    float live = step(0.9975, effect_hash(cell + float3(slot * 1.31, seed * 13.0, 0.0)));\n" \
+	"    float stutter = effect_hash(float3(floor(t * 7.0 + seed * 31.0), seed * 97.0, 1.0));\n" \
+	"    float sag = 0.45 + 0.08 * sin(t * 1.7 + seed * 6.2832);\n" \
+	"    float dip = (stutter > 0.82) ? 0.3 : 1.0;\n" \
+	"    float relit = (stutter > 0.95) ? 1.0 : 0.0;\n" \
+	"    float lamp = smoothstep(0.42, 0.8, max(current.r, max(current.g, current.b)));\n" \
+	"    float3 dark = cold * sag * dip * (1.0 - 0.95 * lamp * (1.0 - relit)) + relit * lamp * current.rgb * 0.8;\n" \
+	"    float3 cell = floor(world * 0.125);\n" \
+	"    float3 inside = frac(world * 0.125) - 0.5;\n" \
+	"    float slot = floor(t * 8.0 + seed * 7.0);\n" \
+	"    float live = step(0.985, effect_hash(cell + float3(slot * 1.31, seed * 13.0, 0.0)));\n" \
 	"    float3 point_at = float3(effect_hash(cell + 3.1), effect_hash(cell + 5.7), effect_hash(cell + 7.3)) - 0.5;\n" \
-	"    float spark = live * saturate(1.0 - length((inside - point_at * 0.6) - surface * dot(inside - point_at * 0.6, surface)) * 4.0);\n" \
+	"    float3 off = inside - point_at * 0.6;\n" \
+	"    float spark = live * saturate(1.0 - length(off - surface * dot(off, surface)) * 2.5);\n" \
+	"    float crackle = 0.6 + 0.4 * effect_hash(float3(floor(t * 40.0), cell.x, cell.y));\n" \
 	"    current.rgb = lerp(current.rgb, dark, DrawEffectParameters.y)\n" \
-	"        + spark * spark * saturate(grey * 4.0) * float3(1.6, 2.2, 3.0);\n" \
+	"        + spark * spark * crackle * saturate(grey * 8.0) * float3(4.0, 5.0, 6.5);\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
@@ -545,15 +547,16 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float t = DrawEffectParameters.x;\n" \
 	"    float seed = DrawEffectParameters.z;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
-	"    float3 base = lerp(current.rgb, grey * float3(0.70, 0.80, 1.0), 0.55) * 0.75;\n" \
+	"    float3 base = lerp(current.rgb, grey * float3(0.70, 0.80, 1.0), 0.65) * 0.6;\n" \
 	"    float wide = effect_noise(world * 0.11 + float3(seed * 17.0, 0.0, t * 1.6));\n" \
 	"    float fine = effect_noise(world * 0.29 - float3(0.0, t * 2.3, seed * 9.0));\n" \
-	"    float line_wide = saturate(1.0 - abs(wide - 0.5) * 28.0);\n" \
-	"    float line_fine = saturate(1.0 - abs(fine - 0.5) * 40.0);\n" \
-	"    float strobe = step(0.3, effect_hash(float3(floor(t * 24.0), seed * 41.0, 2.0)));\n" \
-	"    float arc = (line_wide * line_wide + 0.7 * line_fine * line_fine) * strobe;\n" \
-	"    float rim = pow(1.0 - facing, 3.0) * (0.55 + 0.45 * sin(t * 37.0 + seed * 6.2832));\n" \
-	"    current.rgb = base + (arc * 2.4 + rim * 0.5) * float3(0.45, 0.72, 1.0) * DrawEffectParameters.y;\n" \
+	"    float line_wide = saturate(1.0 - abs(wide - 0.5) * 16.0);\n" \
+	"    float line_fine = saturate(1.0 - abs(fine - 0.5) * 24.0);\n" \
+	"    float strobe = 0.35 + 0.65 * step(0.25, effect_hash(float3(floor(t * 24.0), seed * 41.0, 2.0)));\n" \
+	"    float arc = (line_wide * line_wide + 0.8 * line_fine * line_fine) * strobe;\n" \
+	"    float rim = pow(1.0 - facing, 2.0) * (0.6 + 0.4 * sin(t * 37.0 + seed * 6.2832));\n" \
+	"    float hum = 0.08 + 0.05 * sin(t * 11.0 + seed * 6.2832);\n" \
+	"    current.rgb = base + (arc * 4.0 + rim * 0.9 + hum) * float3(0.45, 0.72, 1.0) * DrawEffectParameters.y;\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
@@ -567,19 +570,19 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    effect_surface(position, world, surface, facing);\n" \
 	"    float t = DrawEffectParameters.x;\n" \
 	"    float opacity = max(DrawEffectParameters.w, 0.05);\n" \
-	"    float rim = pow(1.0 - facing, 2.5);\n" \
-	"    float swim_x = effect_noise(world * 0.35 + float3(t * 0.7, t * 0.4, t * 1.1)) - 0.5;\n" \
-	"    float swim_y = effect_noise(world * 0.35 + float3(5.2 - t * 0.5, 1.3, t * 0.9)) - 0.5;\n" \
+	"    float rim = pow(1.0 - facing, 1.5);\n" \
+	"    float swim_x = effect_noise(world * 0.6 + float3(t * 0.9, t * 0.5, t * 1.3)) - 0.5;\n" \
+	"    float swim_y = effect_noise(world * 0.6 + float3(5.2 - t * 0.7, 1.3, t * 1.1)) - 0.5;\n" \
 	"    float2 screen = 1.0 / ShadowViewport.xy;\n" \
-	"    float2 bend = float2(swim_x, swim_y) * (0.012 + 0.03 * rim) * screen.y + surface.xy * rim * 0.006 * screen.y;\n" \
+	"    float2 bend = float2(swim_x, swim_y) * (0.016 + 0.03 * rim) * screen.y + surface.xy * rim * 0.008 * screen.y;\n" \
 	"    int2 at = int2(clamp(position.xy + bend, float2(0.0, 0.0), screen - 1.0));\n" \
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
-	"    float band = smoothstep(0.92, 1.0, sin(world.z * 0.35 - t * 3.0)) * 0.12;\n" \
-	"    float own = saturate(opacity * 0.6);\n" \
+	"    float band = smoothstep(0.85, 1.0, sin(world.z * 0.5 - t * 4.0)) * 0.35;\n" \
+	"    float own = 0.4;\n" \
 	"    float3 edge = lerp(float3(0.45, 0.85, 1.0), float3(1.0, 0.55, 0.15), DrawEffectParameters.y);\n" \
-	"    float edge_gain = 0.45 + 0.35 * DrawEffectParameters.y * (0.5 + 0.5 * sin(t * 9.0));\n" \
-	"    current.rgb = lerp(behind * float3(0.93, 0.98, 1.04), current.rgb, own)\n" \
-	"        + (rim * edge_gain + band) * edge;\n" \
+	"    float edge_gain = 0.9 + 0.6 * DrawEffectParameters.y * (0.5 + 0.5 * sin(t * 9.0));\n" \
+	"    current.rgb = lerp(behind * float3(0.85, 0.95, 1.15), current.rgb, own)\n" \
+	"        + (rim * edge_gain + band + 0.08) * edge;\n" \
 	"    current.a = saturate(current.a / opacity);\n" \
 	"    return current;\n" \
 	"}\n" \
