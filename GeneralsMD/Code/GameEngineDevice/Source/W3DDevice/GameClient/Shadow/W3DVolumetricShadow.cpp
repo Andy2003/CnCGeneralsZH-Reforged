@@ -4197,7 +4197,11 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 	static Bool wholeMapRefused = FALSE;
 	if (!wholeMap)
 		wholeMapRefused = FALSE;
-	UnsignedInt texels = SHADOW_MAP_TEXELS;
+	/* The ShadowQuality option halves or doubles the usual map: 1024, 2048 or 4096 a side.  The filter
+		 below is held in ground units against the 2048 map, so a level changes how sharp an edge is
+		 and not how wide its penumbra is. */
+	const UnsignedInt chosenTexels = (SHADOW_MAP_TEXELS / 2) << TheGlobalData->m_shadowQuality;
+	UnsignedInt texels = chosenTexels;
 	Bool begun = FALSE;
 	if (TheGlobalData->m_shadowMap && m_shadowList != NULL && TheTacticalView != NULL)
 	{
@@ -4210,7 +4214,7 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 		{
 			if (wholeMap)
 				wholeMapRefused = TRUE;
-			begun = Direct3D11_Begin_Shadow_Map( SHADOW_MAP_TEXELS );
+			begun = Direct3D11_Begin_Shadow_Map( chosenTexels );
 		}
 	}
 	if (!begun)

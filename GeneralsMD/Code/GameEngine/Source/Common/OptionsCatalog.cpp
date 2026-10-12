@@ -109,6 +109,7 @@ OPTION_BOOL_ACCESSORS( m_shadowsForParticles )
 OPTION_BOOL_ACCESSORS( m_particleGroundBounce )
 OPTION_BOOL_ACCESSORS( m_volumetricSmokeShadows )
 OPTION_BOOL_ACCESSORS( m_smokeFireLighting )
+OPTION_INT_ACCESSORS( m_shadowQuality )
 
 //-----------------------------------------------------------------------------
 static const unsigned TheMsaaSamples[ OPTION_MSAA_LEVEL_COUNT ] = { 0, 2, 4, 8, 16 };
@@ -466,6 +467,13 @@ const OptionDef TheOptionCatalog[] =
 	{ "SmokeFireLighting",				"", "",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_smokeFireLighting, set_m_smokeFireLighting },
+
+	// The size of the sun's depth map.  The shadow pass asks for it every frame and the backend makes
+	// the map again when the size changes, so a new level shows on the next frame.  No control in the
+	// game's own menu; the launcher writes it.  Classic graphics and -d3d9 draw no map at all.
+	{ "ShadowQuality",						"", "",
+		OPTION_ENUM, APPLY_LIVE, 0, SHADOW_QUALITY_COUNT - 1,
+		get_m_shadowQuality, set_m_shadowQuality },
 
 	// -smoke and -particlebounce as settings.  Both are spent on the particle system templates while
 	// the particle manager starts, so they wait for the next launch.  The command line is parsed after

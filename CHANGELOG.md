@@ -1379,6 +1379,9 @@ The whole HUD is on the hardware. Four colours carry it, and they mean the same 
   covers.
 - Fences, walls and props cast a real shaped shadow, worked out once.
 - Each of these switches off in `GameData.ini`.
+- Shadow Quality on the launcher's Options page sets how sharp the shadows are. Medium is what the
+  game always drew. High doubles the detail for about 64 MB of video memory, and Low halves it to
+  free memory on a weak card, with the soft edges staying as wide as before at every level.
 
 ## Bright things can glow
 
