@@ -231,7 +231,9 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 			if( TheGlobalData->m_showOrderLines )
 				queueLine( 2, points );
 
-			if( it->mark == InGameUI::ORDER_MARK_JOINT )
+			// with the lines on, the end of the line wears the puck the joints between orders do
+			if( it->mark == InGameUI::ORDER_MARK_JOINT
+					|| ( TheGlobalData->m_showOrderLines && it->mark == InGameUI::ORDER_MARK_FLAG ) )
 			{
 				m_waypointNodeRobj->Set_Position( points[ 1 ] );
 				WW3D::Render( *m_waypointNodeRobj, localRinfo );		// the little hockey puck
