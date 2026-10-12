@@ -55,6 +55,11 @@
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 #include "Lib/Clock.h"
+#include <string>
+#include "Common/file.h"
+#include "Common/FileSystem.h"
+#include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
 
 #include "Common/Player.h"
 #include "Common/PlayerTemplate.h"
@@ -970,6 +975,7 @@ void ControlBarSchemeManager::init( void )
 	ini.load( AsciiString( "Data\\INI\\ControlBarSchemeReforged.ini" ), INI_LOAD_MULTIFILE, NULL );
 	// -modfactions: each mod's own bars, "M<n>~" names, worn only by that mod's factions
 	INI::loadModPasses( "Data\\INI\\ControlBarScheme.ini", NULL );
+	readModWindowRects();
 
 //	//Load the user modified control bar schemes
 //	WIN32_FIND_DATA findData;
@@ -1116,10 +1122,73 @@ Int ControlBarSchemeManager::getCurrentSchemeMod( void ) const
 }
 
 //-----------------------------------------------------------------------------
-/** A mod's bar is one painting authored for 800x600 (or its ScreenCreationRes) and our bar stands in
-	* three panels at one scale, so the painting is cut where the panels meet and each piece is drawn
-	* through its own panel's placement, the way the windows above it are placed.  Classic and Reforged
-	* alike: the windows are laid out the same way in both. */
+/** A mod's bar is painted for the window rectangles of the mod's own ControlBar.wnd: ShockWave's are
+	* EA's (the same 96 rectangles as ours, at 800x600), The End of Days' are a 1920x1080 layout of its
+	* own with the command grid at 668-1308 and the radar at 5-327.  The windows stay ours, but under a
+	* mod's bar layoutPanels gives each the rectangle the mod's file names for it (findModWindowRect).
+	* Only SCREENRECT and NAME are read; nothing of the mod's callbacks or draw data is. */
+//-----------------------------------------------------------------------------
+void ControlBarSchemeManager::readModWindowRects( void )
+{
+	m_modWindowRects.clear();
+	if( TheGlobalData == NULL || !TheGlobalData->m_modFactions )
+		return;
+
+	m_modWindowRects.resize( TheGlobalData->m_mods.size() );
+	for( Int mod = 0; mod < (Int)TheGlobalData->m_mods.size(); ++mod )
+	{
+		TheFileSystem->setFocus( mod );
+		File *file = TheFileSystem->openFile( "Window\\ControlBar.wnd" );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+		if( file == NULL )
+			continue;
+		const Int length = file->size();
+		char *raw = file->readEntireAndClose();
+		const std::string text( raw, length );		// the read is not terminated
+		delete [] raw;
+
+		// SCREENRECT = UPPERLEFT: x y, BOTTOMRIGHT: x y, CREATIONRESOLUTION: w h; NAME = "...";
+		for( const char *rect = strstr( text.c_str(), "SCREENRECT" ); rect; rect = strstr( rect + 1, "SCREENRECT" ) )
+		{
+			Int ulx, uly, lrx, lry, resx, resy;
+			char name[ 128 ];
+			if( sscanf( rect, "SCREENRECT = UPPERLEFT: %d %d , BOTTOMRIGHT: %d %d , CREATIONRESOLUTION: %d %d ; NAME = \"%127[^\"]\"",
+									&ulx, &uly, &lrx, &lry, &resx, &resy, name ) != 7 || resx <= 0 || resy <= 0 )
+				continue;
+
+			ModWindowRect r;
+			r.x = ulx * 800.0f / resx;
+			r.y = uly * 600.0f / resy;
+			r.w = ( lrx - ulx ) * 800.0f / resx;
+			r.h = ( lry - uly ) * 600.0f / resy;
+			m_modWindowRects[ mod ][ TheNameKeyGenerator->nameToKey( AsciiString( name ) ) ] = r;
+		}
+		DEBUG_LOG(( "MODNS M%d~ ControlBar.wnd: %d windows\n", mod + 1, (Int)m_modWindowRects[ mod ].size() ));
+	}
+}
+
+Bool ControlBarSchemeManager::findModWindowRect( Int mod, const AsciiString& decoratedName,
+																								 Real *x, Real *y, Real *w, Real *h ) const
+{
+	if( mod < 0 || mod >= (Int)m_modWindowRects.size() )
+		return FALSE;
+	ModWindowRectMap::const_iterator it = m_modWindowRects[ mod ].find( TheNameKeyGenerator->nameToKey( decoratedName ) );
+	if( it == m_modWindowRects[ mod ].end() )
+		return FALSE;
+	*x = it->second.x;
+	*y = it->second.y;
+	*w = it->second.w;
+	*h = it->second.h;
+	return TRUE;
+}
+
+//-----------------------------------------------------------------------------
+/** A mod's bar is laid out EA's way, one stretch per axis over the whole screen (see
+	* ControlBarPanelDesignToScreen), so the three panel transforms are one and the same and the
+	* painting goes back together at the seams below.  The cut only shows while one panel slides or
+	* stands down on its own - the observer's hidden middle - and each piece then travels with its
+	* panel.  The seams lie in the gaps of The End of Days' painting (radar to 142, middle 247-552,
+	* right from 677, in design units) and inside ShockWave's one-piece one. */
 //-----------------------------------------------------------------------------
 void ControlBarSchemeManager::drawModPainting( ICoord2D offset, Bool foreground )
 {

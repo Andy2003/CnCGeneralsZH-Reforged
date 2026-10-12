@@ -17360,6 +17360,9 @@ TEST(modfactions_prefix_the_mods_own_art)
 	strcpy( line, "  ParticleName = EXSmoke.tga" );		// INI says .tga, the mod ships the .dds
 	CHECK( names.rewriteLine( line, sizeof( line ) ) );
 	CHECK_STR( line, "  ParticleName = M1~EXSmoke.tga" );
+	strcpy( line, "  ShadowTexture = EXSmoke" );			// a decal names its texture bare, the engine adds .tga
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  ShadowTexture = M1~EXSmoke" );
 	strcpy( line, "  Sounds = vrange01a vrange01b" );
 	CHECK( names.rewriteLine( line, sizeof( line ) ) );
 	CHECK_STR( line, "  Sounds = M1~vrange01a vrange01b" );

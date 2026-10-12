@@ -645,7 +645,10 @@ Bool ModNamespace::isAsset( const Names &names, const std::string &word )
 		return TRUE;
 	// an animation is "<hierarchy>.<animation>", and the file is the animation's
 	const size_t dot = name.find( '.' );
-	return dot != std::string::npos && names.assets.count( name.substr( dot + 1 ) ) != 0;
+	if (dot != std::string::npos)
+		return names.assets.count( name.substr( dot + 1 ) ) != 0;
+	// a shadow or radius decal names its texture with no extension, and the engine appends ".tga"
+	return names.assets.count( name + ".tga" ) != 0;
 }
 
 Bool ModNamespace::isAssetField( const std::string &field )

@@ -1664,6 +1664,16 @@ static Bool barIsClassic( void )
 	return TheGlobalData != NULL && TheGlobalData->isClassicUI();
 }
 
+/// -modfactions: a mod's bar is up.  Its painting was made for EA's layout, one stretch per axis over
+/// the whole screen, so under it the panels are not at one scale and not pulled apart: the three
+/// transforms below are the loader's own, and the windows go where the mod authored them.
+static Int barModIndex( void )
+{
+	if( TheControlBar == NULL || TheControlBar->getControlBarSchemeManager() == NULL )
+		return -1;
+	return TheControlBar->getControlBarSchemeManager()->getCurrentSchemeMod();
+}
+
 /// Where a panel's design x 0 lands on screen.
 static Real panelOriginX( Int panel, Real dispW, Real s )
 {
@@ -1828,12 +1838,16 @@ Bool ControlBarPanelDesignToScreen( Int panel, const IRegion2D *design,
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
 	const Real s = loadScaleX < loadScaleY ? loadScaleX : loadScaleY;
 
-	const Real originX = panelOriginX( panel, dispW, s );
+	// a mod's bar keeps the loader's stretch, panels and all (barModIndex)
+	const Bool stretch = barModIndex() >= 0;
+	const Real sx = stretch ? loadScaleX : s;
+	const Real sy = stretch ? loadScaleY : s;
+	const Real originX = stretch ? 0.0f : panelOriginX( panel, dispW, s );
 
-	rectOut->lo.x = REAL_TO_INT_FLOOR( originX + design->lo.x * s );
-	rectOut->hi.x = REAL_TO_INT_CEIL ( originX + design->hi.x * s );
-	rectOut->lo.y = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - design->lo.y ) * s );
-	rectOut->hi.y = REAL_TO_INT_CEIL ( dispH - ( CONTROL_BAR_DESIGN_H - design->hi.y ) * s );
+	rectOut->lo.x = REAL_TO_INT_FLOOR( originX + design->lo.x * sx );
+	rectOut->hi.x = REAL_TO_INT_CEIL ( originX + design->hi.x * sx );
+	rectOut->lo.y = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - design->lo.y ) * sy );
+	rectOut->hi.y = REAL_TO_INT_CEIL ( dispH - ( CONTROL_BAR_DESIGN_H - design->hi.y ) * sy );
 
 	//
 	// The screen has three edges the bar touches and each belongs to one panel: the left panel owns
@@ -2012,8 +2026,7 @@ const ControlBarPlate *ControlBarPlateForSide( const AsciiString& side, Int pane
 
 	// -modfactions: a mod's bar wears the mod's own painting (drawModPainting), never our plates,
 	// so nothing shifts its windows off the mod's layout or masks its clicks with our art
-	if( TheControlBar && TheControlBar->getControlBarSchemeManager() &&
-			TheControlBar->getControlBarSchemeManager()->isCurrentSchemeMod() )
+	if( barModIndex() >= 0 )
 		return NULL;
 
 	// the boss bar is Chinese and the observer bar is American - EA built each out of that art
@@ -2037,6 +2050,20 @@ static const char *shortWindowName( GameWindow *win )
 	const char *name = win->winGetInstanceData()->m_decoratedNameString.str();
 	const char *colon = strchr( name, ':' );
 	return colon ? colon + 1 : name;
+}
+
+/// The windows ControlBarScheme::init puts at the scheme's own UL/LR rather than where the .wnd has them.
+static Bool isSchemePlacedWindow( const char *shortName )
+{
+	static const char *names[] =
+	{
+		"PopupCommunicator", "ButtonIdleWorker", "ButtonOptions", "ButtonPlaceBeacon", "MoneyDisplay",
+		"PowerWindow", "ButtonGeneral", "ButtonLarge", "WinUAttack", NULL
+	};
+	for( const char **n = names; *n; n++ )
+		if( strcmp( shortName, *n ) == 0 )
+			return TRUE;
+	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2258,7 +2285,10 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 	const Real loadScaleX = dispW / CONTROL_BAR_DESIGN_W;
 	const Real loadScaleY = dispH / CONTROL_BAR_DESIGN_H;
 	const Real s = ControlBarUniformScale();
-	const Real originX = panelOriginX( panel, dispW, s );
+	const Int mod = barModIndex();
+	const Real sx = mod >= 0 ? loadScaleX : s;
+	const Real sy = mod >= 0 ? loadScaleY : s;
+	const Real originX = mod >= 0 ? 0.0f : panelOriginX( panel, dispW, s );
 
 	ICoord2D rel, size;
 	win->winGetPosition( &rel.x, &rel.y );
@@ -2278,12 +2308,23 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 		place.designH = size.y / loadScaleY;
 	}
 
-	Int newX = REAL_TO_INT_FLOOR( originX + place.designX * s );
-	Int newY = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - place.designY ) * s );
-	Int newW = REAL_TO_INT_CEIL( place.designW * s );
-	Int newH = REAL_TO_INT_CEIL( place.designH * s );
-
 	const char *shortName = shortWindowName( win );
+
+	//
+	// Under a mod's bar a window the mod's own ControlBar.wnd places goes where that file says, since
+	// that is what the painting was made around.  Not the ones ControlBarScheme::init has just put at
+	// the scheme's UL/LR (the mod's file leaves those at 0,0 100x100), and not the nameless panes.
+	// place.design* stays ours, so the window comes back to our layout when our bar does.
+	//
+	Real designX = place.designX, designY = place.designY, designW = place.designW, designH = place.designH;
+	if( mod >= 0 && shortName[ 0 ] != 0 && !isSchemePlacedWindow( shortName ) )
+		m_controlBarSchemeManager->findModWindowRect( mod, win->winGetInstanceData()->m_decoratedNameString,
+																									&designX, &designY, &designW, &designH );
+
+	Int newX = REAL_TO_INT_FLOOR( originX + designX * sx );
+	Int newY = REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - designY ) * sy );
+	Int newW = REAL_TO_INT_CEIL( designW * sx );
+	Int newH = REAL_TO_INT_CEIL( designH * sy );
 
 	//
 	// A plate is its side's own painting rather than a cut of the shipped one, so where it draws the
@@ -2777,8 +2818,9 @@ void ControlBar::layoutPanels( void )
 	parent->winGetScreenPosition( &barOrigin.x, &barOrigin.y );
 
 	// the frame itself stays full width - it draws nothing and passes input through
+	const Real sy = barModIndex() >= 0 ? dispH / CONTROL_BAR_DESIGN_H : s;		// a mod's bar is stretched
 	const Int parentTop =
-		REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - CONTROL_BAR_DESIGN_TOP ) * s );
+		REAL_TO_INT_FLOOR( dispH - ( CONTROL_BAR_DESIGN_H - CONTROL_BAR_DESIGN_TOP ) * sy );
 	parent->winSetPosition( 0, parentTop );
 	parent->winSetSize( REAL_TO_INT_CEIL( dispW ), REAL_TO_INT_CEIL( dispH ) - parentTop );
 

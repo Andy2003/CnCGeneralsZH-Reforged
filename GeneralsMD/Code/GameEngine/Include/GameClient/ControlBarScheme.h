@@ -53,6 +53,8 @@
 //-----------------------------------------------------------------------------
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+#include <map>
+#include <vector>
 
 //-----------------------------------------------------------------------------
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -282,6 +284,9 @@ public:
 	Bool isCurrentSchemeMod( void ) const { return getCurrentSchemeMod() >= 0; }
 	/// a mod scheme's painting, cut at the panel seams and each piece drawn where its panel stands
 	void drawModPainting( ICoord2D offset, Bool foreground );
+	/// where the mod's own ControlBar.wnd puts the window with this decorated name, in 800x600 design
+	/// units; FALSE when the mod ships no ControlBar.wnd or no window of that name
+	Bool findModWindowRect( Int mod, const AsciiString& decoratedName, Real *x, Real *y, Real *w, Real *h ) const;
 
 
 	// parse Functions for the INI file
@@ -299,12 +304,18 @@ public:
 private:
 	ControlBarScheme *findSchemeForSide( const AsciiString& side, Int mod ) const;	///< the widest of that side's schemes from mod (-1 ours) the screen can wear
 	ControlBarScheme *findSchemeForFaction( const AsciiString& side, Int mod ) const;	///< a mod faction's own scheme, else ours
+	void readModWindowRects( void );																							///< fills m_modWindowRects
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
 	Coord2D m_multiplyer;																	
 	
 	typedef std::list< ControlBarScheme* > ControlBarSchemeList;			///< list of control bar schemes
 	ControlBarSchemeList m_schemeList;
+
+	/// -modfactions: each mod's ControlBar.wnd rectangles by window name key, read once in init
+	struct ModWindowRect { Real x, y, w, h; };
+	typedef std::map< UnsignedInt, ModWindowRect > ModWindowRectMap;
+	std::vector< ModWindowRectMap > m_modWindowRects;
 
 };
 
