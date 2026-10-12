@@ -5,7 +5,7 @@ left, and the soil ring fades out into whatever ground it lands on.
 
 The arming light over each mine is an LED seen from above: a hard, nearly white core a fifth of the
 picture across inside a small glow in the light's colour, red for the standard and cluster mines and
-a cold blue-violet for the EMP mines.  It is drawn additively, so black is nothing.
+a cold sky blue for the EMP mines.  It is drawn additively, so black is nothing.
 
     python Tools/mine_marks.py            # writes Data/Art/Textures/ReforgedMine.tga and ReforgedMineLed*.tga
 
@@ -28,10 +28,10 @@ OUTLINE = 0.035			# a near-black edge round the steel, as a share of the half wi
 PLATE = 0.70			# radius of the steel, as a share of the half width
 SOIL_OUT = 0.98
 BOLTS = 0.55
-LED_CORE = 0.18			# radius of the hard core, as a share of the half width
-LED_GLOW = 0.17			# the glow falls off as exp(-(r - core) / this)
-LED_GLOW_PEAK = 0.7		# the glow's strength just outside the core, against the core's 1
-LEDS = (("Red", (255, 18, 8), (255, 190, 170)), ("Blue", (80, 100, 255), (200, 215, 255)))
+LED_CORE = 0.22			# radius of the hard core, as a share of the half width
+LED_GLOW = 0.22			# the glow falls off as exp(-(r - core) / this)
+LED_GLOW_PEAK = 0.85		# the glow's strength just outside the core, against the core's 1
+LEDS = (("Red", (255, 30, 12), (255, 215, 200)), ("Blue", (150, 190, 255), (225, 235, 255)))
 OUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Art", "Textures")
 
 
