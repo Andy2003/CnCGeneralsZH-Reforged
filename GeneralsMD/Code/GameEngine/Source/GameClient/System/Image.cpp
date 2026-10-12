@@ -255,7 +255,10 @@ void ImageCollection::addImage( Image *image )
 const Image *ImageCollection::findImageByName( const AsciiString& name )
 {
   std::map<unsigned,Image *>::iterator i=m_imageMap.find(TheNameKeyGenerator->nameToLowercaseKey(name));
-  return i==m_imageMap.end()?NULL:i->second;
+  if (i!=m_imageMap.end())
+    return i->second;
+  AsciiString retailName;
+  return TheModNamespace.findRetailName(name, MODNAME_MAPPEDIMAGE, &retailName) ? findImageByName(retailName) : NULL;
 }  // end findImageByName
 
 //-------------------------------------------------------------------------------------------------
@@ -289,6 +292,10 @@ void ImageCollection::load( Int textureSize )
 	ini.loadDirectory( AsciiString( buffer ), TRUE, INI_LOAD_OVERWRITE, NULL );
 
 	ini.loadDirectory("Data\\INI\\MappedImages\\HandCreated", TRUE, INI_LOAD_OVERWRITE, NULL );
+
+	// -modfactions: each mod's cameos and HUD art under its own "M<n>~" names
+	INI::loadModPasses( buffer, NULL, TRUE );
+	INI::loadModPasses( "Data\\INI\\MappedImages\\HandCreated", NULL, TRUE );
 
 
 }  // end load

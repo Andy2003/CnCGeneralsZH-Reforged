@@ -341,7 +341,17 @@ void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], Game
 		{
 			WideChar modName[128];
 			WideCharFromUtf8(TheGlobalData->m_modNames[fac->getModIndex()].str(), modName, ARRAY_SIZE(modName));
-			UnicodeString sideLabel = label;
+			// the mod's own name for the faction: The End of Days' Russia sits on our China Nuke General's side
+			static const WideChar MissingLabel[] = u"MISSING";
+			const Int missingLength = ARRAY_SIZE(MissingLabel) - 1;
+			UnicodeString sideLabel = fac->getDisplayName();
+			if (sideLabel.isEmpty() || (sideLabel.getLength() >= missingLength
+				&& std::char_traits<WideChar>::compare(sideLabel.str(), MissingLabel, missingLength) == 0))
+			{
+				AsciiString modSide;
+				modSide.format("M%d~%s", fac->getModIndex() + 1, side.str());
+				sideLabel = TheGameText->fetch(modSide);
+			}
 			label = UnicodeString(modName);
 			label.concat(UnicodeString(u" - "));
 			label.concat(sideLabel);

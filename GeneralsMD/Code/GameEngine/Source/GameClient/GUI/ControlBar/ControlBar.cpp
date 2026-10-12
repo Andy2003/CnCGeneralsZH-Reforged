@@ -664,11 +664,13 @@ void ControlBar::watchPlayer( Player *player )
 
 	const PlayerTemplate *wear = player ? player->getPlayerTemplate()
 																			: ThePlayerList->getLocalPlayer()->getPlayerTemplate();
-	if( m_controlBarSchemeManager && wear && wear->getSide().compare( m_watchedSide ) != 0 )
+	// by template name rather than side: under -modfactions a mod's America and ours share the side
+	// and not the bar
+	if( m_controlBarSchemeManager && wear && wear->getName().compare( m_watchedSide ) != 0 )
 	{
 		// a scheme lays the whole bar out again, so it is set when the side really changes and not
 		// on every click
-		m_watchedSide = wear->getSide();
+		m_watchedSide = wear->getName();
 		m_controlBarSchemeManager->setControlBarSchemeByPlayerTemplate( wear );
 		restoreStageAfterScheme();
 	}
@@ -2008,6 +2010,12 @@ const ControlBarPlate *ControlBarPlateForSide( const AsciiString& side, Int pane
 	if( side.isEmpty() || panel < 0 || panel >= ControlBar::CB_PANEL_COUNT )
 		return NULL;
 
+	// -modfactions: a mod's bar wears the mod's own painting (drawModPainting), never our plates,
+	// so nothing shifts its windows off the mod's layout or masks its clicks with our art
+	if( TheControlBar && TheControlBar->getControlBarSchemeManager() &&
+			TheControlBar->getControlBarSchemeManager()->isCurrentSchemeMod() )
+		return NULL;
+
 	// the boss bar is Chinese and the observer bar is American - EA built each out of that art
 	if( side.startsWithNoCase( "Boss" ) )
 		return &thePlateSets[ 1 ].plate[ panel ];
@@ -2836,18 +2844,13 @@ void ControlBar::init( void )
 {
 	INI ini;
 	m_sideSelectAnimateDown = FALSE;
-	// -modfactions: retail's own buttons and sets first, then each mod's under its names
-	const Bool apart = TheGlobalData != NULL && TheGlobalData->m_modFactions;
-	if (apart)
-		TheFileSystem->setFocus( FILE_FOCUS_RETAIL );
 	// load the command buttons
 	ini.load( AsciiString( "Data\\INI\\Default\\CommandButton.ini" ), INI_LOAD_OVERWRITE, NULL );
 	ini.load( AsciiString( "Data\\INI\\CommandButton.ini" ), INI_LOAD_OVERWRITE, NULL );
 
 	// load the command sets
 	ini.load( AsciiString( "Data\\INI\\CommandSet.ini" ), INI_LOAD_OVERWRITE, NULL );
-	if (apart)
-		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+	// -modfactions: each mod's buttons and sets after retail's, under its names
 	INI::loadModPasses( "Data\\INI\\CommandButton.ini", NULL );
 	INI::loadModPasses( "Data\\INI\\CommandSet.ini", NULL );
 
@@ -4504,10 +4507,12 @@ const PlayerTemplate *ControlBar::templateForSide( AsciiString side )
 		for( Int c = 0; c < 5; c++ )
 			side.removeLastChar();
 
+	// -modfactions: a mod's bar wears that mod's tray, ours ours, though the side is spelt the same
+	const Int mod = m_controlBarSchemeManager ? m_controlBarSchemeManager->getCurrentSchemeMod() : -1;
 	for( Int t = 0; t < ThePlayerTemplateStore->getPlayerTemplateCount(); t++ )
 	{
 		const PlayerTemplate *pt = ThePlayerTemplateStore->getNthPlayerTemplate( t );
-		if( pt && pt->getSide().compareNoCase( side ) == 0
+		if( pt && pt->getSide().compareNoCase( side ) == 0 && pt->getModIndex() == mod
 				&& !pt->getSpecialPowerShortcutWinName().isEmpty() )
 			return pt;
 	}

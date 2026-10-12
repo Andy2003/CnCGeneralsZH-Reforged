@@ -17281,7 +17281,7 @@ TEST(modfactions_focus_sees_one_set_of_archives)
 	archives.addModArchive( 1, two, AsciiString( "Mods\\Two\\!two.big" ) );
 
 	const AsciiString weapon( "Data\\INI\\Weapon.ini" );
-	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "Mods\\One\\!one.big" );	// merged: the mod wins
+	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "INIZH.big" );	// the default view is retail's
 	archives.setFocus( FILE_FOCUS_RETAIL );
 	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "INIZH.big" );
 	archives.setFocus( 0 );
@@ -17301,7 +17301,74 @@ TEST(modfactions_focus_sees_one_set_of_archives)
 	listed.clear();
 	archives.setFocus( FILE_FOCUS_ALL );
 	archives.getFileListInDirectory( AsciiString( "" ), AsciiString( "Data\\INI\\Object\\" ), AsciiString( "*.ini" ), listed, TRUE );
-	CHECK_EQ( (Int)listed.size(), 3 );
+	CHECK_EQ( (Int)listed.size(), 1 );
+	CHECK( listed.begin()->endsWithNoCase( "a.ini" ) );
+
+	// a mod's own copy by index, whatever the focus: what an "M<n>~" file name asks for
+	archives.setFocus( 1 );
+	CHECK( archives.doesModFileExist( 0, weapon ) );
+	CHECK( !archives.doesModFileExist( 1, weapon ) );
+	CHECK( archives.doesModFileExist( 1, AsciiString( "Data\\INI\\Object\\c.ini" ) ) );
+	CHECK( !archives.doesModFileExist( 0, AsciiString( "Data\\INI\\Object\\a.ini" ) ) );
+	archives.setFocus( FILE_FOCUS_ALL );
+}
+
+// -modfactions: "M<n>~" on a file name's last part names mod n's copy, only with the switch and a mod n
+TEST(modfactions_split_a_mod_file_name)
+{
+	GlobalData *saved = TheWritableGlobalData;
+	TheWritableGlobalData = NEW GlobalData;
+	TheWritableGlobalData->m_mods.assign( 2, AsciiString( "Mods\\X" ) );
+	Int mod = -1;
+	AsciiString bare;
+	TheWritableGlobalData->m_modFactions = FALSE;
+	CHECK( !FileSystem::splitModName( AsciiString( "Art\\W3D\\M1~AVRanger.w3d" ), &mod, &bare ) );
+	TheWritableGlobalData->m_modFactions = TRUE;
+	CHECK( FileSystem::splitModName( AsciiString( "Art\\W3D\\M1~AVRanger.w3d" ), &mod, &bare ) );
+	CHECK_EQ( mod, 0 );
+	CHECK_STR( bare.str(), "Art\\W3D\\AVRanger.w3d" );
+	CHECK( FileSystem::splitModName( AsciiString( "m2~exsmoke.tga" ), &mod, &bare ) );
+	CHECK_EQ( mod, 1 );
+	CHECK_STR( bare.str(), "exsmoke.tga" );
+	CHECK( !FileSystem::splitModName( AsciiString( "Art\\W3D\\M3~AVRanger.w3d" ), &mod, &bare ) );	// no third mod
+	CHECK( !FileSystem::splitModName( AsciiString( "M1~Art\\W3D\\AVRanger.w3d" ), &mod, &bare ) );	// not the last part
+	CHECK( !FileSystem::splitModName( AsciiString( "Art\\W3D\\Mx~AVRanger.w3d" ), &mod, &bare ) );
+	delete TheWritableGlobalData;
+	TheWritableGlobalData = saved;
+}
+
+// -modfactions: a word naming a model, texture or sound the mod ships gets its prefix, so WW3D and the
+// FileSystem serve the mod's copy; art it does not ship stays retail's
+TEST(modfactions_prefix_the_mods_own_art)
+{
+	bootOnce();
+	ModNamespace names;
+	names.addAsset( 0, "Art\\W3D\\AVRanger.W3D" );
+	names.addAsset( 0, "Art\\W3D\\AVRanger_STND.w3d" );
+	names.addAsset( 0, "Art\\Textures\\exsmoke.dds" );
+	names.addAsset( 0, "Data\\Audio\\Sounds\\vrange01a.wav" );
+	names.finishScan( 0 );
+	names.setActive( 0 );
+
+	char line[ 96 ];
+	strcpy( line, "  Model = avranger" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Model = M1~avranger" );
+	strcpy( line, "  Animation = AVRanger_SKL.AVRanger_STND" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Animation = M1~AVRanger_SKL.AVRanger_STND" );
+	strcpy( line, "  ParticleName = EXSmoke.tga" );		// INI says .tga, the mod ships the .dds
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  ParticleName = M1~EXSmoke.tga" );
+	strcpy( line, "  Sounds = vrange01a vrange01b" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Sounds = M1~vrange01a vrange01b" );
+	strcpy( line, "  Model = AVHumvee" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Model = AVHumvee" );
+	strcpy( line, "  ShowSubObject = AVRanger" );			// a sub-object, not a file
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  ShowSubObject = AVRanger" );
 }
 
 #include "test_minimap_input.inc"

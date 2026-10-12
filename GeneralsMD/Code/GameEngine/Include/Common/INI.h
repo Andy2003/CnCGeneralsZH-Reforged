@@ -177,7 +177,8 @@ enum ModNameType
 {
 	MODNAME_OBJECT, MODNAME_WEAPON, MODNAME_ARMOR, MODNAME_DAMAGEFX, MODNAME_UPGRADE, MODNAME_SCIENCE,
 	MODNAME_SPECIALPOWER, MODNAME_COMMANDSET, MODNAME_COMMANDBUTTON, MODNAME_FXLIST, MODNAME_OCL,
-	MODNAME_PARTICLESYSTEM, MODNAME_LOCOMOTOR, MODNAME_PLAYERTEMPLATE,
+	MODNAME_PARTICLESYSTEM, MODNAME_LOCOMOTOR, MODNAME_PLAYERTEMPLATE, MODNAME_MAPPEDIMAGE,
+	MODNAME_CONTROLBARSCHEME, MODNAME_AUDIOEVENT,
 	MODNAME_COUNT
 };
 
@@ -189,13 +190,19 @@ public:
 	void scanMods( void );															///< every -mod's faction files, each under its own FileSystem focus
 	void scanLine( Int mod, const char *line );					///< a block header names one of the mod's own; "Side = X" keeps X out
 	void finishScan( Int mod );													///< drop the side names, which the engine compares as text
+	/// a file the mod ships under Art\W3D, Art\Textures or Data\Audio; a word naming it gets the prefix too,
+	/// and the FileSystem and WW3D then serve the mod's own copy
+	void addAsset( Int mod, const char *fileName );
 	void setActive( Int mod ) { m_active = mod; }				///< -1: nothing is rewritten
 	Int getActive( void ) const { return m_active; }
 	Int getNameCount( Int mod ) const { return (Int)m_mods[ mod ].all.size(); }
 
-	/// rewrite the active mod's names in a comment-free line in place, every word but the first;
-	/// FALSE when the result would not fit capacity bytes
+	/// rewrite the active mod's names, and in a file field the files it ships, in a comment-free line in
+	/// place, every word but the first; FALSE when the result would not fit capacity bytes
 	Bool rewriteLine( char *line, size_t capacity ) const;
+	/// the same for the labels in the mod's own string table.  This runs after the INI checksum: the table
+	/// is the player's language, and two installs in different languages must still agree.
+	Bool rewriteLabels( char *line, size_t capacity ) const;
 	/// "M<n>~X" where mod n has no `type` called X is a reference to retail's X: TRUE and *retailName
 	/// set.  Finders ask this on a miss, so a definition of the mod's own X never falls through to retail's.
 	Bool findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const;
@@ -209,7 +216,14 @@ private:
 		std::set<std::string> all;
 		std::set<std::string> byType[ MODNAME_COUNT ];
 		std::set<std::string> sides;
+		std::set<std::string> assets;		///< lowercase: w3d and audio by base name, textures by file name
 	};
+	static Bool isAsset( const Names &names, const std::string &word );
+	static Bool isAssetField( const std::string &field );	///< a field whose value names a model, animation, texture or sound file
+	typedef Bool (ModNamespace::*WordTest)( const std::string &word, Bool assetField ) const;
+	Bool isNameOrAsset( const std::string &word, Bool assetField ) const;
+	Bool isModLabel( const std::string &word, Bool assetField ) const;
+	Bool prefixWords( char *line, size_t capacity, WordTest test ) const;
 	std::vector<Names> m_mods;
 	Int m_active;
 };

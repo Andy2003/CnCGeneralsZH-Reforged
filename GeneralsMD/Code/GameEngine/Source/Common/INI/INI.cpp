@@ -470,8 +470,13 @@ const char *const ModNamespace::FactionFiles[] =
 	"Data\\INI\\ObjectCreationList.ini", "Data\\INI\\Locomotor.ini", "Data\\INI\\SpecialPower.ini",
 	"Data\\INI\\DamageFX.ini", "Data\\INI\\Armor.ini", "Data\\INI\\Object", "Data\\INI\\Upgrade.ini",
 	"Data\\INI\\CommandButton.ini", "Data\\INI\\CommandSet.ini", "Data\\INI\\ParticleSystem.ini",
+	"Data\\INI\\MappedImages", "Data\\INI\\ControlBarScheme.ini", "Data\\INI\\Music.ini",
+	"Data\\INI\\SoundEffects.ini", "Data\\INI\\Speech.ini", "Data\\INI\\Voice.ini",
 	NULL
 };
+
+/// where a mod's art and sound sit; a word in its INI that names one of these files is read as the mod's copy
+static const char *const ModAssetFolders[] = { "Art\\W3D\\", "Art\\Textures\\", "Data\\Audio\\" };
 
 /// the block keywords whose second word is a name the mod defines
 static const struct { const char *keyword; ModNameType type; } ModBlockTypes[] =
@@ -482,6 +487,8 @@ static const struct { const char *keyword; ModNameType type; } ModBlockTypes[] =
 	{ "CommandSet", MODNAME_COMMANDSET }, { "CommandButton", MODNAME_COMMANDBUTTON }, { "FXList", MODNAME_FXLIST },
 	{ "ObjectCreationList", MODNAME_OCL }, { "ParticleSystem", MODNAME_PARTICLESYSTEM },
 	{ "Locomotor", MODNAME_LOCOMOTOR }, { "PlayerTemplate", MODNAME_PLAYERTEMPLATE },
+	{ "MappedImage", MODNAME_MAPPEDIMAGE }, { "ControlBarScheme", MODNAME_CONTROLBARSCHEME },
+	{ "AudioEvent", MODNAME_AUDIOEVENT }, { "DialogEvent", MODNAME_AUDIOEVENT }, { "MusicTrack", MODNAME_AUDIOEVENT },
 };
 
 void ModNamespace::scanMods( void )
@@ -521,14 +528,22 @@ void ModNamespace::scanMods( void )
 			}
 		}
 		finishScan( mod );
+
+		FilenameList assetFiles;
+		for (size_t folder = 0; folder < ARRAY_SIZE( ModAssetFolders ); ++folder)
+			TheFileSystem->getFileListInDirectory( AsciiString( ModAssetFolders[ folder ] ), "*.*", assetFiles, TRUE );
+		for (FilenameListIter it = assetFiles.begin(); it != assetFiles.end(); ++it)
+			addAsset( mod, it->str() );
+		TheGameText->loadModStrings( mod );
 		TheFileSystem->setFocus( FILE_FOCUS_ALL );
 
 		const Names &names = m_mods[ mod ];
-		DEBUG_LOG(( "MODNS M%d~ is '%s': %d names from %d files, %d objects, %d weapons, %d upgrades, %d sciences, %d player templates\n",
+		DEBUG_LOG(( "MODNS M%d~ is '%s': %d names from %d files, %d objects, %d weapons, %d upgrades, %d sciences, %d player templates, %d images, %d audio events, %d asset names\n",
 			mod + 1, TheGlobalData->m_modNames[ mod ].str(), (Int)names.all.size(), (Int)files.size(),
 			(Int)names.byType[ MODNAME_OBJECT ].size(), (Int)names.byType[ MODNAME_WEAPON ].size(),
 			(Int)names.byType[ MODNAME_UPGRADE ].size(), (Int)names.byType[ MODNAME_SCIENCE ].size(),
-			(Int)names.byType[ MODNAME_PLAYERTEMPLATE ].size() ));
+			(Int)names.byType[ MODNAME_PLAYERTEMPLATE ].size(), (Int)names.byType[ MODNAME_MAPPEDIMAGE ].size(),
+			(Int)names.byType[ MODNAME_AUDIOEVENT ].size(), (Int)names.assets.size() ));
 	}
 }
 
@@ -587,15 +602,103 @@ void ModNamespace::finishScan( Int mod )
 		names.all.erase( *it );
 }
 
-Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
+/// A-Z only: the result goes into the INI checksum, so no locale may decide it
+static std::string foldAscii( const std::string &text )
+{
+	std::string folded( text );
+	for (size_t i = 0; i < folded.size(); ++i)
+	{
+		if (folded[ i ] >= 'A' && folded[ i ] <= 'Z')
+			folded[ i ] = (char)(folded[ i ] - 'A' + 'a');
+	}
+	return folded;
+}
+
+void ModNamespace::addAsset( Int mod, const char *fileName )
+{
+	const char *slash = strrchr( fileName, '\\' );
+	const std::string name = foldAscii( slash != NULL ? slash + 1 : fileName );
+	const size_t dot = name.rfind( '.' );
+	if (dot == std::string::npos)
+		return;
+	const std::string base = name.substr( 0, dot );
+	const std::string extension = name.substr( dot + 1 );
+	if ((Int)m_mods.size() <= mod)
+		m_mods.resize( mod + 1 );
+	std::set<std::string> &assets = m_mods[ mod ].assets;
+	// INI names a model or a sound without its extension, and a texture as .tga when the file is a .dds
+	if (extension == "w3d" || extension == "wav" || extension == "mp3")
+		assets.insert( base );
+	else if (extension == "dds" || extension == "tga")
+	{
+		assets.insert( base + ".tga" );
+		assets.insert( base + ".dds" );
+	}
+	else
+		assets.insert( name );
+}
+
+Bool ModNamespace::isAsset( const Names &names, const std::string &word )
+{
+	const std::string name = foldAscii( word );
+	if (names.assets.count( name ) != 0)
+		return TRUE;
+	// an animation is "<hierarchy>.<animation>", and the file is the animation's
+	const size_t dot = name.find( '.' );
+	return dot != std::string::npos && names.assets.count( name.substr( dot + 1 ) ) != 0;
+}
+
+Bool ModNamespace::isAssetField( const std::string &field )
+{
+	// what a mod pass reads that names a file: draw modules, trees and props, debris, beams, particles,
+	// shadows, mapped images and audio.  ShowSubObject and the bone fields stay out, their words are
+	// names inside a model and can match a file
+	static const char *const AssetFields[] =
+	{
+		"Model", "Animation", "IdleAnimation", "ModelName", "ModelNames", "AnimationSet", "TextureName",
+		"Texture", "ParticleName", "TrackMarks", "ShadowTexture",
+		"Sounds", "SoundsMorning", "SoundsEvening", "SoundsNight", "Attack", "Decay", "Filename",
+	};
+	for (size_t i = 0; i < ARRAY_SIZE( AssetFields ); ++i)
+	{
+		if (stricmp( field.c_str(), AssetFields[ i ] ) == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+Bool ModNamespace::isNameOrAsset( const std::string &word, Bool assetField ) const
 {
 	const Names &names = m_mods[ m_active ];
+	return names.all.count( word ) != 0 || (assetField && isAsset( names, word ));
+}
+
+Bool ModNamespace::isModLabel( const std::string &word, Bool ) const
+{
+	// the engine tests read mod INI with no GameText up
+	return word.find( ':' ) != std::string::npos && TheGameText != NULL
+		&& TheGameText->hasModLabel( m_active, word.c_str() );
+}
+
+Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
+{
+	return prefixWords( line, capacity, &ModNamespace::isNameOrAsset );
+}
+
+Bool ModNamespace::rewriteLabels( char *line, size_t capacity ) const
+{
+	return prefixWords( line, capacity, &ModNamespace::isModLabel );
+}
+
+Bool ModNamespace::prefixWords( char *line, size_t capacity, WordTest test ) const
+{
 	char prefix[ 16 ];
 	snprintf( prefix, sizeof( prefix ), "M%d~", m_active + 1 );
 
 	// INI's own separators; readLine has already turned every other control character into a space
 	std::string out;
 	Bool first = TRUE;
+	Bool assetField = FALSE;
 	for (const char *p = line; *p != 0; )
 	{
 		if (*p == ' ' || *p == '=')
@@ -607,10 +710,17 @@ Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
 		while (*p != 0 && *p != ' ' && *p != '=')
 			++p;
 		const std::string word( start, p - start );
-		if (!first && names.all.count( word ) != 0)
+		if (first)
+		{
+			// only a field that names a file: a bone or sub-object can share a model's name
+			assetField = isAssetField( word );
+			out += word;
+			first = FALSE;
+			continue;
+		}
+		if ((this->*test)( word, assetField ))
 			out += prefix;
 		out += word;
-		first = FALSE;
 	}
 	if (out.size() >= capacity)
 		return FALSE;
@@ -621,7 +731,8 @@ Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
 Bool ModNamespace::findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const
 {
 	const char *text = name.str();
-	if (m_mods.empty() || text[ 0 ] != 'M')
+	// image and sound names may have been lowercased on the way here
+	if (m_mods.empty() || (text[ 0 ] != 'M' && text[ 0 ] != 'm'))
 		return FALSE;
 	char *tilde = NULL;
 	const long mod = strtol( text + 1, &tilde, 10 );
@@ -720,6 +831,13 @@ void INI::readLine( void )
 		s_xfer->xferUser( m_buffer, sizeof( char ) * strlen( m_buffer ) );
 		//DEBUG_LOG(("Xfer val is now 0x%8.8X in %s, line %s\n", ((XferCRC *)s_xfer)->getCRC(),
 			//m_filename.str(), m_buffer));
+	}
+
+	if (TheModNamespace.getActive() >= 0 && !TheModNamespace.rewriteLabels(m_buffer, sizeof(m_buffer)))
+	{
+		g_LastErrorDump.format("INI::readLine: line %d of '%s' is too long once its mod labels are prefixed\n", m_lineNum, m_filename.str());
+		DEBUG_LOG(("%s", g_LastErrorDump.str()));
+		throw INI_BUFFER_TOO_SMALL;
 	}
 }
 

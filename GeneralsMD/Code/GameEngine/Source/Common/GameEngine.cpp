@@ -199,34 +199,16 @@ void initSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *p
 }
 
 //-------------------------------------------------------------------------------------------------
-/** A store a faction is made of.  With -modfactions retail's own files load alone, and then each
-	* mod's under that mod's names (INI::loadModPasses); a mod's Default\ file never loads.  Without it
-	* this is initSubsystem. */
+/** A store a faction is made of.  With -modfactions the plain load sees retail's files only, and
+	* then each mod's load under that mod's names (INI::loadModPasses); a mod's Default\ file never
+	* loads.  Without it this is initSubsystem. */
 //-------------------------------------------------------------------------------------------------
 template<class SUBSYSTEM>
 void initFactionSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *pXfer, const char* path1,
 													const char* path2, const char* dirpath = NULL)
 {
-	const Bool apart = TheGlobalData->m_modFactions;
-	if (apart)
-		TheFileSystem->setFocus(FILE_FOCUS_RETAIL);
 	initSubsystem(sysref, name, sys, pXfer, path1, path2, dirpath);
-	if (apart)
-		TheFileSystem->setFocus(FILE_FOCUS_ALL);
 	INI::loadModPasses(dirpath != NULL ? dirpath : path2, pXfer, dirpath != NULL);
-}
-
-/** A store that names faction parts without being one (crates, the AI's build lists, the ranks):
-	* with -modfactions retail's copy, since a mod's names its own parts as they are only under its prefix. */
-template<class SUBSYSTEM>
-void initRetailSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *pXfer, const char* path1, const char* path2)
-{
-	const Bool apart = TheGlobalData->m_modFactions;
-	if (apart)
-		TheFileSystem->setFocus(FILE_FOCUS_RETAIL);
-	initSubsystem(sysref, name, sys, pXfer, path1, path2);
-	if (apart)
-		TheFileSystem->setFocus(FILE_FOCUS_ALL);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -251,24 +233,18 @@ static void checksumFileContents( XferCRC &xferCRC, const char *path )
 	delete [] contents;
 }
 
-/** The same for a file a faction is made of: with -modfactions retail's copy, then each mod's that
-	* has one (modsToo), as ControlBar::init loads them. */
-static void checksumFactionFile( XferCRC &xferCRC, const char *path, Bool modsToo )
+/** The same for the command buttons and sets: with -modfactions each mod's copy after retail's, as
+	* ControlBar::init loads them. */
+static void checksumFactionFile( XferCRC &xferCRC, const char *path )
 {
-	if (!TheGlobalData->m_modFactions)
-	{
-		checksumFileContents( xferCRC, path );
-		return;
-	}
-	TheFileSystem->setFocus( FILE_FOCUS_RETAIL );
 	checksumFileContents( xferCRC, path );
-	for (Int mod = 0; modsToo && mod < (Int)TheGlobalData->m_mods.size(); ++mod)
+	for (Int mod = 0; TheGlobalData->m_modFactions && mod < (Int)TheGlobalData->m_mods.size(); ++mod)
 	{
 		TheFileSystem->setFocus( mod );
 		if (TheFileSystem->doesFileExist( path ))
 			checksumFileContents( xferCRC, path );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
 	}
-	TheFileSystem->setFocus( FILE_FOCUS_ALL );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1172,7 +1148,7 @@ void GameEngine::init( int argc, char *argv[] )
 		initSubsystem(TheMessageStream,"TheMessageStream", createMessageStream(), NULL);
 		initSubsystem(TheSidesList,"TheSidesList", MSGNEW("GameEngineSubsystem") SidesList(), NULL);
 		initSubsystem(TheCaveSystem,"TheCaveSystem", MSGNEW("GameEngineSubsystem") CaveSystem(), NULL);
-		initRetailSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, NULL, "Data\\INI\\Rank.ini");
+		initSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, NULL, "Data\\INI\\Rank.ini");
 		initFactionSubsystem(ThePlayerTemplateStore,"ThePlayerTemplateStore", MSGNEW("GameEngineSubsystem") PlayerTemplateStore(), &xferCRC, "Data\\INI\\Default\\PlayerTemplate.ini", "Data\\INI\\PlayerTemplate.ini");
 		initSubsystem(TheParticleSystemManager,"TheParticleSystemManager", createParticleSystemManager(), NULL);
 
@@ -1246,10 +1222,10 @@ void GameEngine::init( int argc, char *argv[] )
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 	
-		initRetailSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData.ini", "Data\\INI\\AIData.ini");
+		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData.ini", "Data\\INI\\AIData.ini");
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), NULL);
 		initSubsystem(TheTeamFactory,"TheTeamFactory", MSGNEW("GameEngineSubsystem") TeamFactory(), NULL);
-		initRetailSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate.ini", "Data\\INI\\Crate.ini");
+		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate.ini", "Data\\INI\\Crate.ini");
 		initSubsystem(ThePlayerList,"ThePlayerList", MSGNEW("GameEngineSubsystem") PlayerList(), NULL);
 		initSubsystem(TheRecorder,"TheRecorder", createRecorder(), NULL);
 		initSubsystem(TheRadar,"TheRadar", createRadar(), NULL);
@@ -1297,9 +1273,9 @@ void GameEngine::init( int argc, char *argv[] )
 
 
 		// the control bar parses these without the checksum, and the AI builds and hunts from them
-		checksumFactionFile( xferCRC, "Data\\INI\\Default\\CommandButton.ini", FALSE );
-		checksumFactionFile( xferCRC, "Data\\INI\\CommandButton.ini", TRUE );
-		checksumFactionFile( xferCRC, "Data\\INI\\CommandSet.ini", TRUE );
+		checksumFileContents( xferCRC, "Data\\INI\\Default\\CommandButton.ini" );
+		checksumFactionFile( xferCRC, "Data\\INI\\CommandButton.ini" );
+		checksumFactionFile( xferCRC, "Data\\INI\\CommandSet.ini" );
 		checksumFileContents( xferCRC, "Data\\INI\\CommandSetReforged.ini" );
 		checksumModels( xferCRC );
 

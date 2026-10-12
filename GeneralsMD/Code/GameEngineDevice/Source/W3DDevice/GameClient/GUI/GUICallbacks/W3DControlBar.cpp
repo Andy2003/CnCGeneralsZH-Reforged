@@ -711,6 +711,13 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 		offset.y = now.y - TheControlBar->getPanelOrigin()->y;
 	}
 
+	// -modfactions: a mod faction's bar is the mod's own painting, not our plates or our page
+	if( man->isCurrentSchemeMod() )
+	{
+		man->drawModPainting( offset, FALSE );
+		return;
+	}
+
 	IRegion2D panels[ ControlBar::CB_PANEL_COUNT ];
 	Bool shown[ ControlBar::CB_PANEL_COUNT ];
 	const Image *images[ ControlBar::CB_PANEL_COUNT ];
@@ -757,7 +764,23 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 
 void W3DCommandBarForegroundDraw( GameWindow *window, WinInstanceData *instData )
 {
-	// nothing sits on top of the plates - see W3DCommandBarBackgroundDraw
+	// nothing sits on top of the plates - see W3DCommandBarBackgroundDraw.  A mod's bar keeps its
+	// scheme's foreground layers, moved with the bar the same way
+	ControlBarSchemeManager *man = TheControlBar ? TheControlBar->getControlBarSchemeManager() : NULL;
+	if( man == NULL || TheDisplay == NULL || !man->isCurrentSchemeMod() )
+		return;
+
+	ICoord2D offset;
+	offset.x = offset.y = 0;
+	GameWindow *frame = window ? window->winGetParent() : NULL;
+	if( frame )
+	{
+		ICoord2D now;
+		frame->winGetScreenPosition( &now.x, &now.y );
+		offset.x = now.x - TheControlBar->getPanelOrigin()->x;
+		offset.y = now.y - TheControlBar->getPanelOrigin()->y;
+	}
+	man->drawModPainting( offset, TRUE );
 }
 
 void W3DNoDraw( GameWindow *window, WinInstanceData *instData )

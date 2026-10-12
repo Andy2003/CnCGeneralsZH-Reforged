@@ -155,6 +155,11 @@ public:
 	void setFocus(Int focus);
 	Int getFocus() const { return s_focus; }
 
+	/// -modfactions: a file name starting "M<n>~" ("Art\W3D\M2~AVRanger.w3d") is mod n's copy and nothing
+	/// else; the art code falls back to the plain name itself.  TRUE for such a name, with *mod the -mod
+	/// index and *bare the path without the prefix.
+	static Bool splitModName(const AsciiString& filename, Int *mod, AsciiString *bare);
+
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.
 
 	/// language when Data\<language>\Language.ini is loose or in an archive, otherwise the first
@@ -167,6 +172,7 @@ public:
 	void unloadMusicFilesFromCD();
 protected:
 	AsciiString focusedLooseFile(const AsciiString& filename) const;	///< the loose copy the focus sees, else empty
+	AsciiString modFolderFile(Int mod, const AsciiString& filename) const;	///< "<mod folder><filename>" when it is there, else empty
   mutable std::map<unsigned,bool> m_fileExist;
 	// static: GlobalData's constructor reads files through a TheFileSystem that a few engine tests leave
 	// NULL, and openFile has always answered NULL there without touching the object

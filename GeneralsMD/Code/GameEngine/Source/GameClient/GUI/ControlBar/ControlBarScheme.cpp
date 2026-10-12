@@ -968,6 +968,8 @@ void ControlBarSchemeManager::init( void )
 	ini.load( AsciiString( "Data\\INI\\ControlBarScheme.ini" ), INI_LOAD_OVERWRITE, NULL );
 	// the fork's edits to EA's schemes, each block naming only what it changes
 	ini.load( AsciiString( "Data\\INI\\ControlBarSchemeReforged.ini" ), INI_LOAD_MULTIFILE, NULL );
+	// -modfactions: each mod's own bars, "M<n>~" names, worn only by that mod's factions
+	INI::loadModPasses( "Data\\INI\\ControlBarScheme.ini", NULL );
 
 //	//Load the user modified control bar schemes
 //	WIN32_FIND_DATA findData;
@@ -1076,18 +1078,100 @@ AsciiString ControlBarSchemeManager::getCurrentArtTwinSide( void ) const
 /** The side's widest scheme, as EA picked.  Neither interface draws a scheme's painting; the plates
 	* stand in for it (ControlBarPlateForSide), and the scheme only places the bar's own windows. */
 //-----------------------------------------------------------------------------
-ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side ) const
+/// -modfactions: the mod (0-based) a scheme's "M<n>~" name says it came from, -1 for ours
+static Int schemeModIndex( const AsciiString& name )
+{
+	const char *text = name.str();
+	if( text[ 0 ] != 'M' && text[ 0 ] != 'm' )
+		return -1;
+	char *tilde = NULL;
+	const long mod = strtol( text + 1, &tilde, 10 );
+	return ( tilde != text + 1 && *tilde == '~' && mod >= 1 ) ? (Int)mod - 1 : -1;
+}
+
+ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side, Int mod ) const
 {
 	ControlBarScheme *best = NULL;
 	for( ControlBarSchemeList::const_iterator it = m_schemeList.begin(); it != m_schemeList.end(); ++it )
 	{
 		ControlBarScheme *scheme = *it;
-		if( scheme->m_side.compareNoCase( side ) != 0 )
+		if( scheme->m_side.compareNoCase( side ) != 0 || schemeModIndex( scheme->m_name ) != mod )
 			continue;
 		if( best == NULL || scheme->m_ScreenCreationRes.x > best->m_ScreenCreationRes.x )
 			best = scheme;
 	}
 	return best;
+}
+
+/// a mod faction wears its mod's bar for the side, ours where the mod has none; ours never a mod's
+ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( const AsciiString& side, Int mod ) const
+{
+	ControlBarScheme *scheme = mod >= 0 ? findSchemeForSide( side, mod ) : NULL;
+	return scheme ? scheme : findSchemeForSide( side, -1 );
+}
+
+Int ControlBarSchemeManager::getCurrentSchemeMod( void ) const
+{
+	return m_currentScheme ? schemeModIndex( m_currentScheme->m_name ) : -1;
+}
+
+//-----------------------------------------------------------------------------
+/** A mod's bar is one painting authored for 800x600 (or its ScreenCreationRes) and our bar stands in
+	* three panels at one scale, so the painting is cut where the panels meet and each piece is drawn
+	* through its own panel's placement, the way the windows above it are placed.  Classic and Reforged
+	* alike: the windows are laid out the same way in both. */
+//-----------------------------------------------------------------------------
+void ControlBarSchemeManager::drawModPainting( ICoord2D offset, Bool foreground )
+{
+	// where the left and centre, and the centre and right panels meet, in 800x600 design units
+	static const Int seams[ ControlBar::CB_PANEL_COUNT + 1 ] = { 0, 182, 616, 800 };
+
+	const Real toDesignX = 800.0f / m_currentScheme->m_ScreenCreationRes.x;
+	const Real toDesignY = 600.0f / m_currentScheme->m_ScreenCreationRes.y;
+	const Int first = foreground ? 0 : CONTROL_BAR_SCHEME_FOREGROUND_IMAGE_LAYERS;
+	const Int last = foreground ? CONTROL_BAR_SCHEME_FOREGROUND_IMAGE_LAYERS : MAX_CONTROL_BAR_SCHEME_IMAGE_LAYERS;
+	const Int width = TheDisplay->getWidth();
+	const Int height = TheDisplay->getHeight();
+
+	for( Int p = 0; p < ControlBar::CB_PANEL_COUNT; p++ )
+	{
+		if( TheControlBar->isPanelHidden( p ) )
+			continue;
+		const Int slide = TheControlBar->getPanelSlideOffset( p );
+
+		IRegion2D band, clip;
+		band.lo.x = seams[ p ];
+		band.hi.x = seams[ p + 1 ];
+		band.lo.y = 0;
+		band.hi.y = 600;
+		ControlBarPanelDesignToScreen( p, &band, width, height, &clip );
+		clip.lo.x += offset.x;
+		clip.hi.x += offset.x;
+		clip.lo.y += offset.y + slide;
+		clip.hi.y += offset.y + slide;
+		TheDisplay->setClipRegion( &clip );
+		TheDisplay->enableClipping( TRUE );
+
+		for( Int layer = last - 1; layer >= first; layer-- )
+		{
+			for( ControlBarScheme::ControlBarSchemeImageList::const_iterator it = m_currentScheme->m_layer[ layer ].begin();
+					 it != m_currentScheme->m_layer[ layer ].end(); ++it )
+			{
+				const ControlBarSchemeImage *schemeImage = *it;
+				if( schemeImage->m_image == NULL )
+					continue;
+				IRegion2D design, rect;
+				design.lo.x = REAL_TO_INT_FLOOR( schemeImage->m_position.x * toDesignX );
+				design.lo.y = REAL_TO_INT_FLOOR( schemeImage->m_position.y * toDesignY );
+				design.hi.x = REAL_TO_INT_CEIL( ( schemeImage->m_position.x + schemeImage->m_size.x ) * toDesignX );
+				design.hi.y = REAL_TO_INT_CEIL( ( schemeImage->m_position.y + schemeImage->m_size.y ) * toDesignY );
+				ControlBarPanelDesignToScreen( p, &design, width, height, &rect );
+				TheDisplay->drawImage( schemeImage->m_image, rect.lo.x + offset.x, rect.lo.y + offset.y + slide,
+															 rect.hi.x + offset.x, rect.hi.y + offset.y + slide );
+			}
+		}
+		TheDisplay->enableClipping( FALSE );
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -1104,7 +1188,7 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayerTemplate( const PlayerT
 		side.set("Observer");
 	// picked again every time, even for the side on screen: a new resolution can want a different
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
-	ControlBarScheme *tempScheme = findSchemeForSide( side );
+	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt->getModIndex() );
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
 
 	if(tempScheme)
@@ -1145,7 +1229,9 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
 		side.set("Observer");
 	// picked again every time, even for the side on screen: a new resolution can want a different
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
-	ControlBarScheme *tempScheme = findSchemeForSide( side );
+	// the neutral and civilian players have no template, and wear ours
+	const PlayerTemplate *pt = p->getPlayerTemplate();
+	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt ? pt->getModIndex() : -1 );
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
 
 	if(tempScheme)

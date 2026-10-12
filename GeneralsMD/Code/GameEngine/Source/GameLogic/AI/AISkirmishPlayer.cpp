@@ -34,7 +34,8 @@
 #include "Common/GlobalData.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
-#include "Common/Team.h" 
+#include "Common/PlayerTemplate.h"
+#include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/BuildAssistant.h"
 #include "Common/SpecialPower.h"
@@ -1238,6 +1239,18 @@ void AISkirmishPlayer::newMap( void )
 	while (build) {
 		if (build->m_side == mySide) {
 			BuildListInfo *buildList = build->m_buildList->duplicate();
+			// -modfactions: the build lists are retail's and keyed by side, so a mod's player builds the
+			// mod's own building of each name, and retail's where the mod has none.  Before this its
+			// command center was torn down below and put back as retail's.
+			const Int mod = m_player->getPlayerTemplate()->getModIndex();
+			for (BuildListInfo *info = buildList; mod >= 0 && info != NULL; info = info->getNext())
+			{
+				AsciiString modName;
+				modName.format("M%d~%s", mod + 1, info->getTemplateName().str());
+				const ThingTemplate *modPlan = TheThingFactory->findTemplate( modName );
+				if (modPlan != NULL)
+					info->setTemplateName( modPlan->getName() );
+			}
 			adjustBuildList(buildList); // adjust to  our start position.
 			m_player->setBuildList(buildList);
 			computeCenterAndRadiusOfBase(&m_baseCenter, &m_baseRadius);

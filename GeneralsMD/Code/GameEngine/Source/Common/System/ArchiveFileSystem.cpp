@@ -248,35 +248,35 @@ void ArchiveFileSystem::loadMods() {
 
 void ArchiveFileSystem::keepModsApart(size_t modCount)
 {
-	m_retailRoot = m_rootDirectory;
 	m_modRoots.assign(modCount, ArchivedDirectoryInfo());
 }
 
 void ArchiveFileSystem::addModArchive(Int mod, ArchiveFile *archiveFile, const AsciiString& archiveFilename)
 {
-	loadIntoDirectoryTree(archiveFile, archiveFilename, TRUE);
 	m_archiveFileMap[archiveFilename] = archiveFile;
-	if (m_modRoots.empty())
+	// kept apart, a mod's files are reached only through its own focus or an "M<n>~" name: the merged
+	// view stays retail's, so the menus, the lobby and every file a faction does not name are ours
+	if (!m_modRoots.empty())
+	{
+		addToTree(m_modRoots[mod], archiveFile, archiveFilename, TRUE);
+		m_archiveMod[archiveFilename] = mod;
 		return;
-	addToTree(m_modRoots[mod], archiveFile, archiveFilename, TRUE);
-	m_archiveMod[archiveFilename] = mod;
+	}
+	loadIntoDirectoryTree(archiveFile, archiveFilename, TRUE);
 }
 
 const ArchivedDirectoryInfo &ArchiveFileSystem::focusedRoot() const
 {
-	if (m_focus == FILE_FOCUS_ALL)
-		return m_rootDirectory;
-	if (m_focus == FILE_FOCUS_RETAIL)
-		return m_retailRoot;
-	return m_modRoots[m_focus];
+	return m_focus < 0 ? m_rootDirectory : m_modRoots[m_focus];
 }
 
 Bool ArchiveFileSystem::inFocus(const AsciiString& archiveFilename) const
 {
-	if (m_focus == FILE_FOCUS_ALL)
+	if (m_focus == FILE_FOCUS_ALL && m_modRoots.empty())
 		return TRUE;
 	std::map<AsciiString, Int>::const_iterator it = m_archiveMod.find(archiveFilename);
-	return (it == m_archiveMod.end() ? FILE_FOCUS_RETAIL : it->second) == m_focus;
+	const Int owner = it == m_archiveMod.end() ? FILE_FOCUS_RETAIL : it->second;
+	return m_focus < 0 ? owner < 0 : owner == m_focus;
 }
 
 Bool ArchiveFileSystem::doesFileExist(const Char *filename) const
@@ -412,13 +412,35 @@ void ArchiveFileSystem::prioritizeLargerFiles(const AsciiString& directory, cons
 
 AsciiString ArchiveFileSystem::getArchiveFilenameForFile(const AsciiString& filename) const
 {
+	return archiveInTree(focusedRoot(), filename);
+}
+
+File *ArchiveFileSystem::openModFile(Int mod, const AsciiString& filename, Int access)
+{
+	const AsciiString archive = archiveInTree(m_modRoots[mod], filename);
+	return archive.isEmpty() ? NULL : m_archiveFileMap[archive]->openFile(filename.str(), access);
+}
+
+Bool ArchiveFileSystem::doesModFileExist(Int mod, const AsciiString& filename) const
+{
+	return archiveInTree(m_modRoots[mod], filename).isNotEmpty();
+}
+
+Bool ArchiveFileSystem::getModFileInfo(Int mod, const AsciiString& filename, FileInfo *fileInfo) const
+{
+	ArchiveFileMap::const_iterator it = m_archiveFileMap.find(archiveInTree(m_modRoots[mod], filename));
+	return it != m_archiveFileMap.end() && it->second->getFileInfo(filename, fileInfo);
+}
+
+AsciiString ArchiveFileSystem::archiveInTree(const ArchivedDirectoryInfo &root, const AsciiString& filename)
+{
 	AsciiString path;
 	path = filename;
 	path.toLower();
 	AsciiString token;
 	AsciiString debugpath;
 
-	const ArchivedDirectoryInfo *dirInfo = &focusedRoot();
+	const ArchivedDirectoryInfo *dirInfo = &root;
 
 	path.nextToken(&token, "\\/");
 

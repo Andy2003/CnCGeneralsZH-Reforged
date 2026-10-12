@@ -162,12 +162,44 @@ AsciiString FileSystem::focusedLooseFile( const AsciiString& filename ) const
 	if (s_focus == FILE_FOCUS_RETAIL)
 		return TheLocalFileSystem->doesFileExist( filename.str() ) ? filename : AsciiString();
 
-	const AsciiString &mod = TheGlobalData->m_mods[ s_focus ];
-	if (!mod.endsWith( "\\" ) && !mod.endsWith( "/" ))
+	return modFolderFile( s_focus, filename );
+}
+
+AsciiString FileSystem::modFolderFile( Int mod, const AsciiString& filename ) const
+{
+	const AsciiString &modPath = TheGlobalData->m_mods[ mod ];
+	if (!modPath.endsWith( "\\" ) && !modPath.endsWith( "/" ))
 		return AsciiString();
-	AsciiString path = mod;
+	AsciiString path = modPath;
 	path.concat( filename );
 	return TheLocalFileSystem->doesFileExist( path.str() ) ? path : AsciiString();
+}
+
+//============================================================================
+// FileSystem::splitModName
+//============================================================================
+
+Bool FileSystem::splitModName( const AsciiString& filename, Int *mod, AsciiString *bare )
+{
+	if (TheGlobalData == NULL || !TheGlobalData->m_modFactions)
+		return FALSE;
+	const char *path = filename.str();
+	const char *name = path;
+	for (const char *p = path; *p != 0; ++p)
+	{
+		if (*p == '\\' || *p == '/')
+			name = p + 1;
+	}
+	if ((name[ 0 ] != 'M' && name[ 0 ] != 'm') || name[ 1 ] < '0' || name[ 1 ] > '9')
+		return FALSE;
+	char *tilde = NULL;
+	const long n = strtol( name + 1, &tilde, 10 );
+	if (*tilde != '~' || n < 1 || n > (long)TheGlobalData->m_mods.size())
+		return FALSE;
+	*mod = (Int)n - 1;
+	*bare = std::string( path, name - path ).c_str();
+	bare->concat( tilde + 1 );
+	return TRUE;
 }
 
 //============================================================================
@@ -249,6 +281,15 @@ File*		FileSystem::openFile( const Char *filename, Int access )
 	}
 
 	const Bool readOnly = (access & (File::WRITE | File::CREATE | File::APPEND | File::TRUNCATE)) == 0;
+	Int mod;
+	AsciiString bare;
+	if ( readOnly && splitModName( AsciiString( filename ), &mod, &bare ) )
+	{
+		AsciiString loose = modFolderFile( mod, bare );
+		if ( loose.isNotEmpty() )
+			return TheLocalFileSystem->openFile( loose.str(), access );
+		return TheArchiveFileSystem->openModFile( mod, bare, access );
+	}
 	if ( readOnly && s_focus != FILE_FOCUS_ALL )
 	{
 		AsciiString loose = focusedLooseFile( AsciiString( filename ) );
@@ -308,6 +349,11 @@ Bool FileSystem::doesFileExist(const Char *filename) const
 	if (isGeneratedMapPath( AsciiString( filename ) ))
 		return TRUE;
 
+	Int mod;
+	AsciiString bare;
+	if (splitModName( AsciiString( filename ), &mod, &bare ))
+		return modFolderFile( mod, bare ).isNotEmpty() || TheArchiveFileSystem->doesModFileExist( mod, bare );
+
 	// the cache is the merged view's; a focus asks its own files every time (setFocus)
 	if (s_focus != FILE_FOCUS_ALL)
 		return focusedLooseFile( AsciiString( filename ) ).isNotEmpty() || TheArchiveFileSystem->doesFileExist( filename );
@@ -347,7 +393,9 @@ void FileSystem::getFileListInDirectory(const AsciiString& directory, const Asci
 
 	// a mod's loose files listed under their game path, so a file it replaces is loaded once, from the mod (openFile)
 	// TheGlobalData is not there yet while GameData.ini itself loads, and there is no -mod before it is
-	if (TheGlobalData == NULL || isAbsolutePath(directory) || s_focus == FILE_FOCUS_RETAIL)
+	// -modfactions' merged view is retail's
+	if (TheGlobalData == NULL || isAbsolutePath(directory) || s_focus == FILE_FOCUS_RETAIL ||
+			(s_focus == FILE_FOCUS_ALL && TheGlobalData->m_modFactions))
 	{
 		return;
 	}
@@ -383,7 +431,8 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 		*inModArchive = FALSE;
 	}
 	// a folder is not a file: "" or "Maps\" would otherwise find the mod folder itself, which exists
-	if (TheGlobalData == NULL || TheGlobalData->m_mods.empty() || isAbsolutePath(filename) ||
+	// -modfactions reaches a mod's files only by its focus or its "M<n>~" names
+	if (TheGlobalData == NULL || TheGlobalData->m_mods.empty() || TheGlobalData->m_modFactions || isAbsolutePath(filename) ||
 		filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/"))
 	{
 		return AsciiString();
@@ -484,6 +533,16 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo) co
 	if (generatedMapBytes(filename, &generated, &generatedSize)) {
 		fileInfo->sizeLow = generatedSize;
 		return TRUE;
+	}
+
+	Int mod;
+	AsciiString bare;
+	if (splitModName(filename, &mod, &bare)) {
+		AsciiString loose = modFolderFile(mod, bare);
+		if (loose.isNotEmpty()) {
+			return TheLocalFileSystem->getFileInfo(loose, fileInfo);
+		}
+		return TheArchiveFileSystem->getModFileInfo(mod, bare, fileInfo);
 	}
 
 	if (s_focus != FILE_FOCUS_ALL) {

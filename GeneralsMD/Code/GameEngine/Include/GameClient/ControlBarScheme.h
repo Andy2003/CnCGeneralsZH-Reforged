@@ -276,6 +276,13 @@ public:
 		* is really showing.  Empty when nothing else shares it. */
 	AsciiString getCurrentArtTwinSide( void ) const;
 
+	/// -modfactions: the mod (0-based) whose own bar ("M<n>~" scheme) is on screen, -1 for ours;
+	/// a mod's bar brings its own painting
+	Int getCurrentSchemeMod( void ) const;
+	Bool isCurrentSchemeMod( void ) const { return getCurrentSchemeMod() >= 0; }
+	/// a mod scheme's painting, cut at the panel seams and each piece drawn where its panel stands
+	void drawModPainting( ICoord2D offset, Bool foreground );
+
 
 	// parse Functions for the INI file
 	const FieldParse *getFieldParse() const { return m_controlBarSchemeFieldParseTable; }								///< returns the parsing fields
@@ -290,7 +297,8 @@ public:
 	void preloadAssets( TimeOfDay timeOfDay );									///< preload the assets
 
 private:
-	ControlBarScheme *findSchemeForSide( const AsciiString& side ) const;	///< the widest of that side's schemes the screen can wear
+	ControlBarScheme *findSchemeForSide( const AsciiString& side, Int mod ) const;	///< the widest of that side's schemes from mod (-1 ours) the screen can wear
+	ControlBarScheme *findSchemeForFaction( const AsciiString& side, Int mod ) const;	///< a mod faction's own scheme, else ours
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
 	Coord2D m_multiplyer;																	
