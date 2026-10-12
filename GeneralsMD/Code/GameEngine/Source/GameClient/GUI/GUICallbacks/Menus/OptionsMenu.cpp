@@ -1248,6 +1248,104 @@ static void updateResolutionNote( void )
 	GadgetStaticTextSetText( note, supported ? TheGameText->fetch( "GUI:ResolutionNote0" ) : UnicodeString::TheEmptyString );
 }
 
+//-------------------------------------------------------------------------------------------------
+/** Music, effects and voice: from their sliders into GlobalData, the audio manager and out. */
+//-------------------------------------------------------------------------------------------------
+static void saveVolumeOptions( OptionPreferences &out )
+{
+	Int val;
+
+	//-------------------------------------------------------------------------------------------------
+	// slider music volume
+	val = GadgetSliderGetPosition(sliderMusicVolume);
+	if(val != -1)
+	{
+	  TheWritableGlobalData->m_musicVolumeFactor = val;
+    AsciiString prefString;
+    prefString.format("%d", val);
+    out["MusicVolume"] = prefString;
+    TheAudio->setVolume(val / 100.0f, (AudioAffect) (AudioAffect_Music | AudioAffect_SystemSetting));
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// slider SFX volume
+	val = GadgetSliderGetPosition(sliderSFXVolume);
+	if(val != -1)
+	{
+		//Both 2D and 3D sound effects are sharing the same slider. However, there is a
+		//relative slider that gets applied to one of these values to lower that sound volume.
+		Real sound2DVolume = val / 100.0f;
+		Real sound3DVolume = val / 100.0f;
+		Real relative2DVolume = TheAudio->getAudioSettings()->m_relative2DVolume;
+		relative2DVolume = MIN( 1.0f, MAX( -1.0, relative2DVolume ) );
+		if( relative2DVolume < 0.0f )
+		{
+			//Lower the 2D volume
+			sound2DVolume *= 1.0f + relative2DVolume;
+		}
+		else
+		{
+			//Lower the 3D volume
+			sound3DVolume *= 1.0f - relative2DVolume;
+		}
+
+		//Apply the sound volumes in the audio system now.
+    TheAudio->setVolume( sound2DVolume, (AudioAffect) (AudioAffect_Sound | AudioAffect_SystemSetting) );
+		TheAudio->setVolume( sound3DVolume, (AudioAffect) (AudioAffect_Sound3D | AudioAffect_SystemSetting) );
+
+		//Save the settings in the options.ini.
+    TheWritableGlobalData->m_SFXVolumeFactor = val;
+    AsciiString prefString;
+    prefString.format("%d", REAL_TO_INT( sound2DVolume * 100.0f ) );
+    out["SFXVolume"] = prefString;
+    prefString.format("%d", REAL_TO_INT( sound3DVolume * 100.0f ) );
+		out["SFX3DVolume"] = prefString;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// slider Voice volume
+	val = GadgetSliderGetPosition(sliderVoiceVolume);
+	if(val != -1)
+	{
+    TheWritableGlobalData->m_voiceVolumeFactor = val;
+    AsciiString prefString;
+    prefString.format("%d", val);
+    out["VoiceVolume"] = prefString;
+    TheAudio->setVolume(val / 100.0f, (AudioAffect) (AudioAffect_Speech | AudioAffect_SystemSetting));
+	}
+}
+
+#if defined(_WIN32)
+//-------------------------------------------------------------------------------------------------
+// The volume view.  On Windows the launcher owns every setting but the four volumes, so the quit
+// menu's Options button opens the Audio page alone (OpenVolumeOptions), and its Accept writes those
+// four onto Options.ini as it is on disk right now.  Nothing the menu loaded for the other pages is
+// written back, so a resolution or a detail preset the launcher saved stays what the launcher said.
+// -optionsmenu and -resdrill still open the whole menu; they are how a script reaches it.
+//-------------------------------------------------------------------------------------------------
+static Bool volumeOnly = FALSE;
+
+static void saveVolumeOnly( void )
+{
+	delete pref;
+	pref = NEW OptionPreferences;
+	saveVolumeOptions( *pref );
+
+	// ambience is a catalog row; its setter applies it to the audio manager as well
+	const OptionDef *ambient = findOptionDef( "AmbientVolume" );
+	ambient->set( clampOptionValue( *ambient, GadgetSliderGetPosition( findOptionWidget( *ambient ) ) ) );
+	(*pref)[ "AmbientVolume" ] = formatOptionValue( *ambient, ambient->get() );
+}
+
+void OpenVolumeOptions( void )
+{
+	WindowLayout *optLayout = TheShell->getOptionsLayout( TRUE );
+	optLayout->runInit( &volumeOnly );
+	optLayout->hide( FALSE );
+	optLayout->bringForward();
+}
+#endif
+
 static void saveOptions( void )
 {
 	Int index;
@@ -1591,64 +1689,7 @@ static void saveOptions( void )
 		(*pref)["ScrollFactor"] = prefString;
 	}
 	
-	//-------------------------------------------------------------------------------------------------
-	// slider music volume
-	val = GadgetSliderGetPosition(sliderMusicVolume);
-	if(val != -1)
-	{
-	  TheWritableGlobalData->m_musicVolumeFactor = val;
-    AsciiString prefString;
-    prefString.format("%d", val);
-    (*pref)["MusicVolume"] = prefString;
-    TheAudio->setVolume(val / 100.0f, (AudioAffect) (AudioAffect_Music | AudioAffect_SystemSetting));
-	}
-	
-	//-------------------------------------------------------------------------------------------------
-	// slider SFX volume
-	val = GadgetSliderGetPosition(sliderSFXVolume);
-	if(val != -1)
-	{
-		//Both 2D and 3D sound effects are sharing the same slider. However, there is a 
-		//relative slider that gets applied to one of these values to lower that sound volume.
-		Real sound2DVolume = val / 100.0f;
-		Real sound3DVolume = val / 100.0f;
-		Real relative2DVolume = TheAudio->getAudioSettings()->m_relative2DVolume;
-		relative2DVolume = MIN( 1.0f, MAX( -1.0, relative2DVolume ) );
-		if( relative2DVolume < 0.0f )
-		{
-			//Lower the 2D volume
-			sound2DVolume *= 1.0f + relative2DVolume;
-		}
-		else
-		{
-			//Lower the 3D volume
-			sound3DVolume *= 1.0f - relative2DVolume;
-		}
-
-		//Apply the sound volumes in the audio system now.
-    TheAudio->setVolume( sound2DVolume, (AudioAffect) (AudioAffect_Sound | AudioAffect_SystemSetting) );
-		TheAudio->setVolume( sound3DVolume, (AudioAffect) (AudioAffect_Sound3D | AudioAffect_SystemSetting) );
-
-		//Save the settings in the options.ini.
-    TheWritableGlobalData->m_SFXVolumeFactor = val;
-    AsciiString prefString;
-    prefString.format("%d", REAL_TO_INT( sound2DVolume * 100.0f ) );
-    (*pref)["SFXVolume"] = prefString;
-    prefString.format("%d", REAL_TO_INT( sound3DVolume * 100.0f ) );
-		(*pref)["SFX3DVolume"] = prefString;
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	// slider Voice volume
-	val = GadgetSliderGetPosition(sliderVoiceVolume);
-	if(val != -1)
-	{
-    TheWritableGlobalData->m_voiceVolumeFactor = val;
-    AsciiString prefString;
-    prefString.format("%d", val);
-    (*pref)["VoiceVolume"] = prefString;
-    TheAudio->setVolume(val / 100.0f, (AudioAffect) (AudioAffect_Speech | AudioAffect_SystemSetting));
-	}
+	saveVolumeOptions( *pref );
 
  	//-------------------------------------------------------------------------------------------------
  	// slider Gamma
@@ -2669,6 +2710,17 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	updateDetailNote();
 	showOptionsPage( 0 );
 
+#if defined(_WIN32)
+	// the volume view: the Audio page and no tabs to leave it by
+	volumeOnly = ( userData == &volumeOnly );
+	if( volumeOnly )
+	{
+		showOptionsPage( 3 );
+		for( Int page = 0; page < OPTIONS_PAGE_COUNT; ++page )
+			optionsTab[ page ]->winHide( TRUE );
+	}
+#endif
+
 	// show menu
 	layout->hide( FALSE );
 
@@ -2937,6 +2989,11 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}  // end if
 			else if (controlID == buttonAccept )
 			{
+#if defined(_WIN32)
+				if( volumeOnly )
+					saveVolumeOnly();
+				else
+#endif
 				saveOptions();
 
 				// the command bar rebuilds its grid letters on its next update
