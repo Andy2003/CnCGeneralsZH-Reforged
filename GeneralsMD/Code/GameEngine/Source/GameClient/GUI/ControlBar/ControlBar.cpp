@@ -1387,7 +1387,6 @@ ControlBar::ControlBar( void )
 {
 	Int i;
 	m_commandButtons = NULL;
-	m_barHasEvacuate = FALSE;
 	m_commandSets = NULL;
 	m_controlBarSchemeManager = NULL;
 	m_isObserverCommandBar = FALSE;
@@ -4492,7 +4491,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 				barSlot = slot;
 		const WideChar letter = HotKeyManager::playerButtonKey( commandButton->getName(),
 			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0, barSlot,
-			commandButton->getCommandType(), barSlot >= 0 && m_barHasEvacuate );
+			commandButton->getCommandType() );
 		if( letter != 0 )
 		{
 			TheHotKeyManager->addHotKey( button, HotKeyManager::nameOf( letter ) );

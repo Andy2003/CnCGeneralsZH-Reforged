@@ -307,43 +307,41 @@ static std::map< std::string, WideChar > s_playerButtonKeys;
 
 /** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
 	* to 14 stand two rows of seven read down the columns, so Q W E R T Y over A S D F G H take the
-	* first six columns and the keyboard's third row, Z X C V B N, has no place.  A, S, R, F and G
+	* first six columns and the keyboard's third row, Z X C V B N, has no place.  A, S, G, Y and H
 	* belong to the fixed orders (FIXED_KEYS), so their places take a key off the grid instead: J, K,
-	* U, L and M.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws
+	* M, U and L.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws
 	* the same table (hotkeys.js, GRID_KEYS). */
-static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'U', 'L', 'T', 'M', 'Y', 'H' };
+static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'R', 'F', 'T', 'M', 'U', 'L' };
 static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
 static Bool s_commandGrid = FALSE;
 
 /** The owner's fixed keys, 2026-10-12, on every bar and in both modes: A attack move, S stop,
-	* G guard, R rally point, V evacuate and sell, C combat drop, and F for land mines, camo netting
-	* and the GLA's fake and real switches, which go by button name.  Where a bar has both evacuate and
-	* sell, evacuate keeps V and sell takes O.  No other button may have one of these letters.  The
-	* launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
-static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'R', 'V', 'C', 'F' };
-static const WideChar SELL_BESIDE_EVACUATE_KEY = 'O';
-static const char *const FIXED_F_BUTTONS[] =
+	* G guard, Y rally point, V evacuate, N sell, C combat drop, and H for land mines, camo netting
+	* and the GLA's fake and real switches, which go by button name.  No other button may have one of
+	* these letters.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
+static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'N', 'C', 'H' };
+static const char *const FIXED_H_BUTTONS[] =
 {
 	"command_upgradechinamines", "command_upgradeempmines", "command_upgradecamonetting", "command_upgradeglacamonetting",
 	"command_upgradeglaworkerfakecommandset", "command_upgradeglaworkerrealcommandset"
 };
-static const char FIXED_F_PREFIX[] = "command_becomerealgla";	///< a fake building's switch to the real one
+static const char FIXED_H_PREFIX[] = "command_becomerealgla";	///< a fake building's switch to the real one
 
-static WideChar fixedButtonKey( const AsciiString& lowerName, Int commandType, Bool evacuateOnBar )
+static WideChar fixedButtonKey( const AsciiString& lowerName, Int commandType )
 {
-	if( strncmp( lowerName.str(), FIXED_F_PREFIX, sizeof( FIXED_F_PREFIX ) - 1 ) == 0 )
-		return 'F';
-	for( Int each = 0; each < (Int)( sizeof( FIXED_F_BUTTONS ) / sizeof( FIXED_F_BUTTONS[ 0 ] ) ); each++ )
-		if( lowerName.compare( FIXED_F_BUTTONS[ each ] ) == 0 )
-			return 'F';
+	if( strncmp( lowerName.str(), FIXED_H_PREFIX, sizeof( FIXED_H_PREFIX ) - 1 ) == 0 )
+		return 'H';
+	for( Int each = 0; each < (Int)( sizeof( FIXED_H_BUTTONS ) / sizeof( FIXED_H_BUTTONS[ 0 ] ) ); each++ )
+		if( lowerName.compare( FIXED_H_BUTTONS[ each ] ) == 0 )
+			return 'H';
 	switch( commandType )
 	{
 		case GUI_COMMAND_ATTACK_MOVE:			return 'A';
 		case GUI_COMMAND_STOP:						return 'S';
 		case GUI_COMMAND_GUARD:						return 'G';
-		case GUI_COMMAND_SET_RALLY_POINT:	return 'R';
+		case GUI_COMMAND_SET_RALLY_POINT:	return 'Y';
 		case GUI_COMMAND_EVACUATE:				return 'V';
-		case GUI_COMMAND_SELL:						return evacuateOnBar ? SELL_BESIDE_EVACUATE_KEY : 'V';
+		case GUI_COMMAND_SELL:						return 'N';
 		case GUI_COMMAND_COMBATDROP:			return 'C';
 	}
 	return 0;
@@ -419,13 +417,13 @@ static Bool isOneOf( WideChar letter, const WideChar *letters, Int count )
 
 //-----------------------------------------------------------------------------
 WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
-																				 Int commandType, Bool evacuateOnBar )
+																				 Int commandType )
 {
 	AsciiString lower = button;
 	lower.toLower();
 	Int ownMod = -1;
 	const std::string bare = withoutModPrefix( lower.str(), &ownMod );
-	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType, evacuateOnBar );
+	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType );
 	if( fixed != 0 )
 		return fixed;
 	if( s_commandGrid && barSlot >= 0 )

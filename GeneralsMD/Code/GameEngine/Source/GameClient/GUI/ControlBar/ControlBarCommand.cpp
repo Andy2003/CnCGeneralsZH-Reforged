@@ -384,13 +384,8 @@ void ControlBar::populateCommand( Object *obj )
 
 	// what goes in each slot: the command set, slot for slot
 	const CommandButton *slot[ MAX_COMMANDS_PER_SET ];
-	m_barHasEvacuate = FALSE;
-	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )	// sell gives V up to an evacuate on the same bar
-	{
+	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
 		slot[ i ] = commandSet->getCommandButton( i );
-		if( slot[ i ] && slot[ i ]->getCommandType() == GUI_COMMAND_EVACUATE )
-			m_barHasEvacuate = TRUE;
-	}
 
 	// populate the button with commands defined
 	const CommandButton *commandButton;

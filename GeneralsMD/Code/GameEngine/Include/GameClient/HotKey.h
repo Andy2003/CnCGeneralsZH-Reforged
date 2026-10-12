@@ -113,12 +113,11 @@ public:
 		* Hotkeys page writes it, INI::parseCommandButtonHotKeyDefinition reads it), 0 where the player
 		* took the key away, and labelKey, the letter after the label's '&', where the player left the
 		* button alone; upper case.  Attack move, stop, guard, rally point, evacuate and sell always have
-		* their fixed letters (evacuateOnBar: sell shares the bar with an evacuate) and no other button
-		* gets one.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
+		* their fixed letters and no other button gets one.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
 		* barSlot its ButtonCommand number less one, gets its place's key instead, and any other button
 		* (barSlot -1) loses a letter the grid uses. */
 	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
-																	 Int commandType, Bool evacuateOnBar );
+																	 Int commandType );
 
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
