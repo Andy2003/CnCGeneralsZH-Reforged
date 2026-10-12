@@ -2898,6 +2898,8 @@ void parseCommandLine(int argc, char *argv[])
 	{
 		DEBUG_LOG(("MODS %d loaded, last wins: %s\n", (Int)TheGlobalData->m_mods.size(), TheGlobalData->m_modName.str()));
 		TheFileSystem->reset();
+		// the mod's skirmish and multiplayer scripts are the ones the match runs, so they are the ones the join compares
+		TheWritableGlobalData->computeExeCRC();
 	}
 }
 

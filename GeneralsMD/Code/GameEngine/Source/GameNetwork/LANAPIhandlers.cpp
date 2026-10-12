@@ -259,13 +259,16 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 					gameDataMatchName(dataMatch),
 					msg->GameToJoin.iniCRC, TheGlobalData->m_iniCRC,
 					msg->GameToJoin.exeCRC, TheGlobalData->m_exeCRC));
-				// Same exe and a different INI set is what two different -mod folders look like; then the
-				// player is told the host's mod rather than the bare mismatch.
+				// The same build under different -mod lists: a mod changes the INI set and, with its own
+				// skirmish or multiplayer scripts, the exe CRC too (GlobalData::computeExeCRC), so the build is
+				// compared as it was before the mods mounted.  Then the player is told the host's mods rather
+				// than the bare mismatch.
 				WideChar joinerMod[g_lanModNameLength+1];
 				WideCharNCpy(joinerMod, msg->GameToJoin.modName, g_lanModNameLength);
 				joinerMod[g_lanModNameLength] = 0;
 				WideCharFromUtf8(TheGlobalData->m_modName.str(), reply.GameNotJoined.modName, ARRAY_SIZE(reply.GameNotJoined.modName));
-				const Bool modsDiffer = dataMatch == GAMEDATA_INI_DIFFERS && WideCharCmp(joinerMod, reply.GameNotJoined.modName) != 0;
+				const Bool modsDiffer = msg->GameToJoin.baseExeCRC == TheGlobalData->m_baseExeCRC &&
+					WideCharCmp(joinerMod, reply.GameNotJoined.modName) != 0;
 				DEBUG_LOG(("LANAPI::handleRequestJoin - mods them/us '%s'/'%s'\n",
 					WideCharAsUtf8(joinerMod).str(), TheGlobalData->m_modName.str()));
 

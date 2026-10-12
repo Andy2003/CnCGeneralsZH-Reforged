@@ -1229,43 +1229,9 @@ GlobalData::GlobalData()
 		 a binary modified after the build.  Its four bytes go in as the platform stores them, which is the
 		 same on every platform the game builds for (little-endian).  The version and the two multiplayer
 		 scripts follow, as before. */
-	const Int blockSize = 65536;
-	CRC exeCRC;
-	const UnsignedInt buildFingerprint = ZH_BUILD_FINGERPRINT;
-	exeCRC.computeCRC( &buildFingerprint, sizeof( buildFingerprint ) );
-	File *fp = NULL;
-	if (TheVersion)
-	{
-		UnsignedInt version = TheVersion->getVersionNumber();
-		exeCRC.computeCRC( &version, sizeof(UnsignedInt) );
-	}
-	// Add in MP scripts to the EXE CRC, since the game will go out of sync if they change
-	fp = TheFileSystem->openFile("Data\\Scripts\\SkirmishScripts.scb", File::READ | File::BINARY);
-	if (fp != NULL) {
-		unsigned char crcBlock[blockSize];
-		Int amtRead = 0;
-		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
-		{
-			exeCRC.computeCRC(crcBlock, amtRead);
-		}
-		fp->close();
-		fp = NULL;
-	}
-	fp = TheFileSystem->openFile("Data\\Scripts\\MultiplayerScripts.scb", File::READ | File::BINARY);
-	if (fp != NULL) {
-		unsigned char crcBlock[blockSize];
-		Int amtRead = 0;
-		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
-		{
-			exeCRC.computeCRC(crcBlock, amtRead);
-		}
-		fp->close();
-		fp = NULL;
-	}
+	computeExeCRC();
+	m_baseExeCRC = m_exeCRC;
 
-	m_exeCRC = exeCRC.get();
-	DEBUG_LOG(("EXE CRC: 0x%8.8X\n", m_exeCRC));
-	
 	m_movementPenaltyDamageState = BODY_REALLYDAMAGED;
 	
 	m_shouldUpdateTGAToDDS = FALSE;
@@ -1374,6 +1340,43 @@ GlobalData *GlobalData::newOverride( void )
 	return override;
 
 }  // end newOveride
+
+//-------------------------------------------------------------------------------------------------
+/** The build fingerprint, the version and the two multiplayer scripts as they resolve now: once at
+	* construction, and again after -mod mounts its archives (parseCommandLine), since a mod's
+	* SkirmishScripts.scb or MultiplayerScripts.scb is the one the match runs.  Without -mod it runs once
+	* and the value is what it always was. */
+//-------------------------------------------------------------------------------------------------
+void GlobalData::computeExeCRC( void )
+{
+	const Int blockSize = 65536;
+	CRC exeCRC;
+	const UnsignedInt buildFingerprint = ZH_BUILD_FINGERPRINT;
+	exeCRC.computeCRC( &buildFingerprint, sizeof( buildFingerprint ) );
+	if (TheVersion)
+	{
+		UnsignedInt version = TheVersion->getVersionNumber();
+		exeCRC.computeCRC( &version, sizeof(UnsignedInt) );
+	}
+	// Add in MP scripts to the EXE CRC, since the game will go out of sync if they change
+	const char *scripts[] = { "Data\\Scripts\\SkirmishScripts.scb", "Data\\Scripts\\MultiplayerScripts.scb" };
+	for (Int s = 0; s < 2; ++s)
+	{
+		File *fp = TheFileSystem->openFile(scripts[s], File::READ | File::BINARY);
+		if (fp == NULL)
+			continue;
+		unsigned char crcBlock[blockSize];
+		Int amtRead = 0;
+		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
+		{
+			exeCRC.computeCRC(crcBlock, amtRead);
+		}
+		fp->close();
+	}
+
+	m_exeCRC = exeCRC.get();
+	DEBUG_LOG(("EXE CRC: 0x%8.8X\n", m_exeCRC));
+}
 
 //-------------------------------------------------------------------------------------------------
 void GlobalData::init( void )

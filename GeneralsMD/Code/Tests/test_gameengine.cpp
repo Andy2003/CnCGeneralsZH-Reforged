@@ -17148,6 +17148,9 @@ TEST(every_shipped_master_is_fork_owned_and_retail_files_are_not)
 		std::string relative = std::filesystem::relative(it->path(), data).generic_string();
 		if (relative.rfind("Scenarios/", 0) == 0 || relative.rfind("Cinema/", 0) == 0 || relative == "dx11shaders.shipped")
 			continue;
+		// shipped, but the one master a mod may replace: its skirmish AI is written for its own generals
+		if (relative == "Scripts/SkirmishScripts.scb")
+			continue;
 		// the post-build copy keeps Data\ in front of these and puts the rest at the top of Run
 		const char *underData[] = { "INI/", "Scripts/", "Turkish/", "German/" };
 		Bool keepsData = relative == "Patch.str";
@@ -17163,6 +17166,7 @@ TEST(every_shipped_master_is_fork_owned_and_retail_files_are_not)
 
 	CHECK(FileSystem::isForkOwnedPath(AsciiString("Art\\Textures\\ClassicWideBarGLA.tga")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\Scripts\\MultiplayerScripts.scb")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\Scripts\\SkirmishScripts.scb")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\Scripts\\Scripts.ini")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\INI\\GameData.ini")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\INI\\Object\\AmericaTankReforged.ini")));

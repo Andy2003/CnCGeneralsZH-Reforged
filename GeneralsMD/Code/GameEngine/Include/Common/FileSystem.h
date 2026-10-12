@@ -144,8 +144,8 @@ public:
 	/// which no mod replaces.
 	AsciiString modLooseFile(const AsciiString& filename, Bool *inModArchive = NULL) const;
 
-	/// TRUE for a game path the fork ships loose (BalanceReforged.ini, Patch.str, SkirmishScripts.scb,
-	/// its .wnd layouts ...); see the definition for how the set is decided.
+	/// TRUE for a game path the fork ships loose and no mod replaces (BalanceReforged.ini, Patch.str, its
+	/// .wnd layouts ...); see the definition for how the set is decided.
 	static Bool isForkOwnedPath(const AsciiString& filename);
 
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.

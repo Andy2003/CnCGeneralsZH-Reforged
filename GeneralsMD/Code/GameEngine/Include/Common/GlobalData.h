@@ -559,6 +559,8 @@ public:
 	
 	UnsignedInt m_iniCRC;							///< CRC of important INI files
 	UnsignedInt m_exeCRC;							///< CRC of the executable
+	void computeExeCRC( void );				///< m_exeCRC from the build fingerprint, the version and the two scb as they resolve now
+	UnsignedInt m_baseExeCRC;					///< m_exeCRC before any -mod mounted: the build without its mods, for the LAN mod check
 
 	BodyDamageType m_movementPenaltyDamageState;	///< at this body damage state, we have movement penalties
 

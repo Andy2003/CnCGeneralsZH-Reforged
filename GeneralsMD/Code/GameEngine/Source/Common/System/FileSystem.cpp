@@ -390,7 +390,9 @@ Bool FileSystem::isForkOwnedPath(const AsciiString& filename)
 	// of Code/Data (less Scenarios, Cinema and the shader cache) plus the classic bar textures.
 	// Tests/test_gameengine.cpp walks Code/Data and fails when a master falls outside this.  Retail's own
 	// loose files (Data\Scripts\MultiplayerScripts.scb, the movies, the cursors) are not in it, so a mod
-	// still replaces those.  The fork's Reforged*.big are kept on top in ArchiveFileSystem::loadMods.
+	// still replaces those.  Nor is the fork's SkirmishScripts.scb, by the owner's call: a mod's skirmish
+	// AI is written for its own generals, which the fork's has no players for, so a mod's scb wins whole
+	// and the fork's C++ AI runs it.  The fork's Reforged*.big are kept on top in ArchiveFileSystem::loadMods.
 	AsciiString path = filename;
 	path.toLower();
 	std::string p(path.str());
@@ -407,7 +409,6 @@ Bool FileSystem::isForkOwnedPath(const AsciiString& filename)
 	if (starts("data\\ini\\mappedimages\\handcreated\\reforged") && ends(".ini"))
 		return TRUE;
 	return p == "data\\patch.str"
-		|| p == "data\\scripts\\skirmishscripts.scb"
 		|| starts("data\\turkish\\") || starts("data\\german\\")
 		|| starts("art\\textures\\reforged") || starts("art\\textures\\classicwidebar")
 		|| starts("window\\")

@@ -396,7 +396,8 @@ struct LANMessage
 			UnsignedInt iniCRC;
 			char serial[g_maxSerialLength];
 			char modNamePad;													///< puts modName on an even offset, 70
-			WideChar modName[g_lanModNameLength+1];	///< the joiner's -mod name, empty for none; older builds leave junk here, but their exe CRC differs first
+			WideChar modName[g_lanModNameLength+1];	///< the joiner's -mod list, empty for none
+			UnsignedInt baseExeCRC;										///< the joiner's exe CRC before its mods mounted; older builds leave junk in both
 		} GameToJoin;
 
 		// GameJoined is sent with JOIN_ACCEPT
@@ -473,6 +474,7 @@ static_assert(offsetof(LANMessage, GameToJoin.exeCRC) == 38, "LANMessage::GameTo
 static_assert(offsetof(LANMessage, GameToJoin.iniCRC) == 42, "LANMessage::GameToJoin.iniCRC");
 static_assert(offsetof(LANMessage, GameToJoin.serial) == 46, "LANMessage::GameToJoin.serial");
 static_assert(offsetof(LANMessage, GameToJoin.modName) == 70, "LANMessage::GameToJoin.modName");
+static_assert(offsetof(LANMessage, GameToJoin.baseExeCRC) == 372, "LANMessage::GameToJoin.baseExeCRC");
 static_assert(offsetof(LANMessage, GameNotJoined.modName) == 80, "LANMessage::GameNotJoined.modName");
 static_assert(offsetof(LANMessage, GameJoined.slotPosition) == 76, "LANMessage::GameJoined.slotPosition");
 static_assert(offsetof(LANMessage, GameNotJoined.reason) == 76, "LANMessage::GameNotJoined.reason");

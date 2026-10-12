@@ -856,11 +856,22 @@ void Player::setDefaultTeam(void) {
 	tname.set("team");
 	tname.concat(m_playerName);
 	Team *dt = TheTeamFactory->findTeam(tname);
-	DEBUG_ASSERTCRASH(dt, ("no team"));
-	if (dt) {
-		m_defaultTeam = dt;
-		dt->setActive();
+	if (dt == NULL) {
+		/* A skirmish slot takes the name of the skirmish side its general's scripts are written for
+			 (initFromDict), drops its own teamplayer<n>, and gets its teams from those scripts instead.  A
+			 general the skirmish scripts have no player for - a mod's, under the fork's SkirmishScripts.scb -
+			 is left with no team at all, and the AI read the NULL on its first pass.  Every player is given
+			 its default team here, so the singleton validateSides would have added is made now. */
+		DEBUG_LOG(("Player::setDefaultTeam - %s had no %s, making it\n", m_playerName.str(), tname.str()));
+		Dict d;
+		d.setAsciiString(TheKey_teamName, tname);
+		d.setAsciiString(TheKey_teamOwner, m_playerName);
+		d.setBool(TheKey_teamIsSingleton, true);
+		TheTeamFactory->initTeam(tname, m_playerName, TRUE, &d);
+		dt = TheTeamFactory->findTeam(tname);
 	}
+	m_defaultTeam = dt;
+	dt->setActive();
 }
 
 //=============================================================================
