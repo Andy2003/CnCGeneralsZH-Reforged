@@ -31,7 +31,7 @@ BOLTS = 0.55
 LED_CORE = 0.22			# radius of the hard core, as a share of the half width
 LED_GLOW = 0.22			# the glow falls off as exp(-(r - core) / this)
 LED_GLOW_PEAK = 0.85		# the glow's strength just outside the core, against the core's 1
-LEDS = (("Red", (255, 30, 12), (255, 215, 200)), ("Blue", (150, 190, 255), (225, 235, 255)))
+LEDS = (("Red", (255, 30, 12), (255, 215, 200)), ("Blue", (60, 100, 255), (170, 200, 255)))
 OUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Art", "Textures")
 
 
