@@ -142,6 +142,10 @@ const Real cosAngleToCare = cos ((0.2 * PI) / 180.0);	//1.5 degree difference
 // ground read at a quarter of the sunlit sand, black in front of every wall, and the owner took
 // 0.45 from three panels of the same base on 2026-09-21.
 #define SHADOW_MAP_STRENGTH 0.45f
+// The Reforged lighting style moves light from the ambient to the sun, and a shadow is the share
+// the sun brought: on the rebalanced maps sun over sun plus ambient comes out 0.6 to 0.7 by day
+// and by night alike.  Held short of that and of the 0.55 found black in front of every wall.
+#define SHADOW_MAP_REFORGED_STRENGTH 0.52f
 // How wide the filter may open and how narrow it stays on the ground, in texels of the map, and how
 // much penumbra a unit of gap between a caster and what its shadow falls on is worth.  The last is
 // the number the whole picture turns on: a tank's tracks are on the ground and keep a hard edge, a
@@ -4443,8 +4447,10 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 		? TheGlobalData->m_shadowMapPenumbra : SHADOW_MAP_PENUMBRA_PER_UNIT;
 	const Real skyFill = (TheGlobalData->m_shadowMapSkyFill > 0.0f)
 		? TheGlobalData->m_shadowMapSkyFill : SHADOW_MAP_SKY_FILL;
-	const Real strength = (TheGlobalData->m_shadowMapStrength > 0.0f)
+	Real strength = (TheGlobalData->m_shadowMapStrength > 0.0f)
 		? TheGlobalData->m_shadowMapStrength : SHADOW_MAP_STRENGTH;
+	if (TheGlobalData->m_lightingStyle == LIGHTING_STYLE_REFORGED && TheGlobalData->m_shadowMapStrength <= 0.0f)
+		strength = SHADOW_MAP_REFORGED_STRENGTH;
 
 	Direct3D11_Set_Shadow_Parameters( depthBias, strength, widest,
 		narrowest, penumbra / worldPerTexel, unitsPerUnitOfDepth, skyFill );

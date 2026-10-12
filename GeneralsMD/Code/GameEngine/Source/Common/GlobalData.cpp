@@ -695,6 +695,7 @@ GlobalData::GlobalData()
 	m_volumetricSmokeShadows = TRUE;
 	m_smokeFireLighting = TRUE;
 	m_classicGraphics = FALSE;
+	m_lightingStyle = LIGHTING_STYLE_REFORGED;
 	m_shadowMap = TRUE;						//the sun's own shadows are what the game draws with now
 	m_shadowMapOnly = TRUE;				//and they replace the stencil volumes rather than joining them
 	m_shadowMapReport = FALSE;
@@ -1349,6 +1350,89 @@ Bool GlobalData::setTimeOfDay( TimeOfDay tod )
 }
 
 //-------------------------------------------------------------------------------------------------
+static Real lightLuminance( const RGBColor &c )
+{
+	return 0.299f * c.red + 0.587f * c.green + 0.114f * c.blue;
+}
+
+/** Multiply a colour by a tint and bring it back to the luminance it had, so the tint moves the hue
+	* and never the brightness. */
+static void tintLight( RGBColor &c, Real r, Real g, Real b )
+{
+	const Real before = lightLuminance( c );
+	c.red *= r;
+	c.green *= g;
+	c.blue *= b;
+	const Real after = lightLuminance( c );
+	if( after > 0.0001f )
+	{
+		const Real keep = before / after;
+		c.red *= keep;
+		c.green *= keep;
+		c.blue *= keep;
+	}
+}
+
+static void scaleLight( RGBColor &c, Real s )
+{
+	c.red *= s;
+	c.green *= s;
+	c.blue *= s;
+}
+
+/* What makes the shipped maps read washed out is the share of their light that has no direction.
+	A typical afternoon gives the ground an ambient of about half the sun and two fill lights from the
+	other sides, so the shadow side of a tank is two thirds as bright as its lit side and nothing has
+	a form.  The style moves weight from the ambient and the fills to the sun and leaves the sum a
+	sunlit surface receives where it was, so the picture keeps its exposure and gains its contrast.
+	The ambient goes a little toward the sky's blue and the sun a little toward late light's yellow,
+	by how much of a sun there is: a moonlit night keeps its own cast. */
+static const Real REFORGED_AMBIENT_SHARE = 0.72f;	// what is left of the flat ambient under a full sun
+static const Real REFORGED_NIGHT_AMBIENT_KEPT = 0.16f;	// how much more of it a sunless map keeps
+static const Real REFORGED_FILL_SHARE = 0.6f;			// what is left of the two fill lights
+static const Real REFORGED_SUN_PUNCH = 1.04f;			// the lit side ends a touch brighter than it was
+static const Real REFORGED_SUN_MOST = 1.35f;			// never more than this much more sun
+
+void reforgeLighting( GlobalData::TerrainLighting lights[MAX_GLOBAL_LIGHTS] )
+{
+	GlobalData::TerrainLighting &sun = lights[0];
+	const Real ambient = lightLuminance( sun.ambient );
+	const Real diffuse = lightLuminance( sun.diffuse );
+
+	// How square the sun stands to flat ground; a map whose sun skims the horizon keeps a floor.
+	const Real length = (Real)sqrt( sun.lightPos.x * sun.lightPos.x + sun.lightPos.y * sun.lightPos.y
+		+ sun.lightPos.z * sun.lightPos.z );
+	Real incidence = (length > 0.0001f) ? -sun.lightPos.z / length : 1.0f;
+	if( incidence < 0.3f )
+		incidence = 0.3f;
+
+	const Real daylight = (diffuse - 0.25f) / 0.5f;
+	const Real warmth = (daylight < 0.0f) ? 0.0f : (daylight > 1.0f) ? 1.0f : daylight;
+
+	// A night map's light is mostly ambient already and its moon cannot make up a cut, so the less
+	// sun there is the less of the ambient goes.
+	const Real ambientShare = REFORGED_AMBIENT_SHARE + (1.0f - warmth) * REFORGED_NIGHT_AMBIENT_KEPT;
+	scaleLight( sun.ambient, ambientShare );
+	tintLight( sun.ambient, 1.0f - 0.06f * warmth, 1.0f, 1.0f + 0.10f * warmth );
+
+	const Real sunlit = diffuse * incidence;
+	if( sunlit > 0.001f )
+	{
+		Real gain = (sunlit + ambient * (1.0f - ambientShare)) / sunlit * REFORGED_SUN_PUNCH;
+		if( gain > REFORGED_SUN_MOST )
+			gain = REFORGED_SUN_MOST;
+		scaleLight( sun.diffuse, gain );
+	}
+	tintLight( sun.diffuse, 1.0f + 0.06f * warmth, 1.0f, 1.0f - 0.10f * warmth );
+
+	for( Int i = 1; i < MAX_GLOBAL_LIGHTS; ++i )
+	{
+		scaleLight( lights[i].ambient, REFORGED_AMBIENT_SHARE );
+		scaleLight( lights[i].diffuse, REFORGED_FILL_SHARE );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Create a new global data instance to override the existing data set.  The
 	* initial values of the newly created instance will be a copy of the current
 	* data (or the most recently created override) */
@@ -1524,6 +1608,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	{
 		TheWritableGlobalData->m_shadowMap = FALSE;
 		TheWritableGlobalData->m_volumetricSmokeShadows = FALSE;
+		TheWritableGlobalData->m_lightingStyle = LIGHTING_STYLE_CLASSIC;
 		TheWritableGlobalData->m_direct3D11PostChain = "off";
 	}
 

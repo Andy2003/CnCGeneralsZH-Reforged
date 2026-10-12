@@ -440,6 +440,23 @@ Bool WorldHeightMap::ParseLightingDataChunk(DataChunkInput &file, DataChunkInfo 
 				TheW3DShadowManager->setShadowColor(shadowColor);
 			}
 		}
+
+		// The tables were filled from the file just now, so this is always the map's own numbers it
+		// rebalances, however many maps came before.
+		if (TheGlobalData->m_lightingStyle == LIGHTING_STYLE_REFORGED) {
+			const Int tod = TheGlobalData->m_timeOfDay;
+			const GlobalData::TerrainLighting before = TheGlobalData->m_terrainObjectsLighting[tod][0];
+			for (i=TIME_OF_DAY_FIRST; i<TIME_OF_DAY_COUNT; i++) {
+				reforgeLighting(TheWritableGlobalData->m_terrainLighting[i]);
+				reforgeLighting(TheWritableGlobalData->m_terrainObjectsLighting[i]);
+			}
+			const GlobalData::TerrainLighting &after = TheGlobalData->m_terrainObjectsLighting[tod][0];
+			DEBUG_LOG(("LIGHTING reforged, time of day %d: object ambient %.2f %.2f %.2f -> %.2f %.2f %.2f, sun %.2f %.2f %.2f -> %.2f %.2f %.2f\n",
+				tod, before.ambient.red, before.ambient.green, before.ambient.blue,
+				after.ambient.red, after.ambient.green, after.ambient.blue,
+				before.diffuse.red, before.diffuse.green, before.diffuse.blue,
+				after.diffuse.red, after.diffuse.green, after.diffuse.blue));
+		}
 	DEBUG_ASSERTCRASH(file.atEndOfChunk(), ("Unexpected data left over."));
 	return true;
 }

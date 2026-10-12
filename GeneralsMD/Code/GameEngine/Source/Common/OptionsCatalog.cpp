@@ -100,6 +100,7 @@ OPTION_INT_ACCESSORS( m_fullscreenScaling )
 OPTION_INT_ACCESSORS( m_msaaLevel )
 OPTION_BOOL_ACCESSORS( m_vsync )
 OPTION_BOOL_ACCESSORS( m_classicGraphics )
+OPTION_INT_ACCESSORS( m_lightingStyle )
 OPTION_INT_ACCESSORS( m_healthBarMode )
 OPTION_INT_ACCESSORS( m_hudScale )
 OPTION_INT_ACCESSORS( m_playerColorScheme )
@@ -498,6 +499,14 @@ const OptionDef TheOptionCatalog[] =
 	{ "VolumetricSmokeShadows",		"", "",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_volumetricSmokeShadows, set_m_volumetricSmokeShadows },
+
+	// Classic or Reforged light.  Reforged rebalances each map's lights as the map loads (so a change
+	// shows on the next map), deepens the sun's shadow to match and grades the Direct3D 11 picture,
+	// which follows the setting every frame.  ClassicGraphics forces Classic.  No control in the
+	// game's menu; the launcher writes it and -lighting picks it for one run.
+	{ "LightingStyle",						"", "",
+		OPTION_ENUM, APPLY_NEXT_MAP, 0, LIGHTING_STYLE_COUNT - 1,
+		get_m_lightingStyle, set_m_lightingStyle },
 
 	// Smoke lit by the fire beside it.  No control yet; -nosmokefirelight turns it off for a run.
 	{ "SmokeFireLighting",				"", "",
