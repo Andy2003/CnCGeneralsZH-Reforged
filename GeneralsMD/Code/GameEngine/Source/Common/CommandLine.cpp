@@ -28,6 +28,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "zhio.h"
 
+#include <algorithm>
 #include <string>
 
 #include "Common/ArchiveFileSystem.h"
@@ -2605,7 +2606,7 @@ static AsciiString modIdentity( const AsciiString &modPath, Bool isDir, AsciiStr
 	return name;
 }
 
-Int parseMod(char *args[], Int num)
+static Int addMod(char *args[], Int num, Bool isPatch)
 {
 	if (TheWritableGlobalData && num > 1)
 	{
@@ -2646,18 +2647,58 @@ Int parseMod(char *args[], Int num)
 		}
 		// repeatable: each -mod goes after the ones before it and wins over them (loadMods, FileSystem::modLooseFile)
 		TheWritableGlobalData->m_mods.push_back( modPath );
+		TheWritableGlobalData->m_modIsPatch.push_back( isPatch );
 
 		AsciiString bareName;
 		AsciiString name = modIdentity( modPath, (statBuf.st_mode & S_IFDIR) != 0, &bareName );
 		TheWritableGlobalData->m_modNames.push_back( bareName );
+		// a patch reads "ShockWave 1.201 + Tweak 1.0" in the version line, a replay and a refused join
 		if (TheGlobalData->m_modName.isNotEmpty())
-			TheWritableGlobalData->m_modName.concat( ", " );
+			TheWritableGlobalData->m_modName.concat( isPatch ? " + " : ", " );
 		TheWritableGlobalData->m_modName.concat( name );
-		DEBUG_LOG(("MOD %d name='%s' path='%s'\n", (Int)TheGlobalData->m_mods.size(), name.str(), modPath.str()));
+		DEBUG_LOG(("MOD %d name='%s' path='%s'%s\n", (Int)TheGlobalData->m_mods.size(), name.str(), modPath.str(), isPatch ? " patch" : ""));
 
 		return 2;
 	}
 	return 1;
+}
+
+Int parseMod(char *args[], Int num)
+{
+	return addMod( args, num, FALSE );
+}
+
+/** -modpatch <folder>: a mod that changes the one given before it file by file rather than bringing
+	* armies of its own, or retail's files when it comes first.  Without -modfactions it is a plain -mod. */
+Int parseModPatch(char *args[], Int num)
+{
+	return addMod( args, num, TRUE );
+}
+
+/** -modfactions keeps each full mod's files apart, so a patch joins the full mod before it (retail's
+	* files when none is) and the full mods alone are the faction sets, M1, M2 and so on. */
+static void foldModPatches()
+{
+	GlobalData *data = TheWritableGlobalData;
+	std::vector<AsciiString> mods;
+	std::vector<AsciiString> names;
+	for (size_t i = 0; i < data->m_mods.size(); ++i)
+	{
+		if (!data->m_modIsPatch[i])
+		{
+			mods.push_back( data->m_mods[i] );
+			names.push_back( data->m_modNames[i] );
+			data->m_modPatches.push_back( std::vector<AsciiString>() );
+			continue;
+		}
+		if (mods.empty())
+			data->m_retailPatches.push_back( data->m_mods[i] );
+		else
+			data->m_modPatches.back().push_back( data->m_mods[i] );
+		DEBUG_LOG(("MODPATCH '%s' over %s\n", data->m_modNames[i].str(), mods.empty() ? "retail" : names.back().str()));
+	}
+	data->m_mods = mods;
+	data->m_modNames = names;
 }
 
 Int parseModFactions(char *args[], Int)
@@ -2683,6 +2724,7 @@ static CommandLineParam params[] =
 	{ "-playStats", parsePlayStats },
 	{ "-mod", parseMod },
 	{ "-modfactions", parseModFactions },
+	{ "-modpatch", parseModPatch },
 	{ "-noshaders", parseNoShaders },
 	{ "-particlebounce", parseParticleBounce },
 	{ "-smoke", parseSmoke },
@@ -2906,9 +2948,13 @@ void parseCommandLine(int argc, char *argv[])
 		}
 	}
 
-	// with no -mod there is nothing to keep apart, and the retail focus would have no tree to read
-	if (TheGlobalData->m_mods.empty())
+	// with no full -mod there is nothing to keep apart, and the retail focus would have no tree to read;
+	// patches alone then stack as plain mods
+	const std::vector<Bool> &isPatch = TheGlobalData->m_modIsPatch;
+	if (std::find( isPatch.begin(), isPatch.end(), FALSE ) == isPatch.end())
 		TheWritableGlobalData->m_modFactions = FALSE;
+	if (TheGlobalData->m_modFactions)
+		foldModPatches();
 	TheArchiveFileSystem->loadMods();
 
 	// GameData.ini and the language check have already asked about files the mod may now supply

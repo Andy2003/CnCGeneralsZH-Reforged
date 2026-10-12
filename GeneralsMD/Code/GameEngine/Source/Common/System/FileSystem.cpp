@@ -158,21 +158,45 @@ void FileSystem::setFocus( Int focus )
 
 AsciiString FileSystem::focusedLooseFile( const AsciiString& filename ) const
 {
-	// retail is Run's own loose files; a mod is its folder's, and a mod that is one .big has none
+	// retail is Run's own loose files under the patches given before any -mod (modLooseFile); a mod is
+	// its folder's and its patches', and a mod that is one .big has none
 	if (s_focus == FILE_FOCUS_RETAIL)
+	{
+		Bool inPatchArchive = FALSE;
+		AsciiString patched = modLooseFile( filename, &inPatchArchive );
+		if (patched.isNotEmpty() || inPatchArchive)
+			return patched;
 		return TheLocalFileSystem->doesFileExist( filename.str() ) ? filename : AsciiString();
+	}
 
 	return modFolderFile( s_focus, filename );
 }
 
+/** -modfactions: the folders a faction set's loose files come from, its -modpatch ones after the
+	* mod's own so they win.  FILE_FOCUS_RETAIL is the patches given before any -mod. */
+static std::vector<AsciiString> modLayers( Int mod )
+{
+	if (mod < 0)
+		return TheGlobalData->m_retailPatches;
+	std::vector<AsciiString> layers( 1, TheGlobalData->m_mods[ mod ] );
+	if (mod < (Int)TheGlobalData->m_modPatches.size())
+		layers.insert( layers.end(), TheGlobalData->m_modPatches[ mod ].begin(), TheGlobalData->m_modPatches[ mod ].end() );
+	return layers;
+}
+
 AsciiString FileSystem::modFolderFile( Int mod, const AsciiString& filename ) const
 {
-	const AsciiString &modPath = TheGlobalData->m_mods[ mod ];
-	if (!modPath.endsWith( "\\" ) && !modPath.endsWith( "/" ))
-		return AsciiString();
-	AsciiString path = modPath;
-	path.concat( filename );
-	return TheLocalFileSystem->doesFileExist( path.str() ) ? path : AsciiString();
+	const std::vector<AsciiString> layers = modLayers( mod );
+	for (size_t i = layers.size(); i-- > 0; )
+	{
+		if (!layers[i].endsWith( "\\" ) && !layers[i].endsWith( "/" ))
+			continue;
+		AsciiString path = layers[i];
+		path.concat( filename );
+		if (TheLocalFileSystem->doesFileExist( path.str() ))
+			return path;
+	}
+	return AsciiString();
 }
 
 //============================================================================
@@ -393,19 +417,16 @@ void FileSystem::getFileListInDirectory(const AsciiString& directory, const Asci
 
 	// a mod's loose files listed under their game path, so a file it replaces is loaded once, from the mod (openFile)
 	// TheGlobalData is not there yet while GameData.ini itself loads, and there is no -mod before it is
-	// -modfactions' merged view is retail's
-	if (TheGlobalData == NULL || isAbsolutePath(directory) || s_focus == FILE_FOCUS_RETAIL ||
-			(s_focus == FILE_FOCUS_ALL && TheGlobalData->m_modFactions))
+	// -modfactions' merged view is retail's with the patches given before any -mod, and a focus sees
+	// its own mod and that mod's patches
+	if (TheGlobalData == NULL || isAbsolutePath(directory))
 	{
 		return;
 	}
-	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
+	const std::vector<AsciiString> folders = TheGlobalData->m_modFactions ? modLayers(s_focus) : TheGlobalData->m_mods;
+	for (size_t i = 0; i < folders.size(); ++i)
 	{
-		const AsciiString &modDir = TheGlobalData->m_mods[i];
-		if (s_focus >= 0 && (Int)i != s_focus)
-		{
-			continue;
-		}
+		const AsciiString &modDir = folders[i];
 		if (!modDir.endsWith("\\") && !modDir.endsWith("/"))
 		{
 			continue;	// a .big, already in the archive tree
@@ -431,9 +452,14 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 		*inModArchive = FALSE;
 	}
 	// a folder is not a file: "" or "Maps\" would otherwise find the mod folder itself, which exists
-	// -modfactions reaches a mod's files only by its focus or its "M<n>~" names
-	if (TheGlobalData == NULL || TheGlobalData->m_mods.empty() || TheGlobalData->m_modFactions || isAbsolutePath(filename) ||
-		filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/"))
+	// -modfactions reaches a mod's files only by its focus or its "M<n>~" names, so here only the
+	// patches given before any -mod go over retail's
+	if (TheGlobalData == NULL || isAbsolutePath(filename) || filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/"))
+	{
+		return AsciiString();
+	}
+	const std::vector<AsciiString> &mods = TheGlobalData->m_modFactions ? TheGlobalData->m_retailPatches : TheGlobalData->m_mods;
+	if (mods.empty())
 	{
 		return AsciiString();
 	}
@@ -444,9 +470,9 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 	const AsciiString archive = TheArchiveFileSystem->getArchiveFilenameForFile(filename);
 	AsciiString loose;
 	Bool archived = FALSE;
-	for (size_t i = TheGlobalData->m_mods.size(); i-- > 0 && loose.isEmpty() && !archived; )
+	for (size_t i = mods.size(); i-- > 0 && loose.isEmpty() && !archived; )
 	{
-		const AsciiString &mod = TheGlobalData->m_mods[i];
+		const AsciiString &mod = mods[i];
 		const Bool isFolder = mod.endsWith("\\") || mod.endsWith("/");
 		if (isFolder)
 		{

@@ -211,10 +211,21 @@ void ArchiveFileSystem::loadMods() {
 		keepModsApart(TheGlobalData->m_mods.size());
 
 	// In command-line order, each with overwrite: a later -mod wins over an earlier one, and all of them
-	// over the retail archives.  A folder's archives go in the order Win32BIGFileSystem's own pass uses.
+	// over the retail archives.  Under -modfactions a -modpatch goes over the full mod it was given
+	// after, in that mod's own tree, or over retail's when it came first (-1).  A folder's archives go
+	// in the order Win32BIGFileSystem's own pass uses.
+	std::vector< std::pair<Int, AsciiString> > layers;
+	for (size_t i = 0; i < TheGlobalData->m_retailPatches.size(); ++i)
+		layers.push_back(std::make_pair(-1, TheGlobalData->m_retailPatches[i]));
 	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
 	{
-		const AsciiString &mod = TheGlobalData->m_mods[i];
+		layers.push_back(std::make_pair((Int)i, TheGlobalData->m_mods[i]));
+		for (size_t p = 0; i < TheGlobalData->m_modPatches.size() && p < TheGlobalData->m_modPatches[i].size(); ++p)
+			layers.push_back(std::make_pair((Int)i, TheGlobalData->m_modPatches[i][p]));
+	}
+	for (size_t layer = 0; layer < layers.size(); ++layer)
+	{
+		const AsciiString &mod = layers[layer].second;
 		FilenameList archives;
 		if (mod.endsWith("\\") || mod.endsWith("/"))
 			TheLocalFileSystem->getFileListInDirectory(mod, AsciiString(""), AsciiString("*.big"), archives, TRUE);
@@ -235,7 +246,7 @@ void ArchiveFileSystem::loadMods() {
 				continue;
 			}
 			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", it->str()));
-			addModArchive((Int)i, archiveFile, *it);
+			addModArchive(layers[layer].first, archiveFile, *it);
 		}
 	}
 
@@ -256,7 +267,7 @@ void ArchiveFileSystem::addModArchive(Int mod, ArchiveFile *archiveFile, const A
 	m_archiveFileMap[archiveFilename] = archiveFile;
 	// kept apart, a mod's files are reached only through its own focus or an "M<n>~" name: the merged
 	// view stays retail's, so the menus, the lobby and every file a faction does not name are ours
-	if (!m_modRoots.empty())
+	if (!m_modRoots.empty() && mod >= 0)
 	{
 		addToTree(m_modRoots[mod], archiveFile, archiveFilename, TRUE);
 		m_archiveMod[archiveFilename] = mod;
