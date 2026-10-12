@@ -2262,6 +2262,8 @@ endif()
 # below, so ctest -j runs them beside each other and beside the rest.  Only they are split out: the rest
 # stays one process, in one order, so a failure that depends on what ran before still shows.
 add_lib_test(test_gameengine gameengine ARGS --exclude=every_start_reaches_its_money_and_has_two_ways_out_)
+# every_shipped_master_is_fork_owned_and_retail_files_are_not walks Code/Data
+target_compile_definitions(test_gameengine PRIVATE ZH_CODE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 foreach(_zh_players 2 4 8)
   add_test(NAME test_gameengine_money_sweep_${_zh_players}_players
            COMMAND test_gameengine every_start_reaches_its_money_and_has_two_ways_out_${_zh_players}_players)

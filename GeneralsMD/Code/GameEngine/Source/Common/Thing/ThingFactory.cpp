@@ -390,6 +390,21 @@ AsciiString TheThingTemplateBeingParsedName;
 	TheThingTemplateBeingParsedName = name;
 #endif
 
+	/* An ObjectReskin of an object that is not there - FixesReforged.ini's SupW_SDILasers under a mod that
+		 has no SDILasers - is skipped the same way as a patch of a missing object below, before a template
+		 is made for it, instead of stopping the game at start. */
+	if( reskinFrom.isNotEmpty() )
+	{
+		if( TheThingFactory->findTemplateInternal( reskinFrom, FALSE ) == NULL )
+		{
+			DEBUG_LOG(( "[LINE: %d in '%s'] %s reskins %s, an object that does not exist; the block is skipped.\n", ini->getLineNum(), ini->getFilename().str(), name.str(), reskinFrom.str() ));
+			ThingTemplate *scratch = newInstance(ThingTemplate);
+			ini->initFromINI( scratch, scratch->getReskinFieldParse() );
+			scratch->deleteInstance();
+			return;
+		}
+	}
+
 	// find existing item if present
 	ThingTemplate *thingTemplate = TheThingFactory->findTemplateInternal( name, FALSE );
 	if( !thingTemplate && ini->getLoadType() == INI_LOAD_MULTIFILE && reskinFrom.isEmpty() )

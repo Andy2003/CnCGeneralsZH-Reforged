@@ -725,7 +725,9 @@ void INI::parseAsciiStringVectorAppend( INI* ini, void * /*instance*/, void *sto
 			asv->clear();
 			return;
 		}
-		asv->push_back(INI::scanScience( token ));
+		ScienceType science = INI::scanScience( ini, token );
+		if (science != SCIENCE_INVALID)
+			asv->push_back(science);
 	}
 }
 
@@ -1404,7 +1406,10 @@ void INI::parseSpecialPowerTemplate( INI* ini, void * /*instance*/, void *store,
 		throw ERROR_BUG;
 	}
 
-	*((ScienceType *)store) = INI::scanScience(token);
+	// a skipped reference leaves the field as the loaded data had it
+	ScienceType science = INI::scanScience(ini, token);
+	if (science != SCIENCE_INVALID)
+		*((ScienceType *)store) = science;
 
 }
 
@@ -1600,8 +1605,14 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 }
 
 //-------------------------------------------------------------------------------------------------
-/*static*/ ScienceType INI::scanScience(const char* token)
+/*static*/ ScienceType INI::scanScience(INI* ini, const char* token)
 {
+	// a patch INI loaded over a mod can name a science the mod renamed or removed
+	if (ini->getLoadType() == INI_LOAD_MULTIFILE && !TheScienceStore->isValidScience((ScienceType)NAMEKEY(token)))
+	{
+		DEBUG_LOG(("[LINE: %d in '%s'] science '%s' does not exist; the reference is skipped.\n", ini->getLineNum(), ini->getFilename().str(), token));
+		return SCIENCE_INVALID;
+	}
 	return TheScienceStore->friend_lookupScience( token );
 }
 

@@ -669,8 +669,12 @@ static void parsePrerequisiteScience( INI* ini, void *instance, void * /*store*/
 {
 	std::vector<ProductionPrerequisite>* v = (std::vector<ProductionPrerequisite>*)instance;
 
+	ScienceType science = INI::scanScience(ini, ini->getNextToken());
+	if (science == SCIENCE_INVALID)
+		return;
+
 	ProductionPrerequisite prereq;
-	prereq.addSciencePrereq(INI::scanScience(ini->getNextToken()));
+	prereq.addSciencePrereq(science);
 
 	v->push_back(prereq);
 }

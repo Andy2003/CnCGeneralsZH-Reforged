@@ -223,11 +223,19 @@ const ScienceInfo* ScienceStore::findScienceInfo(ScienceType st) const
 		{
 			if (info != NULL)
 			{
-				DEBUG_CRASH(("duplicate science %s!\n",c));
-				throw INI_INVALID_DATA;
+				// ScienceReforged.ini edits the loaded science in place, and its fields win
+				if (ini->getLoadType() != INI_LOAD_MULTIFILE)
+				{
+					DEBUG_CRASH(("duplicate science %s!\n",c));
+					throw INI_INVALID_DATA;
+				}
+				info->m_rootSciences.clear();
 			}
-			info = newInstance(ScienceInfo);
-			TheScienceStore->m_sciences.push_back(info);
+			else
+			{
+				info = newInstance(ScienceInfo);
+				TheScienceStore->m_sciences.push_back(info);
+			}
 		}
 
 		ini->initFromINI(info, myFieldParse);

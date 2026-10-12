@@ -140,8 +140,13 @@ public:
 
 	/// "<mod dir><filename>" when the last -mod that has this game path has it loose, else empty.  When
 	/// that mod has it in an archive instead, *inModArchive says so.  Either copy beats Run's loose files
-	/// and every archive that is not a mod's.
+	/// and every archive that is not a mod's - except a fork-owned file the install folder holds loose,
+	/// which no mod replaces.
 	AsciiString modLooseFile(const AsciiString& filename, Bool *inModArchive = NULL) const;
+
+	/// TRUE for a game path the fork ships loose (BalanceReforged.ini, Patch.str, SkirmishScripts.scb,
+	/// its .wnd layouts ...); see the definition for how the set is decided.
+	static Bool isForkOwnedPath(const AsciiString& filename);
 
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.
 

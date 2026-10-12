@@ -360,9 +360,10 @@ public:
 
 	/**
 		utility routine that does a sscanf() on the string to get the Science, and throws
-		an exception if not of the right form.
+		an exception if not of the right form.  Under a multifile load an unknown name
+		returns SCIENCE_INVALID instead, and the caller skips the reference.
 	*/
-	static ScienceType scanScience(const char* token);
+	static ScienceType scanScience(INI* ini, const char* token);
 
 	/**
 		utility routine that does a sscanf() on the string to get the int, and throws

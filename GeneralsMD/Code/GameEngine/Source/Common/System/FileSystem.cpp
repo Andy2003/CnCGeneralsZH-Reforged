@@ -60,6 +60,9 @@
 #include "Common/RAMFile.h"
 #include "Common/RandomMapGenerator.h"
 
+#include <set>
+#include <string>
+
 
 DECLARE_PERF_TIMER(FileSystem)
 
@@ -339,7 +342,9 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 	// .big beats an earlier mod's loose copy.  An archive key is the -mod path itself, or that folder
 	// followed by the archive's name (loadMods).
 	const AsciiString archive = TheArchiveFileSystem->getArchiveFilenameForFile(filename);
-	for (size_t i = TheGlobalData->m_mods.size(); i-- > 0; )
+	AsciiString loose;
+	Bool archived = FALSE;
+	for (size_t i = TheGlobalData->m_mods.size(); i-- > 0 && loose.isEmpty() && !archived; )
 	{
 		const AsciiString &mod = TheGlobalData->m_mods[i];
 		const Bool isFolder = mod.endsWith("\\") || mod.endsWith("/");
@@ -349,19 +354,64 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 			path.concat(filename);
 			if (TheLocalFileSystem->doesFileExist(path.str()))
 			{
-				return path;
+				loose = path;
+				break;
 			}
 		}
-		if (archive.isNotEmpty() && (isFolder ? archive.startsWithNoCase(mod.str()) : archive.compareNoCase(mod) == 0))
-		{
-			if (inModArchive != NULL)
-			{
-				*inModArchive = TRUE;
-			}
-			return AsciiString();
-		}
+		archived = archive.isNotEmpty() && (isFolder ? archive.startsWithNoCase(mod.str()) : archive.compareNoCase(mod) == 0);
 	}
-	return AsciiString();
+
+	// ...except over a file the fork ships: retail < mods < the fork.  That copy is the one the install
+	// folder holds loose, and the plain lookup after this finds it.
+	if ((loose.isNotEmpty() || archived) && isForkOwnedPath(filename) && TheLocalFileSystem->doesFileExist(filename.str()))
+	{
+		static std::set<std::string> reported;
+		if (reported.insert(std::string(filename.str())).second)
+		{
+			DEBUG_LOG(("FileSystem - the mod's %s is ignored, the fork's own copy wins (%s)\n",
+				filename.str(), loose.isNotEmpty() ? loose.str() : archive.str()));
+		}
+		return AsciiString();
+	}
+
+	if (inModArchive != NULL)
+	{
+		*inModArchive = archived;
+	}
+	return loose;
+}
+
+//============================================================================
+// FileSystem::isForkOwnedPath
+//============================================================================
+Bool FileSystem::isForkOwnedPath(const AsciiString& filename)
+{
+	// What the fork installs loose next to the exe: the launcher's payload, which is the post-build copy
+	// of Code/Data (less Scenarios, Cinema and the shader cache) plus the classic bar textures.
+	// Tests/test_gameengine.cpp walks Code/Data and fails when a master falls outside this.  Retail's own
+	// loose files (Data\Scripts\MultiplayerScripts.scb, the movies, the cursors) are not in it, so a mod
+	// still replaces those.  The fork's Reforged*.big are kept on top in ArchiveFileSystem::loadMods.
+	AsciiString path = filename;
+	path.toLower();
+	std::string p(path.str());
+	for (size_t i = 0; i < p.size(); ++i)
+	{
+		if (p[i] == '/')
+			p[i] = '\\';
+	}
+	const auto starts = [&p](const char *prefix) { return p.compare(0, strlen(prefix), prefix) == 0; };
+	const auto ends = [&p](const char *suffix) { size_t n = strlen(suffix); return p.size() >= n && p.compare(p.size() - n, n, suffix) == 0; };
+
+	if (starts("data\\ini\\") && p.find('\\', strlen("data\\ini\\")) == std::string::npos && ends("reforged.ini"))
+		return TRUE;
+	if (starts("data\\ini\\mappedimages\\handcreated\\reforged") && ends(".ini"))
+		return TRUE;
+	return p == "data\\patch.str"
+		|| p == "data\\scripts\\skirmishscripts.scb"
+		|| starts("data\\turkish\\") || starts("data\\german\\")
+		|| starts("art\\textures\\reforged") || starts("art\\textures\\classicwidebar")
+		|| starts("window\\")
+		|| p == "install_final.bmp";
 }
 
 //============================================================================

@@ -16,7 +16,9 @@
 
 #include "test_harness.h"
 
+#include <filesystem>
 #include <limits>
+#include <string>
 
 #include "Common/AsciiString.h"
 #include "Common/CommandLine.h"
@@ -17130,6 +17132,42 @@ TEST(unsigned_text_parses_as_windows_32_bit_strtoul)
 	CHECK_EQ(strtoulAsWindows(""), 0u);
 	CHECK_EQ(strtoulAsWindows("x1"), 0u);
 	CHECK_EQ(strtoulAsWindows("-"), 0u);
+}
+
+// No -mod replaces what the fork ships.  The set is Code/Data as the build copies it into Run, less
+// the three trees that never ship, so a new master that FileSystem::isForkOwnedPath does not cover
+// fails here instead of letting a mod quietly win over it.  Retail's own loose files stay the mod's.
+TEST(every_shipped_master_is_fork_owned_and_retail_files_are_not)
+{
+	const std::filesystem::path data = std::filesystem::path(ZH_CODE_DIR) / "Data";
+	Int masters = 0;
+	for (std::filesystem::recursive_directory_iterator it(data), end; it != end; ++it)
+	{
+		if (!it->is_regular_file())
+			continue;
+		std::string relative = std::filesystem::relative(it->path(), data).generic_string();
+		if (relative.rfind("Scenarios/", 0) == 0 || relative.rfind("Cinema/", 0) == 0 || relative == "dx11shaders.shipped")
+			continue;
+		// the post-build copy keeps Data\ in front of these and puts the rest at the top of Run
+		const char *underData[] = { "INI/", "Scripts/", "Turkish/", "German/" };
+		Bool keepsData = relative == "Patch.str";
+		for (const char *prefix : underData)
+			keepsData = keepsData || relative.rfind(prefix, 0) == 0;
+		const std::string runPath = keepsData ? "Data/" + relative : relative;
+		if (!FileSystem::isForkOwnedPath(AsciiString(runPath.c_str())))
+			printf("    not fork-owned: %s\n", runPath.c_str());
+		CHECK(FileSystem::isForkOwnedPath(AsciiString(runPath.c_str())));
+		++masters;
+	}
+	CHECK(masters > 20);
+
+	CHECK(FileSystem::isForkOwnedPath(AsciiString("Art\\Textures\\ClassicWideBarGLA.tga")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\Scripts\\MultiplayerScripts.scb")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\Scripts\\Scripts.ini")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\INI\\GameData.ini")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\INI\\Object\\AmericaTankReforged.ini")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\English\\Movies\\EA_LOGO.bik")));
+	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Art\\Textures\\AVPaladin.tga")));
 }
 
 #include "test_minimap_input.inc"

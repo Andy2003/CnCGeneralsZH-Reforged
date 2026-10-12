@@ -50,7 +50,11 @@
 #include "Common/ArchiveFile.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/AsciiString.h"
+#include "Common/GlobalData.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/PerfTimer.h"
+
+#include <vector>
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -172,34 +176,65 @@ void ArchiveFileSystem::loadIntoDirectoryTree(const ArchiveFile *archiveFile, co
 	}
 }
 
+/// the fork's upscaled art goes by its file name, ReforgedTextures.big and the like
+static Bool isReforgedArchiveName(const AsciiString &path)
+{
+	const char *slash = strrchr(path.str(), '\\');
+	const char *forward = strrchr(path.str(), '/');
+	const char *name = path.str();
+	if (slash != NULL && slash + 1 > name)
+		name = slash + 1;
+	if (forward != NULL && forward + 1 > name)
+		name = forward + 1;
+	return strncasecmp(name, "Reforged", 8) == 0;
+}
+
 void ArchiveFileSystem::loadMods() {
+	if (TheGlobalData->m_mods.empty())
+		return;
+
+	// retail < mods < the fork: the fork's Reforged*.big already in the tree go back on top afterwards
+	std::vector<AsciiString> forkArt;
+	for (ArchiveFileMap::const_iterator it = m_archiveFileMap.begin(); it != m_archiveFileMap.end(); ++it)
+	{
+		if (isReforgedArchiveName(it->first))
+			forkArt.push_back(it->first);
+	}
+
 	// In command-line order, each with overwrite: a later -mod wins over an earlier one, and all of them
-	// over the retail and Reforged archives already in the tree.
+	// over the retail archives.  A folder's archives go in the order Win32BIGFileSystem's own pass uses.
 	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
 	{
 		const AsciiString &mod = TheGlobalData->m_mods[i];
+		FilenameList archives;
 		if (mod.endsWith("\\") || mod.endsWith("/"))
-		{
-#ifdef DEBUG_LOGGING
-			Bool ret =
-#endif
-			loadBigFilesFromDirectory(mod, "*.big", TRUE);
-			DEBUG_ASSERTLOG(ret, ("loadBigFilesFromDirectory(%s) returned FALSE!\n", mod.str()));
-			continue;
-		}
-
-		ArchiveFile *archiveFile = openArchiveFile(mod.str());
-
-		if (archiveFile != NULL) {
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", mod.str()));
-			loadIntoDirectoryTree(archiveFile, mod, TRUE);
-			m_archiveFileMap[mod] = archiveFile;
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - %s inserted into the archive file map.\n", mod.str()));
-		}
+			TheLocalFileSystem->getFileListInDirectory(mod, AsciiString(""), AsciiString("*.big"), archives, TRUE);
 		else
+			archives.insert(mod);
+
+		for (FilenameListIter it = archives.begin(); it != archives.end(); ++it)
 		{
-			DEBUG_LOG(("ArchiveFileSystem::loadMods - could not openArchiveFile(%s)\n", mod.str()));
+			if (isReforgedArchiveName(*it))
+			{
+				DEBUG_LOG(("ArchiveFileSystem::loadMods - %s is ignored, the fork's own Reforged archives win\n", it->str()));
+				continue;
+			}
+			ArchiveFile *archiveFile = openArchiveFile(it->str());
+			if (archiveFile == NULL)
+			{
+				DEBUG_LOG(("ArchiveFileSystem::loadMods - could not openArchiveFile(%s)\n", it->str()));
+				continue;
+			}
+			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", it->str()));
+			loadIntoDirectoryTree(archiveFile, *it, TRUE);
+			m_archiveFileMap[*it] = archiveFile;
 		}
+	}
+
+	for (size_t i = 0; i < forkArt.size(); ++i)
+	{
+		DEBUG_LOG(("ArchiveFileSystem::loadMods - %s back over the mods\n", forkArt[i].str()));
+		loadIntoDirectoryTree(m_archiveFileMap[forkArt[i]], forkArt[i], TRUE);
 	}
 }
 
