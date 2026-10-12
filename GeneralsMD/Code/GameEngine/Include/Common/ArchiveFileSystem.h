@@ -175,12 +175,26 @@ class ArchiveFileSystem : public SubsystemInterface
 	AsciiString						getArchiveFilenameForFile(const AsciiString& filename) const;
 	void loadMods( void );
 
+	/// FileSystem::setFocus: FILE_FOCUS_ALL is the merged tree, FILE_FOCUS_RETAIL the tree as it was
+	/// before any -mod, a -mod index that mod's archives alone.  Only -modfactions keeps the apart trees.
+	void setFocus( Int focus ) { m_focus = focus; }
+
 protected:
 	virtual void					loadIntoDirectoryTree(const ArchiveFile *archiveFile, const AsciiString& archiveFilename, Bool overwrite = FALSE );	///< load the archive file's header information and apply it to the global archive directory tree.
+	void									addToTree(ArchivedDirectoryInfo &root, const ArchiveFile *archiveFile, const AsciiString& archiveFilename, Bool overwrite);
 	void									prioritizeLargerFiles(const AsciiString& directory, const char *inferiorArchive, const char *superiorArchive);	///< where two archives claim the same file in this directory, keep the bigger copy.
+
+	void									keepModsApart( size_t modCount );	///< snapshot the retail tree and start one empty tree per -mod
+	void									addModArchive( Int mod, ArchiveFile *archiveFile, const AsciiString& archiveFilename );	///< over the merged tree, and into the mod's own when kept apart
+	const ArchivedDirectoryInfo &	focusedRoot( void ) const;
+	Bool									inFocus( const AsciiString& archiveFilename ) const;
 
 	ArchiveFileMap m_archiveFileMap;
 	ArchivedDirectoryInfo m_rootDirectory;
+	ArchivedDirectoryInfo m_retailRoot;							///< -modfactions: the tree before any -mod
+	std::vector<ArchivedDirectoryInfo> m_modRoots;	///< -modfactions: each -mod's archives alone, in its own order
+	std::map<AsciiString, Int> m_archiveMod;				///< -modfactions: archive -> -mod index; retail's are not in it
+	Int m_focus;
 };
 
 

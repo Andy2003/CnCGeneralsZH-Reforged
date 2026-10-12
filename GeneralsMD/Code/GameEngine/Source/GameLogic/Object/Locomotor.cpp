@@ -655,8 +655,11 @@ LocomotorTemplate* LocomotorStore::findLocomotorTemplate(NameKeyType namekey)
 		return NULL;
 
   LocomotorTemplateMap::iterator it = m_locomotorTemplates.find(namekey);
-  if (it == m_locomotorTemplates.end()) 
-		return NULL;
+  if (it == m_locomotorTemplates.end())
+	{
+		NameKeyType retailKey;
+		return TheModNamespace.findRetailKey(namekey, MODNAME_LOCOMOTOR, &retailKey) ? findLocomotorTemplate(retailKey) : NULL;
+	}
 	else
 		return (*it).second;
 }
@@ -668,9 +671,10 @@ const LocomotorTemplate* LocomotorStore::findLocomotorTemplate(NameKeyType namek
 		return NULL;
 
   LocomotorTemplateMap::const_iterator it = m_locomotorTemplates.find(namekey);
-  if (it == m_locomotorTemplates.end()) 
+  if (it == m_locomotorTemplates.end())
 	{
-		return NULL;
+		NameKeyType retailKey;
+		return TheModNamespace.findRetailKey(namekey, MODNAME_LOCOMOTOR, &retailKey) ? findLocomotorTemplate(retailKey) : NULL;
 	}
 	else
 	{

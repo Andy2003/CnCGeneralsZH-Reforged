@@ -48,6 +48,8 @@
 #include "Common/PlayerTemplate.h"
 #include "GameNetwork/LANAPICallbacks.h" // for acceptTrueColor, etc
 #include "GameClient/ChallengeGenerals.h"
+#include "Common/GlobalData.h"
+#include "Lib/WideCharFns.h"
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -326,12 +328,25 @@ void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], Game
 
 		AsciiString side;
 		side.format("SIDE:%s", fac->getSide().str());
-		if (seenSides.find(side) != seenSides.end())
+		// -modfactions: each mod's America is a side of its own, "<mod name> - USA"
+		AsciiString seenKey;
+		seenKey.format("%d:%s", fac->getModIndex(), side.str());
+		if (seenSides.find(seenKey) != seenSides.end())
 			continue;
 
-		seenSides.insert(side);
+		seenSides.insert(seenKey);
 
-		newIndex = GadgetComboBoxAddEntry(comboArray[comboBox], TheGameText->fetch(side), def->getColor());
+		UnicodeString label = TheGameText->fetch(side);
+		if (fac->getModIndex() >= 0)
+		{
+			WideChar modName[128];
+			WideCharFromUtf8(TheGlobalData->m_modNames[fac->getModIndex()].str(), modName, ARRAY_SIZE(modName));
+			UnicodeString sideLabel = label;
+			label = UnicodeString(modName);
+			label.concat(UnicodeString(u" - "));
+			label.concat(sideLabel);
+		}
+		newIndex = GadgetComboBoxAddEntry(comboArray[comboBox], label, def->getColor());
 		GadgetComboBoxSetItemData(comboArray[comboBox], newIndex, (void *)(intptr_t)c);
 	}
 	seenSides.clear();

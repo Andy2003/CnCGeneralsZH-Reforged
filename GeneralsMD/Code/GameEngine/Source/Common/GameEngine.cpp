@@ -55,6 +55,7 @@
 #include "Common/INIException.h"
 #include "Common/MessageStream.h"
 #include "Common/ThingFactory.h"
+#include "Common/ThingTemplate.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/ArchiveFileSystem.h"
@@ -198,6 +199,37 @@ void initSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *p
 }
 
 //-------------------------------------------------------------------------------------------------
+/** A store a faction is made of.  With -modfactions retail's own files load alone, and then each
+	* mod's under that mod's names (INI::loadModPasses); a mod's Default\ file never loads.  Without it
+	* this is initSubsystem. */
+//-------------------------------------------------------------------------------------------------
+template<class SUBSYSTEM>
+void initFactionSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *pXfer, const char* path1,
+													const char* path2, const char* dirpath = NULL)
+{
+	const Bool apart = TheGlobalData->m_modFactions;
+	if (apart)
+		TheFileSystem->setFocus(FILE_FOCUS_RETAIL);
+	initSubsystem(sysref, name, sys, pXfer, path1, path2, dirpath);
+	if (apart)
+		TheFileSystem->setFocus(FILE_FOCUS_ALL);
+	INI::loadModPasses(dirpath != NULL ? dirpath : path2, pXfer, dirpath != NULL);
+}
+
+/** A store that names faction parts without being one (crates, the AI's build lists, the ranks):
+	* with -modfactions retail's copy, since a mod's names its own parts as they are only under its prefix. */
+template<class SUBSYSTEM>
+void initRetailSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *pXfer, const char* path1, const char* path2)
+{
+	const Bool apart = TheGlobalData->m_modFactions;
+	if (apart)
+		TheFileSystem->setFocus(FILE_FOCUS_RETAIL);
+	initSubsystem(sysref, name, sys, pXfer, path1, path2);
+	if (apart)
+		TheFileSystem->setFocus(FILE_FOCUS_ALL);
+}
+
+//-------------------------------------------------------------------------------------------------
 #if defined(_WIN32)
 extern HINSTANCE ApplicationHInstance;  ///< our application instance
 extern CComModule _Module;		// ATL's module, for the embedded browser's COM; nothing off Windows uses COM
@@ -217,6 +249,26 @@ static void checksumFileContents( XferCRC &xferCRC, const char *path )
 	char *contents = file->readEntireAndClose();
 	xferCRC.xferUser( contents, fileSize );
 	delete [] contents;
+}
+
+/** The same for a file a faction is made of: with -modfactions retail's copy, then each mod's that
+	* has one (modsToo), as ControlBar::init loads them. */
+static void checksumFactionFile( XferCRC &xferCRC, const char *path, Bool modsToo )
+{
+	if (!TheGlobalData->m_modFactions)
+	{
+		checksumFileContents( xferCRC, path );
+		return;
+	}
+	TheFileSystem->setFocus( FILE_FOCUS_RETAIL );
+	checksumFileContents( xferCRC, path );
+	for (Int mod = 0; modsToo && mod < (Int)TheGlobalData->m_mods.size(); ++mod)
+	{
+		TheFileSystem->setFocus( mod );
+		if (TheFileSystem->doesFileExist( path ))
+			checksumFileContents( xferCRC, path );
+	}
+	TheFileSystem->setFocus( FILE_FOCUS_ALL );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1072,7 +1124,10 @@ void GameEngine::init( int argc, char *argv[] )
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 
-		initSubsystem(TheScienceStore,"TheScienceStore", MSGNEW("GameEngineSubsystem") ScienceStore(), &xferCRC, "Data\\INI\\Default\\Science.ini", "Data\\INI\\Science.ini");
+		// -modfactions: which names each mod defines, read before any of its files load
+		if (TheGlobalData->m_modFactions)
+			TheModNamespace.scanMods();
+		initFactionSubsystem(TheScienceStore,"TheScienceStore", MSGNEW("GameEngineSubsystem") ScienceStore(), &xferCRC, "Data\\INI\\Default\\Science.ini", "Data\\INI\\Science.ini");
 		// New sciences only: a name EA already defined stops the load
 		ini.load( AsciiString( "Data\\INI\\ScienceReforged.ini" ), INI_LOAD_MULTIFILE, &xferCRC );
 		initSubsystem(TheMultiplayerSettings,"TheMultiplayerSettings", MSGNEW("GameEngineSubsystem") MultiplayerSettings(), &xferCRC, "Data\\INI\\Default\\Multiplayer.ini", "Data\\INI\\Multiplayer.ini");
@@ -1117,8 +1172,8 @@ void GameEngine::init( int argc, char *argv[] )
 		initSubsystem(TheMessageStream,"TheMessageStream", createMessageStream(), NULL);
 		initSubsystem(TheSidesList,"TheSidesList", MSGNEW("GameEngineSubsystem") SidesList(), NULL);
 		initSubsystem(TheCaveSystem,"TheCaveSystem", MSGNEW("GameEngineSubsystem") CaveSystem(), NULL);
-		initSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, NULL, "Data\\INI\\Rank.ini");
-		initSubsystem(ThePlayerTemplateStore,"ThePlayerTemplateStore", MSGNEW("GameEngineSubsystem") PlayerTemplateStore(), &xferCRC, "Data\\INI\\Default\\PlayerTemplate.ini", "Data\\INI\\PlayerTemplate.ini");
+		initRetailSubsystem(TheRankInfoStore,"TheRankInfoStore", MSGNEW("GameEngineSubsystem") RankInfoStore(), &xferCRC, NULL, "Data\\INI\\Rank.ini");
+		initFactionSubsystem(ThePlayerTemplateStore,"ThePlayerTemplateStore", MSGNEW("GameEngineSubsystem") PlayerTemplateStore(), &xferCRC, "Data\\INI\\Default\\PlayerTemplate.ini", "Data\\INI\\PlayerTemplate.ini");
 		initSubsystem(TheParticleSystemManager,"TheParticleSystemManager", createParticleSystemManager(), NULL);
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -1129,24 +1184,24 @@ void GameEngine::init( int argc, char *argv[] )
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
     
     
-		initSubsystem(TheFXListStore,"TheFXListStore", MSGNEW("GameEngineSubsystem") FXListStore(), &xferCRC, "Data\\INI\\Default\\FXList.ini", "Data\\INI\\FXList.ini");
+		initFactionSubsystem(TheFXListStore,"TheFXListStore", MSGNEW("GameEngineSubsystem") FXListStore(), &xferCRC, "Data\\INI\\Default\\FXList.ini", "Data\\INI\\FXList.ini");
 		/* The fork's own detonation light, on top of EA's list.  It is a separate file rather than a
 			 loose copy of FXList.ini because a loose copy shadows the whole 190K shipped file: it goes
 			 stale against every patch, it cannot be reviewed, and - since it lands in the INI CRC below -
 			 it silently refuses every multiplayer join from a machine that does not have the same one. */
 		ini.load( AsciiString( "Data\\INI\\FXListReforged.ini" ), INI_LOAD_OVERWRITE, &xferCRC );
-		initSubsystem(TheWeaponStore,"TheWeaponStore", MSGNEW("GameEngineSubsystem") WeaponStore(), &xferCRC, NULL, "Data\\INI\\Weapon.ini");
-		initSubsystem(TheObjectCreationListStore,"TheObjectCreationListStore", MSGNEW("GameEngineSubsystem") ObjectCreationListStore(), &xferCRC, "Data\\INI\\Default\\ObjectCreationList.ini", "Data\\INI\\ObjectCreationList.ini");
+		initFactionSubsystem(TheWeaponStore,"TheWeaponStore", MSGNEW("GameEngineSubsystem") WeaponStore(), &xferCRC, NULL, "Data\\INI\\Weapon.ini");
+		initFactionSubsystem(TheObjectCreationListStore,"TheObjectCreationListStore", MSGNEW("GameEngineSubsystem") ObjectCreationListStore(), &xferCRC, "Data\\INI\\Default\\ObjectCreationList.ini", "Data\\INI\\ObjectCreationList.ini");
 		/* Lists EA left out or got wrong, before any object names one: a list parsed again is cleared
 			 and replaced whole, and a new name is simply added. */
 		ini.load( AsciiString( "Data\\INI\\ObjectCreationListReforged.ini" ), INI_LOAD_OVERWRITE, &xferCRC );
-		initSubsystem(TheLocomotorStore,"TheLocomotorStore", MSGNEW("GameEngineSubsystem") LocomotorStore(), &xferCRC, NULL, "Data\\INI\\Locomotor.ini");
-		initSubsystem(TheSpecialPowerStore,"TheSpecialPowerStore", MSGNEW("GameEngineSubsystem") SpecialPowerStore(), &xferCRC, "Data\\INI\\Default\\SpecialPower.ini", "Data\\INI\\SpecialPower.ini");
+		initFactionSubsystem(TheLocomotorStore,"TheLocomotorStore", MSGNEW("GameEngineSubsystem") LocomotorStore(), &xferCRC, NULL, "Data\\INI\\Locomotor.ini");
+		initFactionSubsystem(TheSpecialPowerStore,"TheSpecialPowerStore", MSGNEW("GameEngineSubsystem") SpecialPowerStore(), &xferCRC, "Data\\INI\\Default\\SpecialPower.ini", "Data\\INI\\SpecialPower.ini");
 		/* Powers edited in place (a scan Frenzy should not give) and the Demolitions General's own
 			 Rebel Ambush, before any object names one. */
 		ini.load( AsciiString( "Data\\INI\\SpecialPowerReforged.ini" ), INI_LOAD_MULTIFILE, &xferCRC );
-		initSubsystem(TheDamageFXStore,"TheDamageFXStore", MSGNEW("GameEngineSubsystem") DamageFXStore(), &xferCRC, NULL, "Data\\INI\\DamageFX.ini");
-		initSubsystem(TheArmorStore,"TheArmorStore", MSGNEW("GameEngineSubsystem") ArmorStore(), &xferCRC, NULL, "Data\\INI\\Armor.ini");
+		initFactionSubsystem(TheDamageFXStore,"TheDamageFXStore", MSGNEW("GameEngineSubsystem") DamageFXStore(), &xferCRC, NULL, "Data\\INI\\DamageFX.ini");
+		initFactionSubsystem(TheArmorStore,"TheArmorStore", MSGNEW("GameEngineSubsystem") ArmorStore(), &xferCRC, NULL, "Data\\INI\\Armor.ini");
 		initSubsystem(TheBuildAssistant,"TheBuildAssistant", MSGNEW("GameEngineSubsystem") BuildAssistant, NULL);
 
 
@@ -1159,7 +1214,7 @@ void GameEngine::init( int argc, char *argv[] )
 
 
 
-		initSubsystem(TheThingFactory,"TheThingFactory", createThingFactory(), &xferCRC, "Data\\INI\\Default\\Object.ini", NULL, "Data\\INI\\Object");
+		initFactionSubsystem(TheThingFactory,"TheThingFactory", createThingFactory(), &xferCRC, "Data\\INI\\Default\\Object.ini", NULL, "Data\\INI\\Object");
 		/* The fork's balance, written over EA's numbers after every object, weapon and armor exists.
 			 MULTIFILE edits a template in place and leaves every field the file does not name as EA
 			 wrote it, so the file holds the changes and nothing else; an Armor block still replaces
@@ -1177,7 +1232,7 @@ void GameEngine::init( int argc, char *argv[] )
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
     
     
-		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade.ini", "Data\\INI\\Upgrade.ini");
+		initFactionSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade.ini", "Data\\INI\\Upgrade.ini");
 		// An upgrade parsed again is edited in place, so this file names only what changes
 		ini.load( AsciiString( "Data\\INI\\UpgradeReforged.ini" ), INI_LOAD_MULTIFILE, &xferCRC );
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), NULL);
@@ -1191,10 +1246,10 @@ void GameEngine::init( int argc, char *argv[] )
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 	
-		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData.ini", "Data\\INI\\AIData.ini");
+		initRetailSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData.ini", "Data\\INI\\AIData.ini");
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), NULL);
 		initSubsystem(TheTeamFactory,"TheTeamFactory", MSGNEW("GameEngineSubsystem") TeamFactory(), NULL);
-		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate.ini", "Data\\INI\\Crate.ini");
+		initRetailSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate.ini", "Data\\INI\\Crate.ini");
 		initSubsystem(ThePlayerList,"ThePlayerList", MSGNEW("GameEngineSubsystem") PlayerList(), NULL);
 		initSubsystem(TheRecorder,"TheRecorder", createRecorder(), NULL);
 		initSubsystem(TheRadar,"TheRadar", createRadar(), NULL);
@@ -1242,9 +1297,9 @@ void GameEngine::init( int argc, char *argv[] )
 
 
 		// the control bar parses these without the checksum, and the AI builds and hunts from them
-		checksumFileContents( xferCRC, "Data\\INI\\Default\\CommandButton.ini" );
-		checksumFileContents( xferCRC, "Data\\INI\\CommandButton.ini" );
-		checksumFileContents( xferCRC, "Data\\INI\\CommandSet.ini" );
+		checksumFactionFile( xferCRC, "Data\\INI\\Default\\CommandButton.ini", FALSE );
+		checksumFactionFile( xferCRC, "Data\\INI\\CommandButton.ini", TRUE );
+		checksumFactionFile( xferCRC, "Data\\INI\\CommandSet.ini", TRUE );
 		checksumFileContents( xferCRC, "Data\\INI\\CommandSetReforged.ini" );
 		checksumModels( xferCRC );
 
@@ -2492,6 +2547,32 @@ static void updateHeadlessRun( void )
 									p->countObjects( MAKE_KINDOF_MASK( KINDOF_AIRCRAFT ), nothing );
 			if (units > peakUnits[ i ])
 				peakUnits[ i ] = units;
+		}
+	}
+
+	// -modfactions: whose objects each side is made of, ten seconds in
+	if (TheGlobalData->m_modFactions && frame == 300)
+	{
+		Int total[ MAX_PLAYER_COUNT ] = { 0 }, namespaced[ MAX_PLAYER_COUNT ] = { 0 };
+		AsciiString example[ MAX_PLAYER_COUNT ];
+		for (Object *obj = TheGameLogic->getFirstObject(); obj != NULL; obj = obj->getNextObject())
+		{
+			const Int index = obj->getControllingPlayer()->getPlayerIndex();
+			++total[ index ];
+			if (strchr( obj->getTemplate()->getName().str(), '~' ) != NULL)
+			{
+				++namespaced[ index ];
+				if (example[ index ].isEmpty())
+					example[ index ] = obj->getTemplate()->getName();
+			}
+		}
+		for (Int i = 0; i < ThePlayerList->getPlayerCount() && i < MAX_PLAYER_COUNT; ++i)
+		{
+			Player *p = ThePlayerList->getNthPlayer( i );
+			if (!p->isPlayableSide() || p->isPlayerObserver())
+				continue;
+			DEBUG_LOG(("MODNS frame %d player %d plays %s: %d objects, %d of them a mod's, e.g. %s\n", frame, i,
+								 p->getPlayerTemplate()->getName().str(), total[ i ], namespaced[ i ], example[ i ].str()));
 		}
 	}
 

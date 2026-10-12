@@ -1105,6 +1105,7 @@ GlobalData::GlobalData()
 
 	m_isBreakableMovie = FALSE;
 	m_breakTheMovie = FALSE;
+	m_modFactions = FALSE;
 
 	setTimeOfDay( m_timeOfDay );
 

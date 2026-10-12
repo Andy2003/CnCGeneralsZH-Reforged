@@ -2561,8 +2561,9 @@ static AsciiString modJsonString( const std::string &json, const char *key )
 }
 
 /** What the mod is called on the version line, in the replay and in a refused join: "<name> <version>"
-	* from the folder's mod.json, else the folder's or the archive's own name. */
-static AsciiString modIdentity( const AsciiString &modPath, Bool isDir )
+	* from the folder's mod.json, else the folder's or the archive's own name.  *bareName is the same
+	* without the version, which is what -modfactions puts in front of a faction. */
+static AsciiString modIdentity( const AsciiString &modPath, Bool isDir, AsciiString *bareName )
 {
 	AsciiString name;
 	if (isDir)
@@ -2578,6 +2579,7 @@ static AsciiString modIdentity( const AsciiString &modPath, Bool isDir )
 			delete [] contents;
 
 			name = modJsonString( json, "name" );
+			*bareName = name;
 			AsciiString version = modJsonString( json, "version" );
 			if (name.isNotEmpty() && version.isNotEmpty())
 			{
@@ -2598,6 +2600,7 @@ static AsciiString modIdentity( const AsciiString &modPath, Bool isDir )
 		if (!isDir && path.size() > 4 && strcasecmp( path.c_str() + path.size() - 4, ".big" ) == 0)
 			path.erase( path.size() - 4 );
 		name = path.c_str();
+		*bareName = name;
 	}
 	return name;
 }
@@ -2644,13 +2647,24 @@ Int parseMod(char *args[], Int num)
 		// repeatable: each -mod goes after the ones before it and wins over them (loadMods, FileSystem::modLooseFile)
 		TheWritableGlobalData->m_mods.push_back( modPath );
 
-		AsciiString name = modIdentity( modPath, (statBuf.st_mode & S_IFDIR) != 0 );
+		AsciiString bareName;
+		AsciiString name = modIdentity( modPath, (statBuf.st_mode & S_IFDIR) != 0, &bareName );
+		TheWritableGlobalData->m_modNames.push_back( bareName );
 		if (TheGlobalData->m_modName.isNotEmpty())
 			TheWritableGlobalData->m_modName.concat( ", " );
 		TheWritableGlobalData->m_modName.concat( name );
 		DEBUG_LOG(("MOD %d name='%s' path='%s'\n", (Int)TheGlobalData->m_mods.size(), name.str(), modPath.str()));
 
 		return 2;
+	}
+	return 1;
+}
+
+Int parseModFactions(char *args[], Int)
+{
+	if (TheWritableGlobalData)
+	{
+		TheWritableGlobalData->m_modFactions = TRUE;
 	}
 	return 1;
 }
@@ -2668,6 +2682,7 @@ static CommandLineParam params[] =
 	{ "-scriptDebug", parseScriptDebug },
 	{ "-playStats", parsePlayStats },
 	{ "-mod", parseMod },
+	{ "-modfactions", parseModFactions },
 	{ "-noshaders", parseNoShaders },
 	{ "-particlebounce", parseParticleBounce },
 	{ "-smoke", parseSmoke },
@@ -2891,6 +2906,9 @@ void parseCommandLine(int argc, char *argv[])
 		}
 	}
 
+	// with no -mod there is nothing to keep apart, and the retail focus would have no tree to read
+	if (TheGlobalData->m_mods.empty())
+		TheWritableGlobalData->m_modFactions = FALSE;
 	TheArchiveFileSystem->loadMods();
 
 	// GameData.ini and the language check have already asked about files the mod may now supply

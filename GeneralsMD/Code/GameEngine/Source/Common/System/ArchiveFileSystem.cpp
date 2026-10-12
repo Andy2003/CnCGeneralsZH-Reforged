@@ -111,7 +111,7 @@ ArchiveFileSystem *TheArchiveFileSystem = NULL;
 //------------------------------------------------------
 // ArchivedFileInfo
 //------------------------------------------------------
-ArchiveFileSystem::ArchiveFileSystem() 
+ArchiveFileSystem::ArchiveFileSystem() : m_focus( FILE_FOCUS_ALL )
 {
 }
 
@@ -130,6 +130,11 @@ ArchiveFileSystem::~ArchiveFileSystem()
 
 void ArchiveFileSystem::loadIntoDirectoryTree(const ArchiveFile *archiveFile, const AsciiString& archiveFilename, Bool overwrite)
 {
+	addToTree(m_rootDirectory, archiveFile, archiveFilename, overwrite);
+}
+
+void ArchiveFileSystem::addToTree(ArchivedDirectoryInfo &root, const ArchiveFile *archiveFile, const AsciiString& archiveFilename, Bool overwrite)
+{
 
 	FilenameList filenameList;
 
@@ -144,7 +149,7 @@ void ArchiveFileSystem::loadIntoDirectoryTree(const ArchiveFile *archiveFile, co
 		AsciiString token;
 		AsciiString debugpath;
 
-		ArchivedDirectoryInfo *dirInfo = &m_rootDirectory;
+		ArchivedDirectoryInfo *dirInfo = &root;
 
 		Bool infoInPath;
 		infoInPath = path.nextToken(&token, "\\/");
@@ -201,6 +206,10 @@ void ArchiveFileSystem::loadMods() {
 			forkArt.push_back(it->first);
 	}
 
+	// -modfactions loads retail's factions and each mod's from their own files (FileSystem::setFocus)
+	if (TheGlobalData->m_modFactions)
+		keepModsApart(TheGlobalData->m_mods.size());
+
 	// In command-line order, each with overwrite: a later -mod wins over an earlier one, and all of them
 	// over the retail archives.  A folder's archives go in the order Win32BIGFileSystem's own pass uses.
 	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
@@ -226,8 +235,7 @@ void ArchiveFileSystem::loadMods() {
 				continue;
 			}
 			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", it->str()));
-			loadIntoDirectoryTree(archiveFile, *it, TRUE);
-			m_archiveFileMap[*it] = archiveFile;
+			addModArchive((Int)i, archiveFile, *it);
 		}
 	}
 
@@ -238,17 +246,50 @@ void ArchiveFileSystem::loadMods() {
 	}
 }
 
+void ArchiveFileSystem::keepModsApart(size_t modCount)
+{
+	m_retailRoot = m_rootDirectory;
+	m_modRoots.assign(modCount, ArchivedDirectoryInfo());
+}
+
+void ArchiveFileSystem::addModArchive(Int mod, ArchiveFile *archiveFile, const AsciiString& archiveFilename)
+{
+	loadIntoDirectoryTree(archiveFile, archiveFilename, TRUE);
+	m_archiveFileMap[archiveFilename] = archiveFile;
+	if (m_modRoots.empty())
+		return;
+	addToTree(m_modRoots[mod], archiveFile, archiveFilename, TRUE);
+	m_archiveMod[archiveFilename] = mod;
+}
+
+const ArchivedDirectoryInfo &ArchiveFileSystem::focusedRoot() const
+{
+	if (m_focus == FILE_FOCUS_ALL)
+		return m_rootDirectory;
+	if (m_focus == FILE_FOCUS_RETAIL)
+		return m_retailRoot;
+	return m_modRoots[m_focus];
+}
+
+Bool ArchiveFileSystem::inFocus(const AsciiString& archiveFilename) const
+{
+	if (m_focus == FILE_FOCUS_ALL)
+		return TRUE;
+	std::map<AsciiString, Int>::const_iterator it = m_archiveMod.find(archiveFilename);
+	return (it == m_archiveMod.end() ? FILE_FOCUS_RETAIL : it->second) == m_focus;
+}
+
 Bool ArchiveFileSystem::doesFileExist(const Char *filename) const
 {
 	AsciiString path = filename;
 	path.toLower();
 	AsciiString token;
 
-	const ArchivedDirectoryInfo *dirInfo = &m_rootDirectory;
+	const ArchivedDirectoryInfo *dirInfo = &focusedRoot();
 
 	path.nextToken(&token, "\\/");
 
-	while (!token.find('.') || path.find('.')) 
+	while (!token.find('.') || path.find('.'))
 	{
 		ArchivedDirectoryInfoMap::const_iterator tempiter = dirInfo->m_directories.find(token);
 		if (tempiter != dirInfo->m_directories.end()) 
@@ -377,7 +418,7 @@ AsciiString ArchiveFileSystem::getArchiveFilenameForFile(const AsciiString& file
 	AsciiString token;
 	AsciiString debugpath;
 
-	const ArchivedDirectoryInfo *dirInfo = &m_rootDirectory;
+	const ArchivedDirectoryInfo *dirInfo = &focusedRoot();
 
 	path.nextToken(&token, "\\/");
 
@@ -426,7 +467,8 @@ void ArchiveFileSystem::getFileListInDirectory(const AsciiString& currentDirecto
 {
 	ArchiveFileMap::const_iterator it = m_archiveFileMap.begin();
 	while (it != m_archiveFileMap.end()) {
-		it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
+		if (inFocus(it->first))
+			it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
 		it++;
 	}
 }

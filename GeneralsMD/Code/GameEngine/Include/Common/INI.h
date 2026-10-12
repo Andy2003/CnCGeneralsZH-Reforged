@@ -36,6 +36,9 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include <stddef.h>	// for offsetof, which we don't use but everyone who includes us does
+#include <set>
+#include <string>
+#include <vector>
 #include "Common/STLTypedefs.h"
 #include "Common/AsciiString.h"
 #include "Common/GameCommon.h"
@@ -165,6 +168,54 @@ typedef void (*INIBlockParse)( INI *ini );
 typedef void (*BuildMultiIniFieldProc)(MultiIniFieldParse& p);
 
 //-------------------------------------------------------------------------------------------------
+/** -modfactions: every name a mod defines is read as "M<n>~name" while that mod's files load, so two
+	* mods and retail can each have their own FactionAmerica, Ranger and Command_ConstructBarracks side
+	* by side.  A name the mod does not define stays retail's.  The rewrite is of the text, before the
+	* INI checksum sees it, so it is the same on every machine that has the same mods in the same order. */
+//-------------------------------------------------------------------------------------------------
+enum ModNameType
+{
+	MODNAME_OBJECT, MODNAME_WEAPON, MODNAME_ARMOR, MODNAME_DAMAGEFX, MODNAME_UPGRADE, MODNAME_SCIENCE,
+	MODNAME_SPECIALPOWER, MODNAME_COMMANDSET, MODNAME_COMMANDBUTTON, MODNAME_FXLIST, MODNAME_OCL,
+	MODNAME_PARTICLESYSTEM, MODNAME_LOCOMOTOR, MODNAME_PLAYERTEMPLATE,
+	MODNAME_COUNT
+};
+
+class ModNamespace
+{
+public:
+	ModNamespace() : m_active( -1 ) {}
+
+	void scanMods( void );															///< every -mod's faction files, each under its own FileSystem focus
+	void scanLine( Int mod, const char *line );					///< a block header names one of the mod's own; "Side = X" keeps X out
+	void finishScan( Int mod );													///< drop the side names, which the engine compares as text
+	void setActive( Int mod ) { m_active = mod; }				///< -1: nothing is rewritten
+	Int getActive( void ) const { return m_active; }
+	Int getNameCount( Int mod ) const { return (Int)m_mods[ mod ].all.size(); }
+
+	/// rewrite the active mod's names in a comment-free line in place, every word but the first;
+	/// FALSE when the result would not fit capacity bytes
+	Bool rewriteLine( char *line, size_t capacity ) const;
+	/// "M<n>~X" where mod n has no `type` called X is a reference to retail's X: TRUE and *retailName
+	/// set.  Finders ask this on a miss, so a definition of the mod's own X never falls through to retail's.
+	Bool findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const;
+	Bool findRetailKey( NameKeyType key, ModNameType type, NameKeyType *retailKey ) const;
+
+	static const char *const FactionFiles[];		///< what scanMods reads and the mod passes load, NULL-ended; no ".ini" is a directory
+
+private:
+	struct Names
+	{
+		std::set<std::string> all;
+		std::set<std::string> byType[ MODNAME_COUNT ];
+		std::set<std::string> sides;
+	};
+	std::vector<Names> m_mods;
+	Int m_active;
+};
+extern ModNamespace TheModNamespace;
+
+//-------------------------------------------------------------------------------------------------
 /** INI Reader interface */
 //-------------------------------------------------------------------------------------------------
 class INI
@@ -179,6 +230,8 @@ public:
 
 	void loadDirectory( AsciiString dirName, Bool subdirs, INILoadType loadType, Xfer *pXfer );  ///< load directory of INI files
 	void load( AsciiString filename, INILoadType loadType, Xfer *pXfer );		///< load INI file
+	/// -modfactions: load path (a directory when directory) from each -mod in turn, under its focus and its names
+	static void loadModPasses( const char *path, Xfer *pXfer, Bool directory = FALSE );
 
 	static Bool isDeclarationOfType( AsciiString blockType, AsciiString blockName, char *bufferToCheck );
 	static Bool isEndOfBlock( char *bufferToCheck );

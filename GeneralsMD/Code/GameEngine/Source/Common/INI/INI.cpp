@@ -41,6 +41,8 @@
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
+#include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/Science.h"
 #include "Common/StackDump.h"	// g_LastErrorDump, see prepFile
 #include "Common/SpecialPower.h"
@@ -434,6 +436,213 @@ void INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 }  // end load
 
 //-------------------------------------------------------------------------------------------------
+/** -modfactions: one pass of path per -mod, each seeing only its own files and reading its own names
+	* with the mod's prefix.  Without the switch this does nothing. */
+//-------------------------------------------------------------------------------------------------
+void INI::loadModPasses( const char *path, Xfer *pXfer, Bool directory )
+{
+	// the engine tests bring the control bar and the particle systems up without any GlobalData
+	if (TheGlobalData == NULL || !TheGlobalData->m_modFactions)
+		return;
+
+	for (Int mod = 0; mod < (Int)TheGlobalData->m_mods.size(); ++mod)
+	{
+		TheFileSystem->setFocus( mod );
+		TheModNamespace.setActive( mod );
+		INI ini;
+		if (directory)
+			ini.loadDirectory( AsciiString( path ), TRUE, INI_LOAD_OVERWRITE, pXfer );
+		else if (TheFileSystem->doesFileExist( path ))
+			ini.load( AsciiString( path ), INI_LOAD_OVERWRITE, pXfer );
+		TheModNamespace.setActive( -1 );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// ModNamespace
+//-------------------------------------------------------------------------------------------------
+ModNamespace TheModNamespace;
+
+const char *const ModNamespace::FactionFiles[] =
+{
+	"Data\\INI\\Science.ini", "Data\\INI\\PlayerTemplate.ini", "Data\\INI\\FXList.ini", "Data\\INI\\Weapon.ini",
+	"Data\\INI\\ObjectCreationList.ini", "Data\\INI\\Locomotor.ini", "Data\\INI\\SpecialPower.ini",
+	"Data\\INI\\DamageFX.ini", "Data\\INI\\Armor.ini", "Data\\INI\\Object", "Data\\INI\\Upgrade.ini",
+	"Data\\INI\\CommandButton.ini", "Data\\INI\\CommandSet.ini", "Data\\INI\\ParticleSystem.ini",
+	NULL
+};
+
+/// the block keywords whose second word is a name the mod defines
+static const struct { const char *keyword; ModNameType type; } ModBlockTypes[] =
+{
+	{ "Object", MODNAME_OBJECT }, { "ObjectReskin", MODNAME_OBJECT }, { "ChildObject", MODNAME_OBJECT },
+	{ "Weapon", MODNAME_WEAPON }, { "Armor", MODNAME_ARMOR }, { "DamageFX", MODNAME_DAMAGEFX },
+	{ "Upgrade", MODNAME_UPGRADE }, { "Science", MODNAME_SCIENCE }, { "SpecialPower", MODNAME_SPECIALPOWER },
+	{ "CommandSet", MODNAME_COMMANDSET }, { "CommandButton", MODNAME_COMMANDBUTTON }, { "FXList", MODNAME_FXLIST },
+	{ "ObjectCreationList", MODNAME_OCL }, { "ParticleSystem", MODNAME_PARTICLESYSTEM },
+	{ "Locomotor", MODNAME_LOCOMOTOR }, { "PlayerTemplate", MODNAME_PLAYERTEMPLATE },
+};
+
+void ModNamespace::scanMods( void )
+{
+	m_mods.assign( TheGlobalData->m_mods.size(), Names() );
+	for (Int mod = 0; mod < (Int)m_mods.size(); ++mod)
+	{
+		TheFileSystem->setFocus( mod );
+		FilenameList files;
+		for (const char *const *path = FactionFiles; *path != NULL; ++path)
+		{
+			if (strstr( *path, ".ini" ) == NULL)
+			{
+				AsciiString dir( *path );
+				dir.concat( '\\' );
+				TheFileSystem->getFileListInDirectory( dir, "*.ini", files, TRUE );
+			}
+			else if (TheFileSystem->doesFileExist( *path ))
+			{
+				files.insert( AsciiString( *path ) );
+			}
+		}
+		for (FilenameListIter it = files.begin(); it != files.end(); ++it)
+		{
+			File *file = TheFileSystem->openFile( it->str(), File::READ );
+			const Int size = file->size();
+			char *contents = file->readEntireAndClose();
+			std::string text( contents, size );
+			delete [] contents;
+			for (size_t start = 0; start < text.size(); )
+			{
+				size_t end = text.find( '\n', start );
+				if (end == std::string::npos)
+					end = text.size();
+				scanLine( mod, text.substr( start, end - start ).c_str() );
+				start = end + 1;
+			}
+		}
+		finishScan( mod );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+
+		const Names &names = m_mods[ mod ];
+		DEBUG_LOG(( "MODNS M%d~ is '%s': %d names from %d files, %d objects, %d weapons, %d upgrades, %d sciences, %d player templates\n",
+			mod + 1, TheGlobalData->m_modNames[ mod ].str(), (Int)names.all.size(), (Int)files.size(),
+			(Int)names.byType[ MODNAME_OBJECT ].size(), (Int)names.byType[ MODNAME_WEAPON ].size(),
+			(Int)names.byType[ MODNAME_UPGRADE ].size(), (Int)names.byType[ MODNAME_SCIENCE ].size(),
+			(Int)names.byType[ MODNAME_PLAYERTEMPLATE ].size() ));
+	}
+}
+
+void ModNamespace::scanLine( Int mod, const char *line )
+{
+	static const char *SPACE = " \t\r\n";
+	static const char *WORD_END = " \t\r\n=";
+	std::string text( line );
+	const size_t comment = text.find( ';' );
+	if (comment != std::string::npos)
+		text.erase( comment );
+
+	const size_t keywordAt = text.find_first_not_of( SPACE );
+	if (keywordAt == std::string::npos)
+		return;
+	const size_t keywordEnd = text.find_first_of( WORD_END, keywordAt );
+	if (keywordEnd == std::string::npos)
+		return;
+	const std::string keyword = text.substr( keywordAt, keywordEnd - keywordAt );
+	size_t nameAt = text.find_first_not_of( SPACE, keywordEnd );
+	if (nameAt == std::string::npos)
+		return;
+
+	if ((Int)m_mods.size() <= mod)
+		m_mods.resize( mod + 1 );
+	Names &names = m_mods[ mod ];
+	if (keyword == "Side" || keyword == "BaseSide")
+	{
+		if (text[ nameAt ] == '=')
+			nameAt = text.find_first_not_of( SPACE, nameAt + 1 );
+		if (nameAt != std::string::npos)
+			names.sides.insert( text.substr( nameAt, text.find_first_of( WORD_END, nameAt ) - nameAt ) );
+		return;
+	}
+	// "Weapon = PRIMARY X" is a field, "Weapon X" a definition
+	if (text[ nameAt ] == '=')
+		return;
+
+	for (size_t i = 0; i < ARRAY_SIZE( ModBlockTypes ); ++i)
+	{
+		if (keyword == ModBlockTypes[ i ].keyword)
+		{
+			const std::string name = text.substr( nameAt, text.find_first_of( WORD_END, nameAt ) - nameAt );
+			names.all.insert( name );
+			names.byType[ ModBlockTypes[ i ].type ].insert( name );
+			return;
+		}
+	}
+}
+
+void ModNamespace::finishScan( Int mod )
+{
+	// a side is compared as text everywhere (Side = GLA), and The End of Days names a CommandSet "GLA"
+	Names &names = m_mods[ mod ];
+	for (std::set<std::string>::const_iterator it = names.sides.begin(); it != names.sides.end(); ++it)
+		names.all.erase( *it );
+}
+
+Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
+{
+	const Names &names = m_mods[ m_active ];
+	char prefix[ 16 ];
+	snprintf( prefix, sizeof( prefix ), "M%d~", m_active + 1 );
+
+	// INI's own separators; readLine has already turned every other control character into a space
+	std::string out;
+	Bool first = TRUE;
+	for (const char *p = line; *p != 0; )
+	{
+		if (*p == ' ' || *p == '=')
+		{
+			out += *p++;
+			continue;
+		}
+		const char *start = p;
+		while (*p != 0 && *p != ' ' && *p != '=')
+			++p;
+		const std::string word( start, p - start );
+		if (!first && names.all.count( word ) != 0)
+			out += prefix;
+		out += word;
+		first = FALSE;
+	}
+	if (out.size() >= capacity)
+		return FALSE;
+	memcpy( line, out.c_str(), out.size() + 1 );
+	return TRUE;
+}
+
+Bool ModNamespace::findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const
+{
+	const char *text = name.str();
+	if (m_mods.empty() || text[ 0 ] != 'M')
+		return FALSE;
+	char *tilde = NULL;
+	const long mod = strtol( text + 1, &tilde, 10 );
+	if (tilde == text + 1 || *tilde != '~' || mod < 1 || mod > (long)m_mods.size())
+		return FALSE;
+	if (m_mods[ mod - 1 ].byType[ type ].count( tilde + 1 ) != 0)
+		return FALSE;
+	*retailName = tilde + 1;
+	return TRUE;
+}
+
+Bool ModNamespace::findRetailKey( NameKeyType key, ModNameType type, NameKeyType *retailKey ) const
+{
+	AsciiString retailName;
+	if (m_mods.empty() || !findRetailName( TheNameKeyGenerator->keyToName( key ), type, &retailName ))
+		return FALSE;
+	*retailKey = TheNameKeyGenerator->nameToKey( retailName );
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Read a line from the already open file.  Any comments will be remved and
 	* therefore ignored from any given line */
 //-------------------------------------------------------------------------------------------------
@@ -497,6 +706,14 @@ void INI::readLine( void )
 
 		}  // end if
   }
+
+	// -modfactions: the mod's own names, before the checksum below reads the line
+	if (TheModNamespace.getActive() >= 0 && !TheModNamespace.rewriteLine(m_buffer, sizeof(m_buffer)))
+	{
+		g_LastErrorDump.format("INI::readLine: line %d of '%s' is too long once its mod names are prefixed\n", m_lineNum, m_filename.str());
+		DEBUG_LOG(("%s", g_LastErrorDump.str()));
+		throw INI_BUFFER_TOO_SMALL;
+	}
 
 	if (s_xfer)
 	{

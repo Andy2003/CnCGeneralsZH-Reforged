@@ -2836,12 +2836,20 @@ void ControlBar::init( void )
 {
 	INI ini;
 	m_sideSelectAnimateDown = FALSE;
+	// -modfactions: retail's own buttons and sets first, then each mod's under its names
+	const Bool apart = TheGlobalData != NULL && TheGlobalData->m_modFactions;
+	if (apart)
+		TheFileSystem->setFocus( FILE_FOCUS_RETAIL );
 	// load the command buttons
 	ini.load( AsciiString( "Data\\INI\\Default\\CommandButton.ini" ), INI_LOAD_OVERWRITE, NULL );
 	ini.load( AsciiString( "Data\\INI\\CommandButton.ini" ), INI_LOAD_OVERWRITE, NULL );
 
 	// load the command sets
 	ini.load( AsciiString( "Data\\INI\\CommandSet.ini" ), INI_LOAD_OVERWRITE, NULL );
+	if (apart)
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+	INI::loadModPasses( "Data\\INI\\CommandButton.ini", NULL );
+	INI::loadModPasses( "Data\\INI\\CommandSet.ini", NULL );
 
 	// the fork's corrections to EA's buttons and sets, edited in place; GameEngine::init checksums it
 	ini.load( AsciiString( "Data\\INI\\CommandSetReforged.ini" ), INI_LOAD_MULTIFILE, NULL );
@@ -4031,6 +4039,9 @@ CommandButton *ControlBar::findNonConstCommandButton( const AsciiString& name )
 		if( command->getName() == name )
 			return const_cast<CommandButton*>((const CommandButton*)command->getFinalOverride());
 
+	AsciiString retailName;
+	if( TheModNamespace.findRetailName( name, MODNAME_COMMANDBUTTON, &retailName ) )
+		return findNonConstCommandButton( retailName );
 	return NULL;  // not found
 
 }  // end findCommandButton
@@ -4140,6 +4151,9 @@ CommandSet* ControlBar::findNonConstCommandSet( const AsciiString& name )
 		if( set->getName() == name )
 			return const_cast<CommandSet*>((const CommandSet *) set);
 
+	AsciiString retailName;
+	if( TheModNamespace.findRetailName( name, MODNAME_COMMANDSET, &retailName ) )
+		return findNonConstCommandSet( retailName );
 	return NULL;  // set not found
 
 }

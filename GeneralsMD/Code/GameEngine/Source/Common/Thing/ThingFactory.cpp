@@ -289,6 +289,10 @@ ThingTemplate *ThingFactory::findTemplateInternal( const AsciiString& name, Bool
 		return tIt->second;
 	}
 
+	AsciiString retailName;
+	if (TheModNamespace.findRetailName(name, MODNAME_OBJECT, &retailName))
+		return findTemplateInternal(retailName, check);
+
 #ifdef LOAD_TEST_ASSETS
 	if (!strncmp(name.str(), TEST_STRING, strlen(TEST_STRING))) 
 	{

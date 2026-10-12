@@ -33,6 +33,7 @@
 
 #define DEFINE_PARTICLE_SYSTEM_NAMES
 
+#include "Common/FileSystem.h"
 #include "Common/GameState.h"
 #include "Common/INI.h"
 #include "Common/PerfTimer.h"
@@ -3506,7 +3507,14 @@ void ParticleSystemManager::init( void )
 {
 	/// Read INI data and build templates
 	INI ini;
+	// -modfactions: retail's own systems first, then each mod's under its names
+	const Bool apart = TheGlobalData != NULL && TheGlobalData->m_modFactions;
+	if (apart)
+		TheFileSystem->setFocus( FILE_FOCUS_RETAIL );
 	ini.load( AsciiString( "Data\\INI\\ParticleSystem.ini" ), INI_LOAD_OVERWRITE, NULL );
+	if (apart)
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+	INI::loadModPasses( "Data\\INI\\ParticleSystem.ini", NULL );
 	// The fork's own systems, beside EA's 1088 rather than in a loose copy of all of them
 	ini.load( AsciiString( "Data\\INI\\ParticleSystemReforged.ini" ), INI_LOAD_OVERWRITE, NULL );
 
@@ -3760,6 +3768,11 @@ ParticleSystemTemplate *ParticleSystemManager::findTemplate( const AsciiString &
 	TemplateMap::const_iterator find(m_templateMap.find(name));
 	if (find != m_templateMap.end()) {
 		sysTemplate = (*find).second;
+	}
+	else {
+		AsciiString retailName;
+		if (TheModNamespace.findRetailName(name, MODNAME_PARTICLESYSTEM, &retailName))
+			sysTemplate = findTemplate(retailName);
 	}
 
 	return sysTemplate;

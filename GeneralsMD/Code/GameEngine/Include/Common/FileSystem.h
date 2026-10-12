@@ -101,6 +101,8 @@ typedef FilenameList::iterator FilenameListIter;
 #define TEST_TGA_DIR_PATH "../TestArt/"		///< .tga texture files live here
 #endif
 
+enum { FILE_FOCUS_ALL = -2, FILE_FOCUS_RETAIL = -1 };	///< FileSystem::setFocus; 0 and up is a -mod index
+
 struct FileInfo {
 	Int sizeHigh;
 	Int sizeLow;
@@ -148,6 +150,11 @@ public:
 	/// .wnd layouts ...); see the definition for how the set is decided.
 	static Bool isForkOwnedPath(const AsciiString& filename);
 
+	/// -modfactions: FILE_FOCUS_RETAIL or a -mod index makes every read see that set of files alone,
+	/// so retail and each mod load their factions one after another; FILE_FOCUS_ALL is the merged view.
+	void setFocus(Int focus);
+	Int getFocus() const { return s_focus; }
+
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.
 
 	/// language when Data\<language>\Language.ini is loose or in an archive, otherwise the first
@@ -159,7 +166,11 @@ public:
 	void loadMusicFilesFromCD();
 	void unloadMusicFilesFromCD();
 protected:
+	AsciiString focusedLooseFile(const AsciiString& filename) const;	///< the loose copy the focus sees, else empty
   mutable std::map<unsigned,bool> m_fileExist;
+	// static: GlobalData's constructor reads files through a TheFileSystem that a few engine tests leave
+	// NULL, and openFile has always answered NULL there without touching the object
+	static Int s_focus;
 };
 
 extern FileSystem*	TheFileSystem;

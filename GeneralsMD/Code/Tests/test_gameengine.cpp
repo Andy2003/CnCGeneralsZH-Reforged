@@ -29,6 +29,8 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/LocalFile.h"
 #include "Common/INI.h"
+#include "Common/ArchiveFile.h"
+#include "Common/ArchiveFileSystem.h"
 #include "Common/INIException.h"
 #include "Common/STLTypedefs.h"
 #include "Common/DataChunk.h"
@@ -17172,6 +17174,134 @@ TEST(every_shipped_master_is_fork_owned_and_retail_files_are_not)
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\INI\\Object\\AmericaTankReforged.ini")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Data\\English\\Movies\\EA_LOGO.bik")));
 	CHECK(!FileSystem::isForkOwnedPath(AsciiString("Art\\Textures\\AVPaladin.tga")));
+}
+
+// -modfactions: a mod's own names get its prefix everywhere but the line's first word, a name it does
+// not define stays retail's, and a side name stays text even when the mod also calls a block that.
+TEST(modfactions_prefix_only_the_mods_own_names)
+{
+	bootOnce();
+	ModNamespace names;
+	names.scanLine( 0, "Object AmericaRanger ; the mod's own" );
+	names.scanLine( 0, "Weapon RangerGun" );
+	names.scanLine( 0, "  Weapon = PRIMARY RetailGun" );		// a field, not a definition
+	names.scanLine( 0, "CommandSet GLA CommandSet" );				// The End of Days really has this line
+	names.scanLine( 0, "  Side = GLA" );
+	names.finishScan( 0 );
+	names.setActive( 0 );
+
+	char line[ 64 ];
+	strcpy( line, "Object AmericaRanger" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "Object M1~AmericaRanger" );
+	strcpy( line, "  Weapon = PRIMARY RangerGun" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Weapon = PRIMARY M1~RangerGun" );
+	strcpy( line, "  Weapon = SECONDARY RetailGun" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Weapon = SECONDARY RetailGun" );
+	strcpy( line, "  Side = GLA" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Side = GLA" );
+	strcpy( line, "RangerGun = RangerGun" );						// the first word is the field
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "RangerGun = M1~RangerGun" );
+	strcpy( line, "Object AmericaRanger" );
+	CHECK( !names.rewriteLine( line, 23 ) );						// "Object M1~AmericaRanger" needs 24
+	CHECK_STR( line, "Object AmericaRanger" );
+
+	// a finder's miss: the mod's own name stays a miss, anything else is retail's
+	AsciiString retail;
+	CHECK( !names.findRetailName( AsciiString( "M1~AmericaRanger" ), MODNAME_OBJECT, &retail ) );
+	CHECK( names.findRetailName( AsciiString( "M1~RangerGun" ), MODNAME_OBJECT, &retail ) );
+	CHECK_STR( retail.str(), "RangerGun" );
+	CHECK( !names.findRetailName( AsciiString( "M1~RangerGun" ), MODNAME_WEAPON, &retail ) );
+	CHECK( !names.findRetailName( AsciiString( "M2~AmericaRanger" ), MODNAME_OBJECT, &retail ) );	// no second mod
+	CHECK( !names.findRetailName( AsciiString( "AmericaRanger" ), MODNAME_OBJECT, &retail ) );
+	NameKeyType key;
+	CHECK( names.findRetailKey( NAMEKEY( "M1~Upgrade_Retail" ), MODNAME_UPGRADE, &key ) );
+	CHECK_EQ( key, NAMEKEY( "Upgrade_Retail" ) );
+}
+
+class ModTestArchiveFile : public ArchiveFile
+{
+public:
+	ModTestArchiveFile() { m_file = NULL; }	// the base leaves it to the device's archive to set
+	void add( const char *directory, const char *file )
+	{
+		ArchivedFileInfo info;
+		info.m_filename = file;
+		addFile( AsciiString( directory ), &info );
+	}
+	virtual Bool getFileInfo( const AsciiString&, FileInfo* ) const { return FALSE; }
+	virtual File* openFile( const Char*, Int ) { return NULL; }
+	virtual void closeAllFiles( void ) {}
+	virtual AsciiString getName( void ) { return AsciiString::TheEmptyString; }
+	virtual AsciiString getPath( void ) { return AsciiString::TheEmptyString; }
+	virtual void setSearchPriority( Int ) {}
+	virtual void close( void ) {}
+};
+
+class ModTestArchiveFileSystem : public ArchiveFileSystem
+{
+public:
+	virtual void init( void ) {}
+	virtual void update( void ) {}
+	virtual void reset( void ) {}
+	virtual void postProcessLoad( void ) {}
+	virtual ArchiveFile* openArchiveFile( const Char* ) { return NULL; }
+	virtual void closeArchiveFile( const Char* ) {}
+	virtual void closeAllArchiveFiles( void ) {}
+	virtual void closeAllFiles( void ) {}
+	virtual Bool loadBigFilesFromDirectory( AsciiString, AsciiString, Bool, Bool ) { return FALSE; }
+
+	void addRetail( ArchiveFile *archive, const char *name )
+	{
+		loadIntoDirectoryTree( archive, AsciiString( name ) );
+		m_archiveFileMap[ AsciiString( name ) ] = archive;
+	}
+	using ArchiveFileSystem::keepModsApart;
+	using ArchiveFileSystem::addModArchive;
+};
+
+// -modfactions' focus: retail sees the tree from before any -mod, a mod its own archives, nothing else
+TEST(modfactions_focus_sees_one_set_of_archives)
+{
+	bootOnce();
+	ModTestArchiveFileSystem archives;
+	ModTestArchiveFile *retail = new ModTestArchiveFile, *one = new ModTestArchiveFile, *two = new ModTestArchiveFile;
+	retail->add( "data\\ini\\", "weapon.ini" );
+	retail->add( "data\\ini\\object\\", "a.ini" );
+	one->add( "data\\ini\\", "weapon.ini" );
+	one->add( "data\\ini\\object\\", "b.ini" );
+	two->add( "data\\ini\\object\\", "c.ini" );
+	archives.addRetail( retail, "INIZH.big" );
+	archives.keepModsApart( 2 );
+	archives.addModArchive( 0, one, AsciiString( "Mods\\One\\!one.big" ) );
+	archives.addModArchive( 1, two, AsciiString( "Mods\\Two\\!two.big" ) );
+
+	const AsciiString weapon( "Data\\INI\\Weapon.ini" );
+	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "Mods\\One\\!one.big" );	// merged: the mod wins
+	archives.setFocus( FILE_FOCUS_RETAIL );
+	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "INIZH.big" );
+	archives.setFocus( 0 );
+	CHECK_STR( archives.getArchiveFilenameForFile( weapon ).str(), "Mods\\One\\!one.big" );
+	archives.setFocus( 1 );
+	CHECK( !archives.doesFileExist( weapon.str() ) );
+
+	FilenameList listed;
+	archives.getFileListInDirectory( AsciiString( "" ), AsciiString( "Data\\INI\\Object\\" ), AsciiString( "*.ini" ), listed, TRUE );
+	CHECK_EQ( (Int)listed.size(), 1 );
+	CHECK( listed.begin()->endsWithNoCase( "c.ini" ) );
+	listed.clear();
+	archives.setFocus( FILE_FOCUS_RETAIL );
+	archives.getFileListInDirectory( AsciiString( "" ), AsciiString( "Data\\INI\\Object\\" ), AsciiString( "*.ini" ), listed, TRUE );
+	CHECK_EQ( (Int)listed.size(), 1 );
+	CHECK( listed.begin()->endsWithNoCase( "a.ini" ) );
+	listed.clear();
+	archives.setFocus( FILE_FOCUS_ALL );
+	archives.getFileListInDirectory( AsciiString( "" ), AsciiString( "Data\\INI\\Object\\" ), AsciiString( "*.ini" ), listed, TRUE );
+	CHECK_EQ( (Int)listed.size(), 3 );
 }
 
 #include "test_minimap_input.inc"

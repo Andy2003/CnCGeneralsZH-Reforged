@@ -135,9 +135,39 @@ FileSystem	*TheFileSystem = NULL;
 // FileSystem::FileSystem
 //============================================================================
 
+Int FileSystem::s_focus = FILE_FOCUS_ALL;
+
 FileSystem::FileSystem()
 {
 
+}
+
+//============================================================================
+// FileSystem::setFocus
+//============================================================================
+
+void FileSystem::setFocus( Int focus )
+{
+	s_focus = focus;
+	TheArchiveFileSystem->setFocus( focus );
+}
+
+//============================================================================
+// FileSystem::focusedLooseFile
+//============================================================================
+
+AsciiString FileSystem::focusedLooseFile( const AsciiString& filename ) const
+{
+	// retail is Run's own loose files; a mod is its folder's, and a mod that is one .big has none
+	if (s_focus == FILE_FOCUS_RETAIL)
+		return TheLocalFileSystem->doesFileExist( filename.str() ) ? filename : AsciiString();
+
+	const AsciiString &mod = TheGlobalData->m_mods[ s_focus ];
+	if (!mod.endsWith( "\\" ) && !mod.endsWith( "/" ))
+		return AsciiString();
+	AsciiString path = mod;
+	path.concat( filename );
+	return TheLocalFileSystem->doesFileExist( path.str() ) ? path : AsciiString();
 }
 
 //============================================================================
@@ -218,9 +248,18 @@ File*		FileSystem::openFile( const Char *filename, Int access )
 		return NULL;
 	}
 
+	const Bool readOnly = (access & (File::WRITE | File::CREATE | File::APPEND | File::TRUNCATE)) == 0;
+	if ( readOnly && s_focus != FILE_FOCUS_ALL )
+	{
+		AsciiString loose = focusedLooseFile( AsciiString( filename ) );
+		if ( loose.isNotEmpty() )
+			return TheLocalFileSystem->openFile( loose.str(), access );
+		return TheArchiveFileSystem->openFile( filename, access );
+	}
+
 	// a mod's copy, loose or archived, goes in front of Run's own loose files and every other archive;
 	// writes stay where they were
-	if ( (access & (File::WRITE | File::CREATE | File::APPEND | File::TRUNCATE)) == 0 )
+	if ( readOnly )
 	{
 		Bool inModArchive = FALSE;
 		AsciiString modded = modLooseFile( AsciiString( filename ), &inModArchive );
@@ -269,6 +308,10 @@ Bool FileSystem::doesFileExist(const Char *filename) const
 	if (isGeneratedMapPath( AsciiString( filename ) ))
 		return TRUE;
 
+	// the cache is the merged view's; a focus asks its own files every time (setFocus)
+	if (s_focus != FILE_FOCUS_ALL)
+		return focusedLooseFile( AsciiString( filename ) ).isNotEmpty() || TheArchiveFileSystem->doesFileExist( filename );
+
   unsigned key=TheNameKeyGenerator->nameToLowercaseKey(filename);
   std::map<unsigned,bool>::iterator i=m_fileExist.find(key);
   if (i!=m_fileExist.end())
@@ -295,18 +338,26 @@ Bool FileSystem::doesFileExist(const Char *filename) const
 void FileSystem::getFileListInDirectory(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const
 {
 	USE_PERF_TIMER(FileSystem)
-	TheLocalFileSystem->getFileListInDirectory(AsciiString(""), directory, searchName, filenameList, searchSubdirectories);
+	// a mod's focus does not see Run's own loose files, retail's sees no mod's (setFocus)
+	if (s_focus < 0)
+	{
+		TheLocalFileSystem->getFileListInDirectory(AsciiString(""), directory, searchName, filenameList, searchSubdirectories);
+	}
 	TheArchiveFileSystem->getFileListInDirectory(AsciiString(""), directory, searchName, filenameList, searchSubdirectories);
 
 	// a mod's loose files listed under their game path, so a file it replaces is loaded once, from the mod (openFile)
 	// TheGlobalData is not there yet while GameData.ini itself loads, and there is no -mod before it is
-	if (TheGlobalData == NULL || isAbsolutePath(directory))
+	if (TheGlobalData == NULL || isAbsolutePath(directory) || s_focus == FILE_FOCUS_RETAIL)
 	{
 		return;
 	}
 	for (size_t i = 0; i < TheGlobalData->m_mods.size(); ++i)
 	{
 		const AsciiString &modDir = TheGlobalData->m_mods[i];
+		if (s_focus >= 0 && (Int)i != s_focus)
+		{
+			continue;
+		}
 		if (!modDir.endsWith("\\") && !modDir.endsWith("/"))
 		{
 			continue;	// a .big, already in the archive tree
@@ -433,6 +484,14 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo) co
 	if (generatedMapBytes(filename, &generated, &generatedSize)) {
 		fileInfo->sizeLow = generatedSize;
 		return TRUE;
+	}
+
+	if (s_focus != FILE_FOCUS_ALL) {
+		AsciiString loose = focusedLooseFile(filename);
+		if (loose.isNotEmpty()) {
+			return TheLocalFileSystem->getFileInfo(loose, fileInfo);
+		}
+		return TheArchiveFileSystem->getFileInfo(filename, fileInfo);
 	}
 
 	Bool inModArchive = FALSE;

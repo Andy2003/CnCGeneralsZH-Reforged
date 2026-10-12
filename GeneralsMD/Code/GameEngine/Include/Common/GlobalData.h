@@ -729,6 +729,8 @@ public:
 	Bool				m_breakTheMovie;								///< The user has hit escape!
 	std::vector<AsciiString> m_mods;	///< every -mod in command-line order, later wins: a folder ends in '\', anything else is a .big
 	AsciiString m_modName;	///< UTF-8, each mod's "<name> <version>" from its mod.json (else the folder or archive name), joined by ", " in m_mods order; empty without -mod
+	std::vector<AsciiString> m_modNames;	///< UTF-8, each mod's mod.json "name" (else the folder or archive name), in m_mods order
+	Bool m_modFactions;	///< -modfactions: every mod's factions load beside retail's under "M<n>~" names (ModNamespace)
 
 	//-allAdvice feature
 	//Bool m_allAdvice;
