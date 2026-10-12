@@ -306,12 +306,12 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 static std::map< std::string, WideChar > s_playerButtonKeys;
 
 /** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
-	* to 14 stand two rows of seven read down the columns, so Q W E R over A S D F take the first
-	* four columns and Z X C V the next two.  A, S, R, F, C and V belong to the fixed orders
-	* (FIXED_KEYS), so their places take the next free key along the keyboard row instead: J, K, T, L,
-	* N and B.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws the
-	* same table (hotkeys.js, GRID_KEYS). */
-static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'T', 'L', 'Z', 'N', 'X', 'B' };
+	* to 14 stand two rows of seven read down the columns, so Q W E R T Y over A S D F G H take the
+	* first six columns and the keyboard's third row, Z X C V B N, has no place.  A, S, R, F and G
+	* belong to the fixed orders (FIXED_KEYS), so their places take a key off the grid instead: J, K,
+	* U, L and M.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws
+	* the same table (hotkeys.js, GRID_KEYS). */
+static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'U', 'L', 'T', 'M', 'Y', 'H' };
 static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
 static Bool s_commandGrid = FALSE;
 
