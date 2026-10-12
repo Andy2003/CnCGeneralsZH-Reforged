@@ -15409,8 +15409,72 @@ GUI:CantBuildTooManyDerrickDefenses
 "Bu petrol kuyularının çevresinde zaten iki savunmanız var."
 END
 
+TOOLTIP:StatTime
+"Üretim süresi"
+END
+
+TOOLTIP:StatSeconds
+"%d sn"
+END
+
+TOOLTIP:StatDamage
+"Hasar"
+END
+
+TOOLTIP:StatRange
+"Menzil"
+END
+
+TOOLTIP:StatHealth
+"Can"
+END
+
+TOOLTIP:StatAttackSpeed
+"Atış hızı"
+END
+
+TOOLTIP:StatPerSecond
+"/sn"
+END
+
+TOOLTIP:StatDamagePerSecond
+"Saniyelik hasar"
+END
+
+TOOLTIP:StatArmor
+"Zırh"
+END
+
+TOOLTIP:StatArmorStronger
+"güçlenir"
+END
+
+TOOLTIP:StatNewWeapon
+"Yeni silah"
+END
+
+TOOLTIP:StatNewWeaponGround
+"Kara silahı"
+END
+
+TOOLTIP:StatNewWeaponAir
+"Uçaksavar silahı"
+END
+
+TOOLTIP:StatNewWeaponFigures
+"%d hasar, %d menzil"
+END
+
 TOOLTIP:Upgrades
 "GELİŞTİRMELER"
+END
+
+TOOLTIP:UpgradeChanges
+"ETKİLEDİKLERİ"
+END
+
+TOOLTIP:UpgradeOwned
+"alındı"
 END
 
 GUI:HudStatArmy

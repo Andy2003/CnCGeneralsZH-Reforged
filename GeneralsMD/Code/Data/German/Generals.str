@@ -14589,8 +14589,64 @@ TOOLTIP:SupplyPileFull
 "\n Belegt: Das Haufenlimit hält deine Sammler fern"
 END
 
+TOOLTIP:StatTime
+"Bauzeit"
+END
+
+TOOLTIP:StatDamage
+"Schaden"
+END
+
+TOOLTIP:StatRange
+"Reichweite"
+END
+
+TOOLTIP:StatHealth
+"Gesundheit"
+END
+
+TOOLTIP:StatAttackSpeed
+"Angriffstempo"
+END
+
+TOOLTIP:StatDamagePerSecond
+"Schaden pro Sekunde"
+END
+
+TOOLTIP:StatArmor
+"Panzerung"
+END
+
+TOOLTIP:StatArmorStronger
+"stärker"
+END
+
+TOOLTIP:StatNewWeapon
+"Neue Waffe"
+END
+
+TOOLTIP:StatNewWeaponGround
+"Bodenwaffe"
+END
+
+TOOLTIP:StatNewWeaponAir
+"Luftabwehrwaffe"
+END
+
+TOOLTIP:StatNewWeaponFigures
+"%d Schaden, %d Reichweite"
+END
+
 TOOLTIP:Upgrades
 "AUFRÜSTUNGEN"
+END
+
+TOOLTIP:UpgradeChanges
+"ÄNDERUNGEN"
+END
+
+TOOLTIP:UpgradeOwned
+"vorhanden"
 END
 
 GUI:PeaceTimeOff

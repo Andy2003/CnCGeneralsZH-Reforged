@@ -804,10 +804,76 @@ TOOLTIP:SupplyPileFull
 "\n Taken: the pile limit keeps your gatherers out"
 END
 
+// The build tooltip card's figures, a label and its value each.
+
+TOOLTIP:StatTime
+"Build time"
+END
+
+TOOLTIP:StatSeconds
+"%ds"
+END
+
+TOOLTIP:StatDamage
+"Damage"
+END
+
+TOOLTIP:StatRange
+"Range"
+END
+
+TOOLTIP:StatHealth
+"Health"
+END
+
+TOOLTIP:StatAttackSpeed
+"Attack speed"
+END
+
+TOOLTIP:StatPerSecond
+"/s"
+END
+
+TOOLTIP:StatDamagePerSecond
+"Damage per second"
+END
+
+TOOLTIP:StatArmor
+"Armor"
+END
+
+TOOLTIP:StatArmorStronger
+"stronger"
+END
+
+TOOLTIP:StatNewWeapon
+"New weapon"
+END
+
+TOOLTIP:StatNewWeaponGround
+"Ground weapon"
+END
+
+TOOLTIP:StatNewWeaponAir
+"Anti-air weapon"
+END
+
+TOOLTIP:StatNewWeaponFigures
+"%d damage, %d range"
+END
+
 // Under the figures: a unit's upgrades, or on an upgrade's card the units it changes.
 
 TOOLTIP:Upgrades
 "UPGRADES"
+END
+
+TOOLTIP:UpgradeChanges
+"CHANGES"
+END
+
+TOOLTIP:UpgradeOwned
+"owned"
 END
 
 // Peace time - the lobby combo box, its tooltip, the corner countdown and the three things the game
