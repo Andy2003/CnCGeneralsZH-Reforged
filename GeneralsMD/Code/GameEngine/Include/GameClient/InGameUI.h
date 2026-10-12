@@ -1326,6 +1326,7 @@ protected:
 	Bool												m_isAttackCircling;														///< TRUE while an attack circle is being dragged (fork)
 	ICoord2D										m_attackCircleAnchor;													///< where the circle was started, in pixels
 	ICoord2D										m_attackCircleCursor;													///< where the cursor is now, which is the rim
+	Coord3D											m_attackCircleCenter;													///< the ground the press landed on, held while the camera moves
 
 	void updateFormationHints( void );													///< recompute who goes where from the curve being drawn
 	void updateOrderHints( void );															///< read the selection's own goals, once a frame

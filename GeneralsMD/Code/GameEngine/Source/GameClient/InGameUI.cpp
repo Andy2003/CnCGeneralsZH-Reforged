@@ -642,8 +642,8 @@ void InGameUI::xfer( Xfer *xfer )
           evaReadyPlayed,
 					m_superweaponNormalFont, 
 					m_superweaponNormalPointSize, 
-					m_superweaponNormalBold, 
-					player->getPlayerColor(), 
+					TRUE,		// the countdown list is white and bold
+					player->getPlayerColor(),
 					powerTemplate);
 				m_superweapons[playerIndex][powerName].push_back(swInfo);
 			}
@@ -736,8 +736,8 @@ void InGameUI::addSuperweapon(Int playerIndex, const AsciiString& powerName, Obj
           FALSE,  // evaReadyPlayed
 					m_superweaponNormalFont, 
 					m_superweaponNormalPointSize, 
-					m_superweaponNormalBold, 
-					player->getPlayerColor(), 
+					TRUE,		// the countdown list is white and bold
+					player->getPlayerColor(),
 					powerTemplate);
 
 	m_superweapons[playerIndex][powerName].push_back(info);
@@ -2864,7 +2864,7 @@ void InGameUI::drawClassicSuperweapon( SuperweaponInfo *info, const AsciiString 
 		if( isReady )
 			info->setFont( m_superweaponReadyFont, m_superweaponReadyPointSize, m_superweaponReadyBold );
 		else if( info->m_timestamp == 0 )
-			info->setFont( m_superweaponNormalFont, m_superweaponNormalPointSize, m_superweaponNormalBold );
+			info->setFont( m_superweaponNormalFont, m_superweaponNormalPointSize, TRUE );
 		info->m_forceUpdateText = false;
 		info->m_ready = isReady;
 		info->m_timestamp = readySecs;
@@ -2876,7 +2876,9 @@ void InGameUI::drawClassicSuperweapon( SuperweaponInfo *info, const AsciiString 
 		info->setText( name, time );
 	}
 
-	Color color = 0;
+	// white, flashing to EA's flash colour once ready
+	const Color white = GameMakeColor( 255, 255, 255, 255 );
+	Color color = white;
 	if( isReady && m_superweaponFlashDuration != 0.0f )
 	{
 		if( TheGameLogic->getFrame() >= m_superweaponLastFlashFrame + (Int)m_superweaponFlashDuration )
@@ -2884,7 +2886,7 @@ void InGameUI::drawClassicSuperweapon( SuperweaponInfo *info, const AsciiString 
 			m_superweaponUsedFlashColor = !m_superweaponUsedFlashColor;
 			m_superweaponLastFlashFrame = TheGameLogic->getFrame();
 		}
-		color = m_superweaponUsedFlashColor ? 0 : m_superweaponFlashColor;
+		color = m_superweaponUsedFlashColor ? white : m_superweaponFlashColor;
 	}
 	const Color drop = GameMakeColor( 0, 0, 0, 255 );
 	info->drawName( x, *y, color, drop );
@@ -3922,6 +3924,7 @@ void InGameUI::beginAttackCircle( const ICoord2D& pt )
 	m_isAttackCircling = TRUE;
 	m_attackCircleAnchor = pt;
 	m_attackCircleCursor = pt;
+	TheTacticalView->screenToTerrain( &pt, &m_attackCircleCenter );
 	DEBUG_LOG(("attack circle: begun at %d,%d with %d selected\n", pt.x, pt.y, getSelectCount()));
 }
 
@@ -3932,9 +3935,10 @@ void InGameUI::updateAttackCircle( const ICoord2D& pt )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The circle the player is dragging, in world terms: the anchor is its centre and the cursor sits
-	* on its rim.  Both the rim drawn on the screen and the wash laid on the ground ask this, so they
-	* cannot disagree about where the circle is. */
+/** The circle the player is dragging, in world terms: its centre is the ground the press landed on,
+	* and the cursor sits on its rim.  Both the rim drawn on the screen and the wash laid on the ground
+	* ask this, so they cannot disagree about where the circle is.  The centre is kept as ground, not
+	* as the pixel: a camera that moves during the drag used to slide the whole circle over the map. */
 //-------------------------------------------------------------------------------------------------
 Bool InGameUI::getAttackCircleGround( Coord3D& center, Real& radius ) const
 {
@@ -3942,7 +3946,7 @@ Bool InGameUI::getAttackCircleGround( Coord3D& center, Real& radius ) const
 		return FALSE;
 
 	Coord3D rim;
-	TheTacticalView->screenToTerrain( &m_attackCircleAnchor, &center );
+	center = m_attackCircleCenter;
 	TheTacticalView->screenToTerrain( &m_attackCircleCursor, &rim );
 
 	const Real dx = rim.x - center.x;
@@ -6399,7 +6403,7 @@ void InGameUI::postDraw( void )
 				{
 					m_superweaponMoreText = TheDisplayStringManager->newDisplayString();
 					m_superweaponMoreText->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
-						TheGlobalLanguageData->adjustFontSize( m_superweaponNormalPointSize ), m_superweaponNormalBold ) );
+						TheGlobalLanguageData->adjustFontSize( m_superweaponNormalPointSize ), TRUE ) );
 				}
 				if( m_superweaponMoreText->getText().compare( more ) != 0 )
 					m_superweaponMoreText->setText( more );
@@ -9648,12 +9652,13 @@ void InGameUI::drawProductionList( void )
 	const Int hidden = m_productionListTotal - shown;
 	const Int lines = m_productionListCount + ( hidden > 0 ? 1 : 0 );
 
-	// left-aligned under the messages' column, the last line standing just clear of the control bar
+	// left-aligned under the messages' column, the last line standing just clear of the control bar,
+	// white and bold so it reads on any ground
 	GameFont *font = TheFontLibrary->getFont( m_superweaponNormalFont,
-		TheGlobalLanguageData->adjustFontSize( m_superweaponNormalPointSize ), m_superweaponNormalBold );
+		TheGlobalLanguageData->adjustFontSize( m_superweaponNormalPointSize ), TRUE );
 	const Int x = m_messagePosition.x;
 	Int y = controlBarTop() - stripPixels( PRODUCTION_LIST_LIFT ) - lines * font->height;
-	const Color color = clientPlayerColor( player );
+	const Color color = GameMakeColor( 255, 255, 255, 255 );
 	const Color drop = GameMakeColor( 0, 0, 0, 255 );
 	for( Int line = 0; line < lines; line++ )
 	{

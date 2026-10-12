@@ -601,6 +601,9 @@ void W3DInGameUI::draw( void )
 	if( isAttackCircling() )
 		drawAttackCircle();
 
+	// which of the local player's units are holding a guard
+	drawGuardMarkers();
+
 	// for each view draw hints
 	/// @todo should the UI be iterating through views like this?
 	if( TheDisplay )
@@ -813,6 +816,9 @@ static void setGroundOverlayState( void )
 	REF_PTR_RELEASE( material );
 	DX8Wrapper::Set_Texture( 0, NULL );
 	DX8Wrapper::Set_Shader( overlayShader );
+	// the quads are in world space; the terrain pass has rendered pucks and bridges since its own
+	// identity was set, and the sheet used to inherit whichever of their matrices came last
+	DX8Wrapper::Set_Transform( D3DTS_WORLD, Matrix3D( 1 ) );
 	DX8Wrapper::Apply_Render_State_Changes();
 }
 
@@ -1126,6 +1132,105 @@ void W3DInGameUI::drawAttackCircle( void )
 													getAttackCircleCursor().y, 1.0f, 0x66FF5555 );
 
 }  // end drawAttackCircle
+
+//-------------------------------------------------------------------------------------------------
+/** One screen row from `left` to `right`, the two end pixels at the share of them the span covers,
+	* so a slanted edge fades across a pixel instead of stepping. */
+//-------------------------------------------------------------------------------------------------
+static void drawCoveredSpan( Real left, Real right, Int y, UnsignedInt color )
+{
+	if( right <= left )
+		return;
+	const UnsignedInt rgb = color & 0x00FFFFFF;
+	const Real alpha = (Real)( color >> 24 );
+	const Int first = (Int)floorf( left );
+	const Int last = (Int)floorf( right );
+	if( first == last )
+	{
+		TheDisplay->drawFillRect( first, y, 1, 1, rgb | ( REAL_TO_INT( alpha * ( right - left ) ) << 24 ) );
+		return;
+	}
+	TheDisplay->drawFillRect( first, y, 1, 1, rgb | ( REAL_TO_INT( alpha * ( first + 1 - left ) ) << 24 ) );
+	if( last > first + 1 )
+		TheDisplay->drawFillRect( first + 1, y, last - first - 1, 1, color );
+	if( right > last )
+		TheDisplay->drawFillRect( last, y, 1, 1, rgb | ( REAL_TO_INT( alpha * ( right - last ) ) << 24 ) );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A heater shield centred on `centreX`, filled one screen row at a time: straight sides for the
+	* upper part, then a curve closing to the point at the bottom.  The left half takes `leftColor`
+	* and the right half `rightColor`, which with a light and a darker steel reads as a raised
+	* centre ridge with the light from the left. */
+//-------------------------------------------------------------------------------------------------
+static void drawShieldShape( Real centreX, Int top, Real width, Int height, UnsignedInt leftColor, UnsignedInt rightColor )
+{
+	const Real SHOULDER = 0.4f;		// share of the height above the taper
+	for( Int row = 0; row < height; ++row )
+	{
+		const Real t = ( row + 0.5f ) / height;
+		Real half = width * 0.5f;
+		if( t > SHOULDER )
+			half *= sqrtf( ( 1.0f - t ) / ( 1.0f - SHOULDER ) );
+		drawCoveredSpan( centreX - half, centreX, top + row, leftColor );
+		drawCoveredSpan( centreX, centreX + half, top + row, rightColor );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A guarding unit looks like an idle one until something walks into its circle, so each of the
+	* local player's guards wears a small shield over its head, selected or not.  It follows the zoom
+	* like the health bar does, between a floor that still reads as a shield and a ceiling that does
+	* not cover a close-up infantryman.  The one-interface change took it out with the Reforged
+	* interface it was drawn under; it belongs to guard, not to that interface. */
+//-------------------------------------------------------------------------------------------------
+void W3DInGameUI::drawGuardMarkers( void )
+{
+	const Real MARKER_HEIGHT = 10.0f;		// at 800x600 and zoom 1, a little closer than the opening camera
+	const Real MARKER_MIN_HEIGHT = 6.0f;
+	const Real MARKER_MAX_HEIGHT = 10.0f;
+	const UnsignedInt SHADOW_COLOR = 0x60000000;		// lifts it off snow and sand alike
+	const UnsignedInt EDGE_COLOR = 0xE00C1014;
+	const UnsignedInt LIT_COLOR = 0xF0E8EEF4;		// the command bar's steel, the side facing the light
+	const UnsignedInt SHADED_COLOR = 0xF0939FAC;
+
+	if( !TheGameLogic->isInGame() || TheGameLogic->isInShellGame() )
+		return;
+
+	const Real uiScale = TheUIScale();
+	const Real size = MARKER_HEIGHT * uiScale / TheTacticalView->getZoom();
+	const Int height = REAL_TO_INT( max( MARKER_MIN_HEIGHT * uiScale, min( MARKER_MAX_HEIGHT * uiScale, size ) ) );
+	const Real width = height * 0.8f;
+	const Int lift = height / 2;		// clear of the health bar's line over the model's top
+	const Real rim = max( 1.0f, height / 10.0f );
+
+	// ponytail: walks every object each frame; share one walk with another per-object overlay if it shows
+	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
+	{
+		if( !obj->isLocallyControlled() || obj->isEffectivelyDead() || obj->getContainedBy() )
+			continue;
+		const AIUpdateInterface *ai = obj->getAI();
+		if( ai == NULL || ai->getCurrentStateID() != AI_GUARD )
+			continue;
+		const Drawable *draw = obj->getDrawable();
+		if( draw == NULL || draw->isDrawableEffectivelyHidden() )
+			continue;
+
+		Coord3D top = *obj->getPosition();
+		top.z += obj->getGeometryInfo().getMaxHeightAbovePosition();
+		ICoord2D spot;
+		if( !TheTacticalView->worldToScreen( &top, &spot ) )
+			continue;
+
+		const Real centreX = spot.x + 0.5f;
+		const Int y = spot.y - lift - height;
+		const Int inset = REAL_TO_INT( rim );
+		drawShieldShape( centreX + rim, y + inset, width, height, SHADOW_COLOR, SHADOW_COLOR );
+		drawShieldShape( centreX, y, width, height, EDGE_COLOR, EDGE_COLOR );
+		drawShieldShape( centreX, y + inset, width - 2.0f * rim, height - 3 * inset, LIT_COLOR, SHADED_COLOR );
+	}
+
+}  // end drawGuardMarkers
 
 //-------------------------------------------------------------------------------------------------
 /** EA's animated ring on the ground where a move order landed, 40 client frames each.  EA's own
