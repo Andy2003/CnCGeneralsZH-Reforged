@@ -428,8 +428,7 @@ void ControlBar::getOrderKeyPlaces( Int *keys ) const
 Bool ControlBar::getCommandPlaces( Int *places ) const
 {
 	// a context without the command group hides the group's parent.  Its buttons stay as the last
-	// selection set them and are not on the bar.  A building going up and one counting down to a
-	// unit put their own button on the grid in placeContextOnGrid.
+	// selection set them and are not on the bar.
 	const Bool groupShown = !m_contextParent[ CP_COMMAND ]->winIsHidden();
 	Int types[ MAX_COMMANDS_PER_SET ];
 	Int groups[ MAX_COMMANDS_PER_SET ];
@@ -528,48 +527,6 @@ void ControlBar::pressCommandButton( Int place )
 	}
 
 }  // end pressCommandButton
-
-//-------------------------------------------------------------------------------------------------
-/** Build the menu and back buttons a paged builder shows.  They carry no thing template and no
-	text label of their own - the page they open is told by the cameo of its first structure, and
-	by the grid letter setControlCommand paints in the corner. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::makeBuildPageButtons( void )
-{
-	// Classic's command sets are EA's slot for slot: no pages
-	if( TheGlobalData->isClassicUI() )
-		return;
-
-	AsciiString name;
-	for( Int page = 0; page < BUILD_PAGE_COUNT; page++ )
-	{
-		name.format( "NonCommand_BuildPage%d", page + 1 );
-		m_buildPageButton[ page ] = newCommandButton( name );
-		m_buildPageButton[ page ]->friend_setCommandType( GUI_COMMAND_BUILD_PAGE );
-		m_buildPageButton[ page ]->friend_setBorderType( COMMAND_BUTTON_BORDER_SYSTEM );
-	}
-
-	m_buildPageBackButton = newCommandButton( AsciiString( "NonCommand_BuildPageBack" ) );
-	m_buildPageBackButton->friend_setCommandType( GUI_COMMAND_BUILD_PAGE );
-	m_buildPageBackButton->friend_setBorderType( COMMAND_BUTTON_BORDER_SYSTEM );
-
-}  // end makeBuildPageButtons
-
-//-------------------------------------------------------------------------------------------------
-/** Show 'page' of the selected builder's structures, BUILD_PAGE_ROOT for the menu buttons. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::setBuildPage( Int page )
-{
-	if( page < BUILD_PAGE_ROOT || page >= BUILD_PAGE_COUNT )
-		page = BUILD_PAGE_ROOT;
-
-	if( m_buildPage == page )
-		return;
-
-	m_buildPage = page;
-	markUIDirty();
-
-}  // end setBuildPage
 
 /// mark the UI as dirty so the context of everything is re-evaluated
 void ControlBar::markUIDirty( void )
@@ -676,10 +633,8 @@ void ControlBar::watchPlayer( Player *player )
 	}
 
 	// a seat clicked at the top clears the selection before it gets here, so what is selected is
-	// read again rather than taken from the caller; the portrait's panel is the selection's
+	// read again rather than taken from the caller
 	m_watchedSelection = getSelectedPlayer();
-	if( m_currentControlBarStage == CONTROL_BAR_STAGE_DEFAULT )
-		showPanel( CB_PANEL_RIGHT, m_watchedSelection != NULL );
 }
 
 Player *ControlBar::getWatchedPlayer( void )
@@ -1441,10 +1396,6 @@ ControlBar::ControlBar( void )
 	m_currentControlBarStage = CONTROL_BAR_STAGE_DEFAULT;
 	m_buildToolTipLayout = NULL;
 	m_showBuildToolTipLayout = FALSE;
-	m_boardCardButton = NULL;
-	m_boardCardOwner = NULL;
-	m_boardCardShown = FALSE;
-	m_boardCardWasShown = FALSE;
 
 	// Added By Sadullah Nader
 	// initializing vars to zero
@@ -1473,12 +1424,7 @@ ControlBar::ControlBar( void )
 	{
 		m_panelRect[ i ].lo.x = m_panelRect[ i ].lo.y = 0;
 		m_panelRect[ i ].hi.x = m_panelRect[ i ].hi.y = 0;
-		m_panelHidden[ i ] = FALSE;
-		m_panelSlide[ i ] = 0.0f;
-		m_panelSlideTo[ i ] = 0.0f;
-		m_panelDropCap[ i ] = 0;
 	}
-	m_panelSlideMs = 0;
 	m_panelOrigin.x = m_panelOrigin.y = 0;
 	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
 	{
@@ -1503,7 +1449,6 @@ ControlBar::ControlBar( void )
 	m_specialPowerShortcutParent = NULL;
 	m_specialPowerShortcutRow = -1;
 	m_specialPowerShortcutRowMs = 0;
-	m_borrowedTrayCount = 0;
 	m_purchaseScienceColumn = -1;
 	m_purchaseScienceColumnMs = 0;
 	m_specialPowerLayout = NULL;
@@ -1516,9 +1461,6 @@ ControlBar::ControlBar( void )
 	m_communicatorButton = NULL;
 	m_currentSelectedDrawable = NULL;
 	m_currContext = CB_CONTEXT_NONE;
-	for( i = 0; i < BUILD_PAGE_COUNT; i++ )
-		m_buildPageButton[ i ] = NULL;
-	m_buildPageBackButton = NULL;
 	m_upgradeSpreadFrame = 0;
 	m_upgradeSpreadEntries = 0;
 	for( i = 0; i < UPGRADE_SPREAD_MAX; i++ )
@@ -1534,9 +1476,6 @@ ControlBar::ControlBar( void )
 	}
 	m_multiSelectGroupCount = 0;
 	m_multiSelectFocus = 0;
-	m_buildPage = BUILD_PAGE_ROOT;
-	m_buildPageObjectID = INVALID_ID;
-	m_standInBuilderID = INVALID_DRAWABLE_ID;
 	m_rallyPointDrawableID = INVALID_DRAWABLE_ID;
 	m_displayedConstructPercent = -1.0f;
 	m_displayedOCLTimerSeconds = 0;
@@ -1562,8 +1501,6 @@ ControlBar::ControlBar( void )
 	m_genArrow = NULL;
 	m_sideSelectAnimateDown = FALSE;
 	updateCommanBarBorderColors(GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED,GAME_COLOR_UNDEFINED);
-
-	m_pageSolidsActive = FALSE;
 	m_radarAttackGlowWindow = NULL;
 	m_remainingRadarAttackGlowFrames = 0;
 
@@ -1657,13 +1594,6 @@ static const Real thePanelAnchorFraction[ ControlBar::CB_PANEL_COUNT ] = { 0.0f,
 /// ...and which authored x that anchor is, so at 4:3 the three plates reassemble the shipped bar
 static const Real thePanelAnchorDesignX[ ControlBar::CB_PANEL_COUNT ] = { 0.0f, 400.0f, 800.0f };
 
-/// The Classic interface.  Its bar is laid out as Reforged's is, three plates at one scale, and keeps
-/// EA's habits on top: the beacon button, the under-attack lamp, and minimising as one piece.
-static Bool barIsClassic( void )
-{
-	return TheGlobalData != NULL && TheGlobalData->isClassicUI();
-}
-
 /// -modfactions: a mod's bar is up.  Its painting was made for EA's layout, one stretch per axis over
 /// the whole screen, so under it the panels are not at one scale and not pulled apart: the three
 /// transforms below are the loader's own, and the windows go where the mod authored them.
@@ -1723,21 +1653,7 @@ Real ControlBarHudScale( void )
 	if( TheDisplay == NULL )
 		return 1.0f;
 
-	// the player's HudScale option on top, 100/115/130/150%
-	static const Real steps[] = { 1.0f, 1.15f, 1.3f, 1.5f };
-	Int step = TheGlobalData ? TheGlobalData->m_hudScale : 0;
-	if( step < 0 || step > 3 || barIsClassic() )		// EA's HUD has the one size
-		step = 0;
-
-	return ControlBarHudScaleFit( ControlBarHudScaleFor( TheDisplay->getWidth(), TheDisplay->getHeight() ) * steps[ step ],
-																TheDisplay->getWidth() );
-}
-
-//-------------------------------------------------------------------------------------------------
-Real ControlBarHudScaleFit( Real scale, Int displayWidth )
-{
-	const Real widest = (Real)displayWidth / InGameUI_consolePageWidth();
-	return scale < widest ? scale : widest;
+	return ControlBarHudScaleFor( TheDisplay->getWidth(), TheDisplay->getHeight() );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1875,28 +1791,12 @@ Bool ControlBarPanelDesignToScreen( Int panel, const IRegion2D *design,
 struct ControlBarPanelPlacement
 {
 	Bool known;
-	Int panel;						///< which of the three it was put in, so a panel can be hidden as a unit
-	Bool weHid;						///< TRUE while the minimised bar is what is hiding it, and not the context
+	Int panel;						///< which of the three it was put in
 	Real designX, designY, designW, designH;
 	Int placedX, placedY, placedW, placedH;
-	Int slideApplied;			///< how far down applyPanelSlide has actually moved this one, in pixels
 };
 typedef std::map< GameWindow *, ControlBarPanelPlacement > ControlBarPanelPlacementMap;
 static ControlBarPanelPlacementMap theControlBarPlacement;
-
-//-------------------------------------------------------------------------------------------------
-/** How far layoutPanels has to lift a window to put it back where applyPanelSlide found it.  It is
-	* what was recorded on the window, never what the panel's slide says now: applyPanelSlide leaves
-	* windows behind - a plate marker is never moved, and a panel minimised with immediate = TRUE is
-	* marked hidden before anything moves - and taking the panel's offset off one of those lifts a
-	* window that never went down.  The bar then climbed a little further off the bottom of the
-	* screen every time the layout was rebuilt, and the tooltip, placed against BackgroundMarker,
-	* climbed with it until it left the screen.  Not static: the test calls it. */
-//-------------------------------------------------------------------------------------------------
-Int ControlBar_slideToUndo( Int slideAppliedToWindow, Int panelSlideOffsetNow )
-{
-	return slideAppliedToWindow;
-}
 
 //-------------------------------------------------------------------------------------------------
 /** Which panel a direct child of ControlBarParent belongs to.  Everything not named here rides in
@@ -2173,19 +2073,6 @@ static const std::vector<UnsignedByte> &plateMask( const ControlBarPlate *plate 
 	return mask;
 }
 
-//-------------------------------------------------------------------------------------------------
-void ControlBar::setPageSolids( const std::vector< IRegion2D > *solids, const std::vector< IRegion2D > *holes )
-{
-	m_pageSolidsActive = solids != NULL;
-	if( solids )
-		m_pageSolids = *solids;
-	else
-		m_pageSolids.clear();
-	if( holes )
-		m_pageHoles = *holes;
-	else
-		m_pageHoles.clear();
-}
 
 //-------------------------------------------------------------------------------------------------
 void ControlBar::triggerRadarAttackGlow( void )
@@ -2209,41 +2096,16 @@ Bool ControlBar::letsClickThrough( GameWindow *window, Int x, Int y )
 	if( shortName[ 0 ] != 0 && strcmp( shortName, "CenterBackground" ) != 0 )
 		return FALSE;
 
-	// the CSS page is what is drawn, so what it drew solid is what is solid.  Asked before the
-	// children, because a see-through child the page does not draw - the observer's info window
-	// spans the whole centre - would otherwise keep a click on bare battlefield
-	if( m_pageSolidsActive )
-	{
-		// the page's own buttons hand their clicks on to the page, which takes them as clicks on
-		// the world, even where they stand on a solid panel
-		for( size_t hole = 0; hole < m_pageHoles.size(); hole++ )
-		{
-			const IRegion2D &rect = m_pageHoles[ hole ];
-			if( x >= rect.lo.x && y >= rect.lo.y && x < rect.hi.x && y < rect.hi.y )
-				return TRUE;
-		}
-		for( size_t solid = 0; solid < m_pageSolids.size(); solid++ )
-		{
-			const IRegion2D &rect = m_pageSolids[ solid ];
-			if( x >= rect.lo.x && y >= rect.lo.y && x < rect.hi.x && y < rect.hi.y )
-				return FALSE;
-		}
-		return TRUE;
-	}
-
 	// a command button or anything else inside the pane is its own window and keeps its click
 	if( window->winPointInChild( x, y, TRUE ) != window )
 		return FALSE;
 
-	// the plates are drawn from design rectangles and travel with the frame and the slide, the same
+	// the plates are drawn from design rectangles and travel with the frame, the same
 	// arithmetic W3DCommandBarBackgroundDraw paints them with
 	ICoord2D now;
 	frame->winGetScreenPosition( &now.x, &now.y );
 	for( Int p = 0; p < CB_PANEL_COUNT; p++ )
 	{
-		if( m_panelHidden[ p ] )
-			continue;
-
 		const ControlBarPlate *plate = ControlBarPlateForSide( m_controlBarSchemeManager->getCurrentSide(), p );
 		if( plate == NULL )
 			plate = ControlBarPlateForSide( m_controlBarSchemeManager->getCurrentArtTwinSide(), p );
@@ -2253,7 +2115,7 @@ Bool ControlBar::letsClickThrough( GameWindow *window, Int x, Int y )
 			continue;
 
 		const Int left = rect.lo.x + now.x - m_panelOrigin.x;
-		const Int top = rect.lo.y + now.y - m_panelOrigin.y + getPanelSlideOffset( p );
+		const Int top = rect.lo.y + now.y - m_panelOrigin.y;
 		const Int width = rect.width();
 		const Int height = rect.height();
 		if( width <= 0 || height <= 0 || x < left || y < top || x >= left + width || y >= top + height )
@@ -2374,8 +2236,6 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 
 	place.known = TRUE;
 	place.panel = panel;
-	place.weHid = FALSE;
-	place.slideApplied = 0;
 	place.placedX = newX;
 	place.placedY = newY;
 	place.placedW = newW;
@@ -2385,44 +2245,6 @@ void ControlBar::placeInPanel( GameWindow *win, Int panel,
 		placeInPanel( child, panel, oldX, oldY, newX, newY, childShiftX );
 
 }  // end placeInPanel
-
-/// how long a panel takes to leave or return, in milliseconds
-static const Real PANEL_SLIDE_MS = 220.0f;
-
-//-------------------------------------------------------------------------------------------------
-/** The three marker windows draw nothing of their own - they are five pixels square and exist only
-	* to hang a draw callback on, and one of those callbacks paints all three plates.  They are
-	* authored over the radar, so taking the left panel away by its windows would take the painting
-	* off the panel that is staying too. */
-//-------------------------------------------------------------------------------------------------
-static Bool isPlateMarker( GameWindow *win )
-{
-	const char *shortName = shortWindowName( win );
-	return strcmp( shortName, "BackgroundMarker" ) == 0 ||
-				 strcmp( shortName, "ForegroundMarker" ) == 0 ||
-				 strcmp( shortName, "OnTopDraw" ) == 0;
-}
-
-//-------------------------------------------------------------------------------------------------
-Int ControlBar::getPanelSlideOffset( Int panel ) const
-{
-	if( panel < 0 || panel >= CB_PANEL_COUNT || TheDisplay == NULL )
-		return 0;
-	if( m_panelSlide[ panel ] <= 0.0f )
-		return 0;
-
-	//
-	// Far enough that the top edge of the frame is off the bottom of the screen, so everything is -
-	// except a panel with a cap, which travels only as far as the cap says and keeps the strip above
-	// it on screen.  The selection panel has one: it carries the button that puts the bar back, and
-	// it stops with that button's row standing on the bottom edge.  It takes the same quarter of a
-	// second to travel the shorter distance, so all three still move as one.
-	//
-	const Real drop = ( m_panelDropCap[ panel ] > 0 )
-											? (Real)m_panelDropCap[ panel ]
-											: (Real)( TheDisplay->getHeight() - m_panelOrigin.y );
-	return REAL_TO_INT_FLOOR( m_panelSlide[ panel ] * drop );
-}
 
 //-------------------------------------------------------------------------------------------------
 /** A window moved without its place moving was read by the next layoutPanels as moved by somebody
@@ -2464,154 +2286,6 @@ void ControlBar::placeWindowAt( GameWindow *window, const IRegion2D &rect )
 	place.placedW = width;
 	place.placedH = height;
 }
-
-//-------------------------------------------------------------------------------------------------
-/** Put every window where its panel's slide says it should be.
-	*
-	* layoutPanels has already recorded which panel each direct child of the frame went into and the
-	* screen position it was given, so this is that position plus however far the panel has travelled.
-	* What is inside those children keeps whatever the context system last decided, and comes back
-	* saying the same thing - they move as one piece and are never individually touched. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::applyPanelSlide( void )
-{
-	GameWindow *parent = m_contextParent[ CP_MASTER ];
-	if( parent == NULL )
-		return;
-
-	Int offset[ CB_PANEL_COUNT ];
-	for( Int p = 0; p < CB_PANEL_COUNT; p++ )
-		offset[ p ] = getPanelSlideOffset( p );
-
-	for( GameWindow *child = parent->winGetChild(); child; child = child->winGetNext() )
-	{
-		ControlBarPanelPlacementMap::iterator it = theControlBarPlacement.find( child );
-		if( it == theControlBarPlacement.end() || it->second.known == FALSE )
-			continue;
-		if( isPlateMarker( child ) )
-			continue;
-
-		ControlBarPanelPlacement &place = it->second;
-		const Int panel = place.panel;
-		if( panel < 0 || panel >= CB_PANEL_COUNT )
-			continue;
-
-		//
-		// Clear of the bottom edge and staying there: stop drawing it at all.  Only what we hid do
-		// we ever un-hide - the context system hides windows of its own all the time (the unused
-		// minimise buttons, a beacon pane, an empty portrait) and a blanket winHide(FALSE) over the
-		// panel put every one of them back on screen.  Which is why a window that was already hidden
-		// when the panel went down is not counted as ours: hiding it changes nothing and remembering
-		// it puts it on screen the first time the bar is minimised and brought back.  ControlBar.wnd
-		// authors ButtonSmall and ButtonMedium hidden, and that is where the stray "S" and "M" over
-		// the battlefield came from.
-		//
-		if( m_panelHidden[ panel ] )
-		{
-			if( !place.weHid && !child->winIsHidden() )
-			{
-				child->winHide( TRUE );
-				place.weHid = TRUE;
-			}
-			continue;
-		}
-
-		if( place.weHid )
-		{
-			child->winHide( FALSE );
-			place.weHid = FALSE;
-		}
-
-		ICoord2D pos;
-		child->winGetPosition( &pos.x, &pos.y );
-		const Int wantY = place.placedY - m_panelOrigin.y + offset[ panel ];
-		if( pos.y != wantY )
-			child->winSetPosition( pos.x, wantY );
-
-		//
-		// What the window is actually carrying, which is not the same as what its panel's slide says.
-		// The two continues above leave windows behind - a plate marker never moves at all, and a
-		// panel minimised with immediate = TRUE is marked hidden before anything is moved - and
-		// layoutPanels used to take the panel's offset back off every one of them.  A window that
-		// never went down came back up, and placeInPanel then read that position as the rectangle it
-		// was authored at: the bar climbed a little further off the bottom of the screen every time
-		// the layout was rebuilt, and the tooltip, which is placed relative to BackgroundMarker,
-		// climbed with it until it left the screen.
-		//
-		place.slideApplied = offset[ panel ];
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-/** Step the slide.  Wall clock rather than logic frames: this is a piece of the interface moving,
-	* and it should take the same quarter of a second whatever the game is doing. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::updatePanelSlide( void )
-{
-	const UnsignedInt now = Clock_Milliseconds();
-	const UnsignedInt sinceMs = ( m_panelSlideMs == 0 || now < m_panelSlideMs ) ? 0 : now - m_panelSlideMs;
-	m_panelSlideMs = now;
-
-	Bool moving = FALSE;
-	for( Int p = 0; p < CB_PANEL_COUNT; p++ )
-		if( m_panelSlide[ p ] != m_panelSlideTo[ p ] )
-			moving = TRUE;
-
-	if( !moving )
-		return;
-
-	const Real step = ( sinceMs > 0 ) ? (Real)sinceMs / PANEL_SLIDE_MS : 0.0f;
-
-	for( Int p = 0; p < CB_PANEL_COUNT; p++ )
-	{
-		if( m_panelSlide[ p ] < m_panelSlideTo[ p ] )
-		{
-			m_panelSlide[ p ] += step;
-			if( m_panelSlide[ p ] >= m_panelSlideTo[ p ] )
-			{
-				m_panelSlide[ p ] = m_panelSlideTo[ p ];
-				// arrived - off screen, unless the cap kept a strip of it on
-				m_panelHidden[ p ] = ( m_panelDropCap[ p ] <= 0 );
-			}
-		}
-		else if( m_panelSlide[ p ] > m_panelSlideTo[ p ] )
-		{
-			m_panelSlide[ p ] -= step;
-			if( m_panelSlide[ p ] <= m_panelSlideTo[ p ] )
-				m_panelSlide[ p ] = m_panelSlideTo[ p ];
-		}
-	}
-
-	applyPanelSlide();
-
-}  // end updatePanelSlide
-
-//-------------------------------------------------------------------------------------------------
-/** Send one whole panel off the bottom of the screen, or bring it back. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::showPanel( Int panel, Bool show, Bool immediate )
-{
-	// EA's bar is one piece and minimises as one (setLowControlBarConfig)
-	if( panel < 0 || panel >= CB_PANEL_COUNT || barIsClassic() )
-		return;
-
-	m_panelSlideTo[ panel ] = show ? 0.0f : 1.0f;
-
-	// coming back it is on screen from the first frame of the slide, going it is on screen until the
-	// last: only a panel that has arrived at the bottom is hidden
-	if( show )
-		m_panelHidden[ panel ] = FALSE;
-
-	if( immediate )
-	{
-		m_panelSlide[ panel ] = m_panelSlideTo[ panel ];
-		m_panelHidden[ panel ] = !show && ( m_panelDropCap[ panel ] <= 0 );
-	}
-
-	m_panelSlideMs = Clock_Milliseconds();
-	applyPanelSlide();
-
-}  // end showPanel
 
 //-------------------------------------------------------------------------------------------------
 /** Where the command bar's windows actually are, for -uidrill to write down.
@@ -2716,83 +2390,13 @@ void ControlBar::forEachPlacedWindow( Int *topOut, Int *moneyOut )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Put the slide away: every window back up by however far it actually travelled, and all three
-	* panels declared home.
-	*
-	* Anything that reads a window's screen position has to run after this.  ControlBarScheme::init
-	* is the one that does - it asks each parent where it is on screen and writes the money readout,
-	* the two tabs and the toolbar column their own positions relative to that answer - and it used
-	* to ask while the bar was still on its way down.  The answer was the slid position, so the
-	* children came out right for a slid parent; then layoutPanels lifted the parent and every one of
-	* those children rode up with it, and placeInPanel read the lifted position as the rectangle they
-	* were authored at.  A few pixels a rebuild.  Toggle the bar and change side a dozen times and
-	* the money box, the toolbar column and the general's tabs are stranded a third of the way up an
-	* empty screen with the plates still painted at the bottom, and the build tooltip - which is
-	* placed against BackgroundMarker - has left the top of the picture.
-	*
-	* Taken off per window rather than per panel, and by what each window is actually carrying:
-	* applyPanelSlide leaves windows behind (a plate marker never moves, a panel minimised with
-	* immediate = TRUE is marked hidden before anything moves), and lifting one of those lifts a
-	* window that never went down.  Not by calling applyPanelSlide with the slide zeroed either -
-	* that puts every window back at the y layoutPanels last handed out, which throws away exactly
-	* the ControlBarScheme.ini positions the bar is being rebuilt to wear.
-	*/
-//-------------------------------------------------------------------------------------------------
-void ControlBar::clearPanelSlide( void )
-{
-	GameWindow *parent = m_contextParent[ CP_MASTER ];
-
-	for( GameWindow *slid = parent ? parent->winGetChild() : NULL; slid; slid = slid->winGetNext() )
-	{
-		ControlBarPanelPlacementMap::iterator it = theControlBarPlacement.find( slid );
-		if( it == theControlBarPlacement.end() || it->second.known == FALSE )
-			continue;
-		ControlBarPanelPlacement &place = it->second;
-		if( place.panel < 0 || place.panel >= CB_PANEL_COUNT )
-			continue;
-		if( place.weHid )
-		{
-			slid->winHide( FALSE );
-			place.weHid = FALSE;
-		}
-		const Int undo = ControlBar_slideToUndo( place.slideApplied, getPanelSlideOffset( place.panel ) );
-		if( undo != 0 )
-		{
-			ICoord2D pos;
-			slid->winGetPosition( &pos.x, &pos.y );
-			slid->winSetPosition( pos.x, pos.y - undo );
-			place.slideApplied = 0;
-		}
-	}
-
-	for( Int q = 0; q < CB_PANEL_COUNT; q++ )
-	{
-		m_panelSlide[ q ] = 0.0f;
-		m_panelSlideTo[ q ] = 0.0f;
-		m_panelHidden[ q ] = FALSE;
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-/** Re-anchor the control bar as three panels at one uniform scale.
-	*
-	* A panel that is away, or on its way, is not where this function last put it - and this function
-	* reads a window's position to work out what it was authored at.  So the slide comes off first
-	* and goes back on at the end, and a bar that was minimised when the side changed is minimised
-	* again without the trip down. */
+/** Re-anchor the control bar as three panels at one uniform scale. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::layoutPanels( void )
 {
 	GameWindow *parent = m_contextParent[ CP_MASTER ];
 	if( parent == NULL || TheDisplay == NULL )
 		return;
-
-	Bool wasAway[ CB_PANEL_COUNT ];
-	Int q;
-	for( q = 0; q < CB_PANEL_COUNT; q++ )
-		wasAway[ q ] = ( m_panelSlideTo[ q ] > 0.0f );
-
-	clearPanelSlide();
 
 	const Real dispW = (Real)TheDisplay->getWidth();
 	const Real dispH = (Real)TheDisplay->getHeight();
@@ -2833,26 +2437,6 @@ void ControlBar::layoutPanels( void )
 	m_panelOrigin.x = 0;
 	m_panelOrigin.y = parentTop;
 
-	//
-	// Two of the three panels go all the way off the bottom.  The selection panel stops with the row
-	// its minimise tab is in standing on the bottom edge: the button that puts the bar back is in
-	// that row, and so is the plate that paints it, so the tab a minimised player clicks is real
-	// artwork and not a button floating over the battlefield.
-	//
-	for( p = 0; p < CB_PANEL_COUNT; p++ )
-		m_panelDropCap[ p ] = 0;
-	if( m_controlBarSchemeManager && !barIsClassic() )
-	{
-		const ControlBarPlate *rightPlate =
-			ControlBarPlateForSide( m_controlBarSchemeManager->getCurrentSide(), CB_PANEL_RIGHT );
-		if( rightPlate == NULL )
-			rightPlate = ControlBarPlateForSide( m_controlBarSchemeManager->getCurrentArtTwinSide(),
-																					 CB_PANEL_RIGHT );
-		if( rightPlate && rightPlate->minTab.height() > 0 )
-			m_panelDropCap[ CB_PANEL_RIGHT ] =
-				REAL_TO_INT_FLOOR( ( CONTROL_BAR_DESIGN_H - rightPlate->minTab.hi.y ) * s );
-	}
-
 	for( GameWindow *child = parent->winGetChild(); child; child = child->winGetNext() )
 	{
 		// the nameless panes go by where they were authored, so ask the cache before it is rewritten
@@ -2871,11 +2455,6 @@ void ControlBar::layoutPanels( void )
 		placeInPanel( child, panelForWindow( shortWindowName( child ), designCenterX ),
 									barOrigin.x, barOrigin.y, 0, parentTop );
 	}
-
-	// whatever was away before is away again, without being watched leaving a second time
-	for( q = 0; q < CB_PANEL_COUNT; q++ )
-		if( wasAway[ q ] )
-			showPanel( q, FALSE, TRUE );
 
 }  // end layoutPanels
 
@@ -2901,9 +2480,6 @@ void ControlBar::init( void )
 
 	// post process step after loading the command buttons and command sets
 	postProcessCommands();
-
-	// the builder's page menu buttons are ours, not the data's
-	makeBuildPageButtons();
 
 	// Init the scheme manager, this will call it's won INI init funciton.
 	m_controlBarSchemeManager = NEW ControlBarSchemeManager;
@@ -2998,8 +2574,7 @@ void ControlBar::shutdownWindows( void )
 
 }  // end shutdownWindows
 
-/** The painted promotion screen's own draw, and the battlefield and bar dimmed under it the way the
-	* Reforged page dims them (Promotion.html, .dim); the page takes the draw over in Reforged. */
+/** The painted promotion screen's own draw, and the battlefield and bar dimmed under it. */
 static GameWinDrawFunc theClassicPromotionDraw = NULL;
 
 static void drawClassicPromotionScreen( GameWindow *window, WinInstanceData *instData )
@@ -3190,15 +2765,12 @@ void ControlBar::initWindows( void )
 			setControlCommand(win, findCommandButton("NonCommand_IdleWorker") );
 			win->winSetTooltipFunc(commandButtonTooltip);
 		}
-		// the Reforged bar carries no beacon button; nothing below shows it again.  Classic keeps EA's
 		win = TheWindowManager->winGetWindowFromId(NULL,TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonPlaceBeacon"));
-		if( win && barIsClassic() )
+		if( win )
 		{
 			setControlCommand( win, findCommandButton( "NonCommand_Beacon" ) );
 			win->winSetTooltipFunc( commandButtonTooltip );
 		}
-		else if( win )
-			win->winHide(TRUE);
 		win = TheWindowManager->winGetWindowFromId(NULL,TheNameKeyGenerator->nameToKey("ControlBar.wnd:ButtonGeneral"));
 		if(win)
 		{
@@ -3228,13 +2800,8 @@ void ControlBar::initWindows( void )
 			win->winSetTooltipFunc(commandButtonTooltip);
 		}
 
-		// the radar's under-attack light is gone from the Reforged bar: the radar ping, the EVA line
-		// and the message say it already.  Classic keeps it flashing, as EA's did
-		win = TheWindowManager->winGetWindowFromId(NULL, TheNameKeyGenerator->nameToKey("ControlBar.wnd:WinUAttack"));
-		if( win && barIsClassic() )
-			m_radarAttackGlowWindow = win;
-		else if(win)
-			win->winHide(TRUE);
+		// the radar's under-attack light flashes, as EA's did
+		m_radarAttackGlowWindow = TheWindowManager->winGetWindowFromId(NULL, TheNameKeyGenerator->nameToKey("ControlBar.wnd:WinUAttack"));
 
 
 		win = TheWindowManager->winGetWindowFromId(NULL,TheNameKeyGenerator->nameToKey( AsciiString( "ControlBar.wnd:BackgroundMarker" ) ));
@@ -3292,18 +2859,11 @@ void ControlBar::reset( void )
 	m_displayedConstructPercent = -1.0f;
 	m_displayedOCLTimerSeconds = 0;
 
-	m_buildPage = BUILD_PAGE_ROOT;
-	m_buildPageObjectID = INVALID_ID;
-	m_standInBuilderID = INVALID_DRAWABLE_ID;
-
 	m_isObserverCommandBar = FALSE; // reset us to use a normal command bar
 	m_observerLookAtPlayer = NULL;
 	m_watchedSide.clear();
 	m_watchedSelection = NULL;
 	m_currentControlBarStage = CONTROL_BAR_STAGE_DEFAULT;	// a minimised bar is this match's, not the next one's
-
-	// the next match has its own sides, and a mod switch reloads the artwork these point at
-	m_borrowedTrayCount = 0;
 
 	if(m_buildToolTipLayout)
 		m_buildToolTipLayout->hide(TRUE);
@@ -3375,19 +2935,6 @@ void ControlBar::reset( void )
 }  // end reset
 
 //-------------------------------------------------------------------------------------------------
-/** How far a unit is into its current veterancy rank, 0..100, or -1 when there is no next rank to
-	* fill towards (top rank, or a template with no thresholds - both mean "draw no bar"). */
-//-------------------------------------------------------------------------------------------------
-Int ControlBar_experiencePercent( Int currentExp, Int levelExp, Int nextLevelExp )
-{
-	if( nextLevelExp <= levelExp )
-		return -1;
-
-	Int percent = ( currentExp - levelExp ) * 100 / ( nextLevelExp - levelExp );
-	return min( 100, max( 0, percent ) );
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Update phase, we can track if our selected object is destroyed, update button
 	* percentages, status, enabled status etc */
 //-------------------------------------------------------------------------------------------------
@@ -3438,9 +2985,6 @@ void ControlBar::update( void )
 				|| m_specialPowerShortcutRow >= visibleRows )
 			clearSpecialPowerShortcutRow();
 	}
-
-	// the minimised panels going or coming back
-	updatePanelSlide();
 
 	if(m_controlBarSchemeManager)
 		m_controlBarSchemeManager->update();
@@ -3582,31 +3126,6 @@ void ControlBar::update( void )
 		clearPurchaseScienceColumn();
 
 	//
-	// a stand-in builder is not selected, so no deselect event tells us when it dies or when a
-	// real selection arrives; re-evaluate ourselves before anything touches its drawable
-	//
-	if( m_standInBuilderID != INVALID_DRAWABLE_ID )
-	{
-		Drawable *standIn = TheGameClient->findDrawableByID( m_standInBuilderID );
-		Object *standInObj = standIn ? standIn->getObject() : NULL;
-		if( TheInGameUI->getSelectCount() > 0 || standInObj == NULL || standInObj->isEffectivelyDead() )
-		{
-			m_standInBuilderID = INVALID_DRAWABLE_ID;
-			m_currentSelectedDrawable = NULL;
-			markUIDirty();
-		}
-	}
-	//
-	// nothing selected and nothing standing in: a builder that is made or bought later gets the
-	// bar, which no selection event would announce either
-	//
-	else if( logicTick && ( logicNow % LOGICFRAMES_PER_SECOND ) == 0 && TheInGameUI->getSelectCount() == 0
-					 && m_currentSelectedDrawable == NULL && findStandInBuilder( FALSE ) )
-	{
-		markUIDirty();
-	}
-
-	//
 	// first, if the UI is dirty repopulate the UI with what the user should see for all the
 	// selected drawables
 	//
@@ -3644,33 +3163,6 @@ void ControlBar::update( void )
 				win->winEnable(FALSE);
 			}
 		}
-	}
-
-	//
-	// the experience bar under the portrait. The rank chevron on the cameo says which rank a
-	// unit holds and nothing about how close the next one is, and that is the half of it you
-	// decide with - whether this tank is one kill off veteran or has just got there. Only for a
-	// single selection: with a group selected the portrait is one member standing in for all of
-	// them, and its experience would be read as the group's.
-	//
-	if( m_rightHUDCameoWindow )
-	{
-		Int xpPercent = -1;
-		Object *portraitObj = ( TheInGameUI && TheInGameUI->getSelectCount() == 1 &&
-														m_currentSelectedDrawable ) ? m_currentSelectedDrawable->getObject()
-																												: NULL;
-		const ExperienceTracker *xp = portraitObj ? portraitObj->getExperienceTracker() : NULL;
-		// Classic's portrait is EA's picture alone: the bar stays empty
-		if( xp && !TheGlobalData->isClassicUI() && portraitObj->isLocallyControlled() && xp->isTrainable() &&
-				xp->getVeterancyLevel() < LEVEL_LAST )
-		{
-			const ThingTemplate *tmpl = portraitObj->getTemplate();
-			xpPercent = ControlBar_experiencePercent( xp->getCurrentExperience(),
-																							 tmpl->getExperienceRequired( xp->getVeterancyLevel() ),
-																							 tmpl->getExperienceRequired( xp->getVeterancyLevel() + 1 ) );
-		}
-
-		GadgetButtonSetBar( m_rightHUDCameoWindow, xpPercent, GameMakeColor( 255, 200, 40, 255 ) );
 	}
 
 	//
@@ -3876,22 +3368,9 @@ void ControlBar::evaluateContextUI( void )
 	// erase any current state of the GUI by switching out to the empty context
 	switchToContext( CB_CONTEXT_NONE, NULL );
 
-	//
-	// nothing selected: one of the player's builders stands in and its command bar shows, so
-	// a structure can be placed without selecting a dozer first - the logic then sends the
-	// idle builder nearest the site (MSG_DOZER_CONSTRUCT).  m_standInBuilderID is not cleared
-	// first: findStandInBuilder reads it to keep the builder it is already showing.
-	//
+	// nothing selected is an empty bar, as 1.04 had it
 	if( TheInGameUI->getSelectCount() == 0 && !m_isObserverCommandBar )
-	{
-		Drawable *builder = findStandInBuilder( FALSE );
-		m_standInBuilderID = builder ? builder->getID() : INVALID_DRAWABLE_ID;
-		if( builder )
-			switchToContext( CB_CONTEXT_COMMAND, builder );
 		return;
-	}
-
-	m_standInBuilderID = INVALID_DRAWABLE_ID;
 
 	// get the list of drawable IDs from the in game UI
 	const DrawableList *selectedDrawables = TheInGameUI->getAllSelectedDrawables();
@@ -4272,10 +3751,6 @@ CommandSet *ControlBar::newCommandSetOverride( CommandSet *setToOverride )
 //-------------------------------------------------------------------------------------------------
 Int getBuildBatchCount( void )
 {
-	// Classic's click is one unit, as the game shipped
-	if( TheGlobalData->isClassicUI() )
-		return 1;
-
 	if( TheKeyboard->isCtrl() )
 		return TheKeyboard->isShift() ? CTRL_SHIFT_BUILD_QUEUE_COUNT : CTRL_BUILD_QUEUE_COUNT;
 
@@ -4428,79 +3903,6 @@ Bool ControlBar::cancelLastQueuedUnit( const ThingTemplate *thing )
 }  // end cancelLastQueuedUnit
 
 //-------------------------------------------------------------------------------------------------
-/** The local player's builder that stands in for an empty selection: an idle one if there is
-	* one, else any live one.  (Player::iterateObjects callback + driver.) */
-//-------------------------------------------------------------------------------------------------
-struct StandInBuilderSearch
-{
-	Object *idle;
-	Object *any;
-};
-
-static void findStandInBuilderProc( Object *obj, void *userData )
-{
-	StandInBuilderSearch *s = (StandInBuilderSearch *)userData;
-	if( obj == NULL || obj->isEffectivelyDead() || obj->getDrawable() == NULL )
-		return;
-	if( obj->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) || obj->testStatus( OBJECT_STATUS_SOLD ) )
-		return;
-	AIUpdateInterface *ai = obj->getAI();
-	DozerAIInterface *dozer = ai ? ai->getDozerAIInterface() : NULL;
-	if( dozer == NULL )
-		return;
-	if( s->any == NULL )
-		s->any = obj;
-	// free = no build/repair task and not hauling supplies; walking somewhere does not count
-	const SupplyTruckAIInterface *supply = ai->getSupplyTruckAIInterface();
-	if( s->idle == NULL && !dozer->isAnyTaskPending() && !( supply && supply->isCurrentlyFerryingSupplies() ) )
-		s->idle = obj;
-}
-
-Drawable *ControlBar::findStandInBuilder( Bool freeOnly )
-{
-	// Classic's bar is 1.04's: nothing selected is an empty bar, and a build needs a selected worker.
-	// A stand-in kept the dozer's build menu up after the dozer was let go.
-	if( barIsClassic() )
-		return NULL;
-
-	Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : NULL;
-	if( player == NULL )
-		return NULL;
-
-	//
-	// The builder already standing in keeps the bar for as long as it is still a builder.  The
-	// sweep below answers "the first idle one", and idleness changes on its own: a dozer somewhere
-	// across the base finishing a building goes idle and used to take the bar off the one you were
-	// working with.  That drops the page you were on and takes the structure off your cursor, in
-	// the middle of placing it, because something happened somewhere else.  For a GLA worker it
-	// also keeps the fake-structure page it was switched to.
-	//
-	if( m_standInBuilderID != INVALID_DRAWABLE_ID && TheGameClient )
-	{
-		Drawable *held = TheGameClient->findDrawableByID( m_standInBuilderID );
-		Object *obj = held ? held->getObject() : NULL;
-		if( obj && obj->getControllingPlayer() == player )
-		{
-			StandInBuilderSearch check;
-			check.idle = NULL;
-			check.any = NULL;
-			findStandInBuilderProc( obj, &check );
-			if( check.any && ( !freeOnly || check.idle ) )
-				return held;
-		}
-	}
-
-	StandInBuilderSearch s;
-	s.idle = NULL;
-	s.any = NULL;
-	player->iterateObjects( findStandInBuilderProc, &s );
-
-	Object *pick = s.idle ? s.idle : ( freeOnly ? NULL : s.any );
-	return pick ? pick->getDrawable() : NULL;
-
-}  // end findStandInBuilder
-
-//-------------------------------------------------------------------------------------------------
 /** Press the index'th general's power shortcut button, as a mouse click would */
 //-------------------------------------------------------------------------------------------------
 Bool ControlBar::clearSpecialPowerShortcutRow( void )
@@ -4513,252 +3915,6 @@ Bool ControlBar::clearSpecialPowerShortcutRow( void )
 	return TRUE;
 
 }  // end clearSpecialPowerShortcutRow
-
-//-------------------------------------------------------------------------------------------------
-/** The tray a general's power shortcut stands in: the background of one of that bar's slots, taken
-	* off the slot itself.  Each side ships its own bar and its own tray art, so reading it here is
-	* what keeps anything that borrows the look - both HUD strips do - on the same side's metal as
-	* the bar underneath them, without naming a single image.
-	*
-	* Watching a match there is no such bar: FactionObserver ships neither a shortcut layout nor a
-	* button count, so both strips used to fall back to a flat black plate for the whole match.  The
-	* side the observer bar is looking at answers for it instead - one side for the whole HUD, the
-	* one the bar itself is showing. */
-//-------------------------------------------------------------------------------------------------
-const Image *ControlBar::getSpecialPowerTrayImage( void )
-{
-	if( m_specialPowerShortcutParent && m_specialPowerShortcutButtonParents[ 0 ] )
-		return m_specialPowerShortcutButtonParents[ 0 ]->winGetEnabledImage( 0 );
-
-	const BorrowedTray *borrowed = borrowTray( specialPowerTraySide() );
-	return borrowed ? borrowed->image : NULL;
-
-}  // end getSpecialPowerTrayImage
-
-//-------------------------------------------------------------------------------------------------
-/** Any template of this side that ships a general's power bar - the generals of one side share that
-	* layout, so which one comes back does not matter, only that it carries the side's tray.  The
-	* shell's bar names its side with "Small" on the end; that is the same art at another size. */
-//-------------------------------------------------------------------------------------------------
-const PlayerTemplate *ControlBar::templateForSide( AsciiString side )
-{
-	if( side.isEmpty() || ThePlayerTemplateStore == NULL )
-		return NULL;
-
-	if( side.endsWithNoCase( "Small" ) )
-		for( Int c = 0; c < 5; c++ )
-			side.removeLastChar();
-
-	// -modfactions: a mod's bar wears that mod's tray, ours ours, though the side is spelt the same
-	const Int mod = m_controlBarSchemeManager ? m_controlBarSchemeManager->getCurrentSchemeMod() : -1;
-	for( Int t = 0; t < ThePlayerTemplateStore->getPlayerTemplateCount(); t++ )
-	{
-		const PlayerTemplate *pt = ThePlayerTemplateStore->getNthPlayerTemplate( t );
-		if( pt && pt->getSide().compareNoCase( side ) == 0 && pt->getModIndex() == mod
-				&& !pt->getSpecialPowerShortcutWinName().isEmpty() )
-			return pt;
-	}
-
-	return NULL;
-
-}  // end templateForSide
-
-//-------------------------------------------------------------------------------------------------
-/** Whose metal the HUD wears when this bar has none of its own.  The answer is the bar on screen and
-	* nothing else: the scheme manager knows which side's artwork it is drawing, so the strips wear
-	* that side even while watching, where the seat at the keyboard has no side at all.
-	*
-	* The scheme names a side, not a general, and the generals of one side share a shortcut layout, so
-	* any template of that side hands over the same tray.  The observer bar's own side is "Observer",
-	* which no template carries, but every plate on that bar is another side's - so the scheme sharing
-	* its right hand plate names the side it is really wearing, and the strips follow the bar rather
-	* than the seat.  Only if even that finds nothing does whoever is being watched, and then the first
-	* side still in the match, answer: a plate of plain black is worse than somebody else's metal, and
-	* it was what the strips wore for whole matches. */
-//-------------------------------------------------------------------------------------------------
-const PlayerTemplate *ControlBar::specialPowerTraySide( void )
-{
-	if( m_controlBarSchemeManager )
-	{
-		const PlayerTemplate *own = templateForSide( m_controlBarSchemeManager->getCurrentSide() );
-		if( own )
-			return own;
-
-		const PlayerTemplate *worn = templateForSide( m_controlBarSchemeManager->getCurrentArtTwinSide() );
-		if( worn )
-			return worn;
-	}
-
-	// the bar wears artwork no side owns; the seat it is showing is the next best answer
-	if( m_observerLookAtPlayer && m_observerLookAtPlayer->getPlayerTemplate()
-			&& !m_observerLookAtPlayer->getPlayerTemplate()->getSpecialPowerShortcutWinName().isEmpty() )
-		return m_observerLookAtPlayer->getPlayerTemplate();
-
-	if( ThePlayerList == NULL )
-		return NULL;
-
-	for( Int i = 0; i < ThePlayerList->getPlayerCount(); i++ )
-	{
-		Player *p = ThePlayerList->getNthPlayer( i );
-		if( p == NULL || !p->isPlayerActive() || !p->isPlayableSide() )
-			continue;
-
-		const PlayerTemplate *pt = p->getPlayerTemplate();
-		if( pt && !pt->getSpecialPowerShortcutWinName().isEmpty() )
-			return pt;
-	}
-
-	return NULL;
-
-}  // end specialPowerTraySide
-
-//-------------------------------------------------------------------------------------------------
-/** Read a side's tray out of its own shortcut layout, once.  Nothing of the layout survives the
-	* call: the Image belongs to the mapped image collection and the size is two integers, so the
-	* windows go straight back.  The lookup is by layout name rather than by template, since the
-	* generals of one side share a bar. */
-//-------------------------------------------------------------------------------------------------
-const ControlBar::BorrowedTray *ControlBar::borrowTray( const PlayerTemplate *pt )
-{
-	if( pt == NULL || pt->getSpecialPowerShortcutWinName().isEmpty() )
-		return NULL;
-
-	const AsciiString layoutName = pt->getSpecialPowerShortcutWinName();
-
-	//
-	// the side at the keyboard is read off the bar it is already showing.  Not an optimization: the
-	// generals of one side share a layout, and a second copy of it would put a second window under
-	// every one of its names for as long as this call runs
-	//
-	if( m_specialPowerLayout && m_specialPowerShortcutButtonParents[ 0 ]
-			&& m_specialPowerLayout->getFilename().compareNoCase( layoutName ) == 0 )
-		return NULL;
-
-	for( Int i = 0; i < m_borrowedTrayCount; i++ )
-		if( m_borrowedTrays[ i ].layout.compareNoCase( layoutName ) == 0 )
-			return m_borrowedTrays[ i ].image ? &m_borrowedTrays[ i ] : NULL;
-
-	if( m_borrowedTrayCount >= MAX_BORROWED_TRAYS )
-		return NULL;			// more sides on one screen than any game ships: they keep the plain plate
-
-	BorrowedTray *slot = &m_borrowedTrays[ m_borrowedTrayCount++ ];
-	slot->layout = layoutName;
-	slot->image = NULL;
-	slot->size.x = 0;
-	slot->size.y = 0;
-
-	WindowLayout *layout = TheWindowManager->winCreateLayout( layoutName );
-	if( layout == NULL )
-		return NULL;					// a mod naming a layout it does not ship: remembered as having no tray
-	layout->hide( TRUE );
-
-	// the size read off it below is the size the strips draw a tray at, so it has to come out of the
-	// same un-stretched space the bar itself is put in - see initSpecialPowershortcutBar
-	ControlBarLayoutUniform( layout->getFirstWindow(), 1.0f, 1.0f );
-
-	AsciiString parentName = layoutName;
-	parentName.concat( ":ButtonParent1" );
-
-	//
-	// looked up inside our own copy of the bar rather than across every window on screen: a player
-	// who was knocked out still has his own bar loaded, and it carries these very names
-	//
-	GameWindow *slotWindow = TheWindowManager->winGetWindowFromId( layout->getFirstWindow(),
-																			TheNameKeyGenerator->nameToKey( parentName ) );
-	if( slotWindow )
-	{
-		slot->image = slotWindow->winGetEnabledImage( 0 );
-		slotWindow->winGetSize( &slot->size.x, &slot->size.y );
-	}
-
-	layout->destroyWindows();
-	layout->deleteInstance();
-
-	return slot->image ? slot : NULL;
-
-}  // end borrowTray
-
-//-------------------------------------------------------------------------------------------------
-/** That tray at the size the bar itself draws it, the hole in its artwork the cameo fills, and the
-	* step a row of them runs at.  All of it read back off the loaded bar, which the loader has
-	* already scaled to the running resolution - so nothing here is in 800x600 pixels, and anything
-	* borrowing the look comes out the size of the powers themselves at every resolution.
-	*
-	* Any of the four out-parameters may be NULL.  FALSE when there is no bar and no layout to
-	* borrow one from - the strips then keep the plain plate they had before any of this. */
-//-------------------------------------------------------------------------------------------------
-Bool ControlBar::getSpecialPowerTrayLayout( ICoord2D *traySize, ICoord2D *cameoSize,
-																						ICoord2D *cameoOffset, Int *columnStep )
-{
-	if( m_specialPowerShortcutParent && m_specialPowerShortcutButtonParents[ 0 ] )
-	{
-		Int slotWidth, slotHeight;
-		m_specialPowerShortcutButtonParents[ 0 ]->winGetSize( &slotWidth, &slotHeight );
-		return trayLayoutFromSlot( slotWidth, slotHeight, traySize, cameoSize, cameoOffset, columnStep );
-	}
-
-	// measured off the very layout the tray came out of, so the two always agree
-	const BorrowedTray *borrowed = borrowTray( specialPowerTraySide() );
-	if( borrowed == NULL )
-		return FALSE;
-
-	return trayLayoutFromSlot( borrowed->size.x, borrowed->size.y,
-														 traySize, cameoSize, cameoOffset, columnStep );
-
-}  // end getSpecialPowerTrayLayout
-
-//-------------------------------------------------------------------------------------------------
-/** The artwork's proportions, applied to whatever size a slot came out at. */
-//-------------------------------------------------------------------------------------------------
-Bool ControlBar::trayLayoutFromSlot( Int slotWidth, Int slotHeight, ICoord2D *traySize,
-																		 ICoord2D *cameoSize, ICoord2D *cameoOffset, Int *columnStep )
-{
-	if( slotWidth <= 0 || slotHeight <= 0 )
-		return FALSE;
-
-	//
-	// where the cameo goes is the hole in the tray artwork, not a guess: SATraySmall is the 60x56
-	// patch at 413,1 of SAControlBar512_001.tga and its transparent middle runs x 4..48, y 9..46.
-	// Those are fractions of the art, so they hold at whatever size the loader gave the tray
-	//
-	const Int ART_WIDTH = 60;
-	const Int ART_HEIGHT = 56;
-	const Int HOLE_X = 4;
-	const Int HOLE_Y = 9;
-	const Int HOLE_WIDTH = 45;
-	const Int HOLE_HEIGHT = 38;
-
-	if( traySize )
-	{
-		traySize->x = slotWidth;
-		traySize->y = slotHeight;
-	}
-
-	if( cameoSize )
-	{
-		cameoSize->x = ( slotWidth * HOLE_WIDTH + ART_WIDTH / 2 ) / ART_WIDTH;
-		cameoSize->y = ( slotHeight * HOLE_HEIGHT + ART_HEIGHT / 2 ) / ART_HEIGHT;
-	}
-
-	if( cameoOffset )
-	{
-		cameoOffset->x = ( slotWidth * HOLE_X + ART_WIDTH / 2 ) / ART_WIDTH;
-		cameoOffset->y = ( slotHeight * HOLE_Y + ART_HEIGHT / 2 ) / ART_HEIGHT;
-	}
-
-	//
-	// A row steps a whole tray, the way a column already does.  The slots used to slide an eighth of
-	// a tray back under each other so a row read as one run of metal, and what that actually did was
-	// lay the neighbour's rail over the left edge of every cameo but the last: the general's powers
-	// and the superweapon countdowns both came out overlapping.  Side by side they read as the boxes
-	// they are, and the queue column down the left has looked like that all along.
-	//
-	if( columnStep )
-		*columnStep = slotWidth;
-
-	return TRUE;
-
-}  // end getSpecialPowerTrayLayout
 
 //-------------------------------------------------------------------------------------------------
 /** How many of the slots carry a power right now.  populateSpecialPowerShortcut() fills them from
@@ -5208,54 +4364,6 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 /** Set the command data into the control */
 //-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-/** The letter currently bound to command bar slot 'slot' (0 based), or an empty string when the
-	slot has no unmodified binding.  Read live out of the meta map so rebinding the key in
-	Options > Keyboard re-labels the button. */
-//-------------------------------------------------------------------------------------------------
-static UnicodeString getMetaKeyLabel( GameMessage::Type wanted )
-{
-	UnicodeString label;
-
-	if( TheMetaMap == NULL || TheKeyboard == NULL )
-		return label;
-
-	for( const MetaMapRec *rec = TheMetaMap->getFirstMetaMapRec(); rec; rec = rec->m_next )
-	{
-		// only a plain, unmodified key makes a readable short label
-		if( rec->m_meta != wanted || rec->m_modState != 0 )
-			continue;
-
-		// function keys have no printable character; name them
-		if( rec->m_key >= MK_F1 && rec->m_key <= MK_F10 )
-			label.format( u"F%d", rec->m_key - MK_F1 + 1 );
-		else if( rec->m_key == MK_F11 )
-			label.set( u"F11" );
-		else if( rec->m_key == MK_F12 )
-			label.set( u"F12" );
-		else
-		{
-			WideChar c = TheKeyboard->getPrintableKey( (UnsignedByte)rec->m_key, 0 );
-			if( c )
-			{
-				if( c >= u'a' && c <= u'z' )
-					c -= (u'a' - u'A');
-
-				WideChar text[ 2 ] = { c, 0 };
-				label.set( text );
-			}
-		}
-		break;
-	}
-
-	return label;
-
-}  // end getMetaKeyLabel
-
-static UnicodeString getGridHotKeyLabel( Int place )
-{
-	return getMetaKeyLabel( (GameMessage::Type)(GameMessage::MSG_META_COMMAND_SLOT01 + place) );
-}
 
 //-------------------------------------------------------------------------------------------------
 void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )
@@ -5330,23 +4438,15 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	GadgetButtonSetData(button, (void*)commandButton);
 	//button->winSetUserData( commandButton );
 
-	// a recycled button must not keep the previous occupant's count badge, nor its seconds label:
-	// only the command context re-stamps those every frame, so a button that ends up in any other
-	// context (a garrisoned building's exit cameos, a beacon, an OCL timer) would wear the build
-	// time of whatever used to live in that window.
+	// a recycled button must not keep the previous occupant's count badge
 	GadgetButtonSetCount( button, 0 );
-	GadgetButtonSetSeconds( button, 0 );
-	GadgetButtonSetCost( button, 0 );
-	GadgetButtonSetPower( button, 0 );
 
 	setCommandBarBorder(button, commandButton->getCommandButtonMappedBorderType());
 	
-	// the key in the button's top left corner is its place's, and a place is only known once the
-	// whole set is on the bar: labelCommandPlaces paints it.  Classic has no places: its key is the
-	// game's own, the letter after the '&' in the button's label - the English label's in every
-	// language, so a Turkish or German player presses what an English one does - and it wears it
-	// on the button the way Reforged wears a grid key
-	if( TheHotKeyManager && TheGlobalData->isClassicUI() )
+	// the key is the game's own, the letter after the '&' in the button's label - the English
+	// label's in every language, so a Turkish or German player presses what an English one does -
+	// and the button wears it in its top left corner
+	if( TheHotKeyManager )
 	{
 		WideChar letter = TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0;
 		if( letter >= u'a' && letter <= u'z' )
@@ -5368,93 +4468,6 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	GadgetButtonSetAltSound(button, "GUICommandBarClick");
 
 }  // end setControlCommand
-
-//-------------------------------------------------------------------------------------------------
-void ControlBar::labelPlaceButton( GameWindow *button, Int place )
-{
-	if( button == NULL )
-		return;
-
-	const UnicodeString label = place >= 0 ? getGridHotKeyLabel( place ) : UnicodeString();
-	if( label.isEmpty() )
-		button->winClearStatus( WIN_STATUS_SHORTCUT_BUTTON );
-	else
-		button->winSetStatus( WIN_STATUS_SHORTCUT_BUTTON );
-
-	// every frame, so only a changed key goes to the button
-	if( button->winGetText().compare( label ) != 0 )
-		GadgetButtonSetText( button, label );
-
-}
-
-void ControlBar::labelCommandPlaces( const Int *places )
-{
-	for( Int slot = 0; slot < MAX_COMMANDS_PER_SET; slot++ )
-		labelPlaceButton( m_commandWindows[ slot ], places[ slot ] );
-
-}  // end labelCommandPlaces
-
-//-------------------------------------------------------------------------------------------------
-static IRegion2D spanCells( const IRegion2D *cells, Int first, Int last )
-{
-	IRegion2D span = cells[ first ];
-	span.hi.x = cells[ last ].hi.x;
-	if( cells[ last ].lo.y < span.lo.y )
-		span.lo.y = cells[ last ].lo.y;
-	if( cells[ last ].hi.y > span.hi.y )
-		span.hi.y = cells[ last ].hi.y;
-	return span;
-}
-
-void ControlBar::placeContextOnGrid( const IRegion2D &frame, const IRegion2D *cells, Bool *taken )
-{
-	// the command group is up, so its own buttons already fill the grid
-	if( m_contextParent[ CP_COMMAND ] && !m_contextParent[ CP_COMMAND ]->winIsHidden() )
-		return;
-
-	GameWindow *building = m_contextParent[ CP_UNDER_CONSTRUCTION ];
-	if( building && !building->winIsHidden() )
-	{
-		// the parent has to cover the cell or the click never arrives
-		placeWindowAt( building, frame );
-		GameWindow *cancel = barWindow( "ControlBar.wnd:ButtonCancelConstruction" );
-		if( barWindowShown( cancel ) )
-		{
-			taken[ COMMAND_PLACE_STOP ] = TRUE;
-			placeWindowAt( cancel, cells[ COMMAND_PLACE_STOP ] );
-			labelPlaceButton( cancel, COMMAND_PLACE_STOP );
-		}
-		GameWindow *desc = barWindow( "ControlBar.wnd:UnderConstructionDesc" );
-		if( barWindowShown( desc ) )
-			placeWindowAt( desc, spanCells( cells, COMMAND_PLACE_Q, COMMAND_PLACE_Y ) );
-		return;
-	}
-
-	GameWindow *timer = m_contextParent[ CP_OCL_TIMER ];
-	if( timer == NULL || timer->winIsHidden() )
-		return;
-
-	placeWindowAt( timer, frame );
-	GameWindow *sell = barWindow( "ControlBar.wnd:OCLTimerSellButton" );
-	if( barWindowShown( sell ) )
-	{
-		const CommandButton *command = (const CommandButton *)GadgetButtonGetData( sell );
-		const Int where = command ? fixedCommandPlace( command->getCommandType() ) : -1;
-		if( where >= 0 )
-		{
-			taken[ where ] = TRUE;
-			placeWindowAt( sell, cells[ where ] );
-			labelPlaceButton( sell, where );
-		}
-	}
-	GameWindow *text = barWindow( "ControlBar.wnd:OCLTimerStaticText" );
-	if( barWindowShown( text ) )
-		placeWindowAt( text, spanCells( cells, COMMAND_PLACE_Q, COMMAND_PLACE_Y ) );
-	GameWindow *bar = barWindow( "ControlBar.wnd:OCLTimerProgressBar" );
-	if( barWindowShown( bar ) )
-		placeWindowAt( bar, spanCells( cells, COMMAND_PLACE_A, COMMAND_PLACE_H ) );
-
-}  // end placeContextOnGrid
 
 //-------------------------------------------------------------------------------------------------
 void CommandButton::cacheButtonImage()
@@ -5545,12 +4558,6 @@ void ControlBar::setPortraitByImage( const Image *image )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::setPortraitByObject( Object *obj )
 {
-	// a builder standing in for an empty selection lends the bar its buildings and nothing else: its
-	// portrait, name and health beside it read as that worker being selected, so the well stays empty
-	if( obj && m_standInBuilderID != INVALID_DRAWABLE_ID && obj->getDrawable()
-			&& obj->getDrawable()->getID() == m_standInBuilderID )
-		obj = NULL;
-
 	// the multi-select unit grid lives over this same HUD; a plain portrait means it must
 	// go, and so must the selection-count badge a one-type selection put on the portrait.
 	// updateMultiSelectStrip re-applies its own look right after calling in here.
@@ -5946,10 +4953,7 @@ void ControlBar::showPurchaseScience( void )
 	// the screen's foot (to 434 of 600) runs under the command bar's top edge (416), and the first
 	// window under the pointer takes the click, so the screen goes in front of the bar while it is up
 	m_contextParent[ CP_PURCHASE_SCIENCE ]->winBringToTop();
-	TheInGameUI->openPromotionPage();
-	// the fade holds the screen hidden for nine frames and draws the side's old painting of it fading
-	// in, which the page has replaced
-	if (TheGlobalData->m_animateWindows && !TheInGameUI->isPromotionPageShown())
+	if (TheGlobalData->m_animateWindows)
 	{
 		// a fade still running out is ended first, or it would hide the screen it just showed
 		TheTransitionHandler->remove("GenExpFade");
@@ -5967,23 +4971,14 @@ void ControlBar::hidePurchaseScience( void )
 	m_purchaseScienceOpen = FALSE;
 
 	//
-	// Closing plays the opening backwards.  The page fades itself out and hides the window when it
-	// is gone; Classic's painted screen runs its fade in reverse, which hides it at the end.  The
-	// window stays up meanwhile, which is why the open state is ours and not its hidden flag.
+	// Closing plays the opening backwards: the painted screen runs its fade in reverse, which hides
+	// it at the end.  The window stays up meanwhile, which is why the open state is ours and not its
+	// hidden flag.
 	//
-	GameWindow *screen = m_contextParent[ CP_PURCHASE_SCIENCE ];
-	if( wasOpen && screen && TheGlobalData->m_animateWindows )
+	if( wasOpen && m_contextParent[ CP_PURCHASE_SCIENCE ] && TheGlobalData->m_animateWindows )
 	{
-		if( !TheInGameUI->isPromotionPageShown() )
-		{
-			TheTransitionHandler->reverse( "GenExpFade" );
-			return;
-		}
-		if( !screen->winIsHidden() )
-		{
-			TheInGameUI->closePromotionPage();
-			return;
-		}
+		TheTransitionHandler->reverse( "GenExpFade" );
+		return;
 	}
 
 	//
@@ -6129,14 +5124,9 @@ void ControlBar::updatePurchaseScienceHotKeys( void )
 	{
 		GameWindow *candidate = purchaseScienceCandidate( column );
 
-		// Classic's number keys pick teams on this screen as they did in 1.04 (SelectionXlat), so a
-		// column key here would name a key that buys nothing
+		// the number keys pick teams on this screen as they did in 1.04 (SelectionXlat), so a column
+		// key here would name a key that buys nothing
 		UnicodeString label;
-		if( barIsClassic() )
-		{
-		}
-		else if( m_purchaseScienceColumn < 0 || m_purchaseScienceColumn == column )
-			label = getMetaKeyLabel( (GameMessage::Type)( GameMessage::MSG_META_SELECT_TEAM1 + column ) );
 
 		for( Int depth = 0; depth < PURCHASE_SCIENCE_COLUMN_DEPTH; depth++ )
 		{
@@ -6271,12 +5261,6 @@ void ControlBar::setDefaultControlBarConfig( void )
 	m_contextParent[ CP_MASTER ]->winSetPosition(m_defaultControlBarPosition.x, m_defaultControlBarPosition.y);
 	m_contextParent[ CP_MASTER ]->winHide(FALSE);
 
-	// the three panels the minimised bar stands down.  Watching, the middle is the player list, which
-	// the spectator page and the Tab scoreboard have taken over, and the right is the selection's portrait
-	showPanel( CB_PANEL_LEFT, TRUE );
-	showPanel( CB_PANEL_CENTER, !m_isObserverCommandBar );
-	showPanel( CB_PANEL_RIGHT, !m_isObserverCommandBar || getSelectedPlayer() != NULL );
-
 	repopulateBuildTooltipLayout();
 	setUpDownImages();
 
@@ -6299,32 +5283,12 @@ void ControlBar::setLowControlBarConfig( void )
 
 	m_currentControlBarStage = CONTROL_BAR_STAGE_LOW;
 
-	//
-	// Minimised is all three panels gone, not the whole bar slid down a tenth of the screen with its
-	// top edge still showing.  Sliding it left a strip of metal, a readable money box and the top of
-	// the radar dish lying along the bottom of the picture, which is neither the bar nor out of the
-	// way.  The one thing that stays is the button that puts it all back: applyPanelSlide rides it
-	// down with the selection panel and stops it on the bottom edge of the screen.
-	//
 	TheTacticalView->setHeight((Int)(TheDisplay->getHeight()));
 
 	// EA's: the whole bar drops to a tenth of the screen from the bottom, its top edge still showing
-	if( barIsClassic() )
-	{
-		m_contextParent[ CP_MASTER ]->winSetPosition( m_defaultControlBarPosition.x,
-			REAL_TO_INT( TheDisplay->getHeight() - 0.1f * TheDisplay->getHeight() ) );
-		m_contextParent[ CP_MASTER ]->winHide(FALSE);
-		setUpDownImages();
-		return;
-	}
-
-	m_contextParent[ CP_MASTER ]->winSetPosition(m_defaultControlBarPosition.x, m_defaultControlBarPosition.y);
+	m_contextParent[ CP_MASTER ]->winSetPosition( m_defaultControlBarPosition.x,
+		REAL_TO_INT( TheDisplay->getHeight() - 0.1f * TheDisplay->getHeight() ) );
 	m_contextParent[ CP_MASTER ]->winHide(FALSE);
-
-	showPanel( CB_PANEL_LEFT, FALSE );
-	showPanel( CB_PANEL_CENTER, FALSE );
-	showPanel( CB_PANEL_RIGHT, FALSE );
-
 	setUpDownImages();
 
 }
@@ -6529,161 +5493,15 @@ void ControlBar::initSpecialPowershortcutBar( Player *player)
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The shipped layout is one slot wide and eleven tall, so a general late in a game runs his powers
-	* from the radar all the way to the top of the screen - a column nobody can take in at a glance.
-	* The same slots are re-laid here as rows of SPECIAL_POWER_SHORTCUT_COLS, filling right to left
-	* and then upward, so the first shortcut keeps the corner it has always been in and the bar grows
-	* sideways instead of climbing.
-	*
-	* Every measurement is read back off the layout - each side ships its own bar, and the loader has
-	* already scaled it to the running resolution - so nothing here is in 800x600 pixels. */
+/** The shipped column, stretched with the bar, on the right edge of the screen and climbing from
+	* the top of the bar as 1.04's did.  Its frame runs most of the screen's height and took every
+	* click over the battlefield and the promotion screen beside the powers; the frame takes none
+	* now, its slots and buttons still do. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::arrangeSpecialPowerShortcutGrid( void )
 {
-	if( m_specialPowerShortcutParent == NULL )
-		return;
-
-	//
-	// Classic keeps the shipped column, stretched with the bar, on the right edge of the screen and
-	// climbing from the top of the bar as 1.04's did.  Its frame runs most of the screen's height and
-	// took every click over the battlefield and the promotion screen beside the powers; the frame
-	// takes none now, its slots and buttons still do
-	//
-	if( barIsClassic() )
-	{
+	if( m_specialPowerShortcutParent )
 		m_specialPowerShortcutParent->winSetStatus( WIN_STATUS_NO_INPUT );
-		return;
-	}
-	if( m_currentlyUsedSpecialPowersButtons < 2 )
-		return;
-
-	//
-	// the two lowest slots give the step the artwork was drawn with: the column runs upward, so
-	// the second slot sits above the first and the difference is one row
-	//
-	Int firstX, firstY, secondX, secondY, slotWidth, slotHeight;
-	m_specialPowerShortcutButtonParents[ 0 ]->winGetPosition( &firstX, &firstY );
-	m_specialPowerShortcutButtonParents[ 1 ]->winGetPosition( &secondX, &secondY );
-	m_specialPowerShortcutButtonParents[ 0 ]->winGetSize( &slotWidth, &slotHeight );
-
-	const Int rowStep = firstY - secondY;
-	if( rowStep <= 0 || slotWidth <= 0 || slotHeight <= 0 )
-		return;
-
-	ICoord2D cameoSize, cameoOffset;
-	Int columnStep;
-	if( getSpecialPowerTrayLayout( NULL, &cameoSize, &cameoOffset, &columnStep ) == FALSE )
-		return;
-
-	const Int columns = MIN( m_currentlyUsedSpecialPowersButtons, (Int)SPECIAL_POWER_SHORTCUT_COLS );
-	const Int widen = ( columns - 1 ) * columnStep;
-
-	//
-	// the bar itself has to cover the columns we are adding.  winPointInChild only descends into
-	// the children of a window the cursor is already inside, so a button hanging off the left edge
-	// of its parent would draw fine and never take a click.
-	//
-	Int barX, barY, barWidth, barHeight;
-	m_specialPowerShortcutParent->winGetPosition( &barX, &barY );
-	m_specialPowerShortcutParent->winGetSize( &barWidth, &barHeight );
-	m_specialPowerShortcutParent->winSetSize( barWidth + widen, barHeight );
-	m_specialPowerShortcutParent->winSetPosition( barX - widen, barY );
-
-	//
-	// slot positions are relative to that bar, so widening it to the left moves every slot right by
-	// the same amount first: the rightmost column has to land back where the old column stood
-	//
-	for( Int i = 0; i < MAX_SPECIAL_POWER_SHORTCUTS; i++ )
-	{
-		GameWindow *slot = m_specialPowerShortcutButtonParents[ i ];
-		GameWindow *button = m_specialPowerShortcutButtons[ i ];
-		if( slot == NULL || button == NULL )
-			continue;
-
-		const Int column = i % SPECIAL_POWER_SHORTCUT_COLS;
-		const Int row = i / SPECIAL_POWER_SHORTCUT_COLS;
-
-		slot->winSetPosition( firstX + widen - column * columnStep, firstY - row * rowStep );
-
-		//
-		// the cameo fills that hole exactly, rounded to the nearest pixel.  The layout put it at
-		// 1,7 39x27, which sat over the frame on the left and left a gap under it
-		//
-		button->winSetSize( cameoSize.x, cameoSize.y );
-		button->winSetPosition( cameoOffset.x, cameoOffset.y );
-	}
-
-	//
-	// children draw from the tail of the list back to the head, so the head is the one on top.
-	// Bringing them to the top in reverse leaves slot 1 at the head and the order running down
-	// the list from there: in a row the slot to the right covers the one to its left, and the row
-	// nearest the corner covers the row above it.
-	//
-	for( Int j = MAX_SPECIAL_POWER_SHORTCUTS - 1; j >= 0; j-- )
-		if( m_specialPowerShortcutButtonParents[ j ] )
-			m_specialPowerShortcutButtonParents[ j ]->winBringToTop();
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The page draws the cell behind each power, so the slot's own tray picture, in the side's art,
-	* is not drawn under it. */
-static void drawNoTray( GameWindow *window, WinInstanceData *instData )
-{
-}
-
-Int ControlBar::placeSpecialPowerShortcutGrid( const ICoord2D *corner, const ICoord2D &cell, Int gap )
-{
-	if( m_specialPowerShortcutParent == NULL || m_specialPowerShortcutButtonParents[ 0 ] == NULL )
-		return 0;
-
-	if( corner == NULL || m_currentlyUsedSpecialPowersButtons < 1 )
-	{
-		if( !m_specialPowerShortcutParent->winIsHidden() )
-			m_specialPowerShortcutParent->winHide( TRUE );
-		return 0;
-	}
-
-	// the powers showing, not the slots the side has: m_currentlyUsedSpecialPowersButtons is eleven
-	// for a general with one power ready
-	const Int shown = countVisibleSpecialPowerShortcuts();
-	if( shown < 1 )
-		return 0;
-
-	// the bar covers every cell, or a cell off its edge draws and never takes a click, and it is only
-	// as big as the powers shown, so the battlefield round them takes its own clicks.  Its position is
-	// its own parent's, and the layout's root is not the screen
-	const Int columns = ( shown + SPECIAL_POWER_SHORTCUT_COLS - 1 ) / SPECIAL_POWER_SHORTCUT_COLS;
-	const Int rows = MIN( shown, (Int)SPECIAL_POWER_SHORTCUT_COLS );
-	const Int width = columns * cell.x + ( columns - 1 ) * gap;
-	const Int height = rows * cell.y + ( rows - 1 ) * gap;
-	Int parentX = 0, parentY = 0;
-	if( m_specialPowerShortcutParent->winGetParent() )
-		m_specialPowerShortcutParent->winGetParent()->winGetScreenPosition( &parentX, &parentY );
-	m_specialPowerShortcutParent->winSetPosition( corner->x - parentX, corner->y - height - parentY );
-	m_specialPowerShortcutParent->winSetSize( width, height );
-	m_specialPowerShortcutParent->winSetDrawFunc( drawNoTray );
-	if( m_specialPowerShortcutParent->winIsHidden() )
-		m_specialPowerShortcutParent->winHide( FALSE );
-
-	// the first power in the corner, its group of SPECIAL_POWER_SHORTCUT_COLS going up from it and the
-	// next group in the column to the right: F1's group is the first column, F2's the second, the
-	// order the group keys count in.  Each cameo fills its cell
-	for( Int i = 0; i < MAX_SPECIAL_POWER_SHORTCUTS; i++ )
-	{
-		GameWindow *slot = m_specialPowerShortcutButtonParents[ i ];
-		GameWindow *button = m_specialPowerShortcutButtons[ i ];
-		if( slot == NULL || button == NULL )
-			continue;
-
-		const Int column = i / SPECIAL_POWER_SHORTCUT_COLS;
-		const Int row = i % SPECIAL_POWER_SHORTCUT_COLS;
-		slot->winSetPosition( column * ( cell.x + gap ), height - ( row + 1 ) * cell.y - row * gap );
-		slot->winSetSize( cell.x, cell.y );
-		slot->winSetDrawFunc( drawNoTray );
-		button->winSetSize( cell.x, cell.y );
-		button->winSetPosition( 0, 0 );
-	}
-	return shown;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -7159,45 +5977,16 @@ void ControlBar::drawSpecialPowerShortcutMultiplierText()
 		if( command == NULL )
 			continue;
 
-		// the button's text: the key that presses it (SHORTCUT_SLOTnn, F1..), then how many
-		// of its superweapons are ready - a "1" is superfluous (Lorenzen)
+		// the button's text: how many of its superweapons are ready, as the game shipped - a "1" is
+		// superfluous (Lorenzen)
 		UnicodeString text;
-
-		//
-		// a power takes two keys, so only the half of them that the next press can reach is
-		// labelled: with no group pending that is the foot of each group's column, carrying the
-		// key that picks the group; with one pending it is that group's powers, carrying their own keys.
-		// Which key a slot number means is up to CommandMap.ini - getMetaKeyLabel returns
-		// nothing for an unbound one.
-		//
-		// Classic's powers wear no key, only how many are ready, as the game shipped
-		Int keySlot = -1;
-		if( barIsClassic() )
-		{
-		}
-		else if( m_specialPowerShortcutRow < 0 )
-		{
-			if( i % SPECIAL_POWER_SHORTCUT_COLS == 0 )
-				keySlot = i / SPECIAL_POWER_SHORTCUT_COLS;
-		}
-		else if( i / SPECIAL_POWER_SHORTCUT_COLS == m_specialPowerShortcutRow )
-			keySlot = i % SPECIAL_POWER_SHORTCUT_COLS;
-
-		if( keySlot >= 0 && keySlot < MAX_SPECIAL_POWER_SHORTCUTS )
-			text = getMetaKeyLabel( (GameMessage::Type)(GameMessage::MSG_META_SHORTCUT_SLOT01 + keySlot) );
 
 		const SpecialPowerTemplate *spTemplate = command->getSpecialPowerTemplate();
 		Int numReady = 0;
 		if( spTemplate )
 			numReady = ThePlayerList->getLocalPlayer()->countReadyShortcutSpecialPowersOfType( spTemplate->getSpecialPowerType() );
 		if( numReady > 1 )
-		{
-			UnicodeString count;
-			count.format( u"%d", numReady );
-			if( !text.isEmpty() )
-				text.concat( u" " );
-			text.concat( count );
-		}
+			text.format( u"%d", numReady );
 
 		GadgetButtonSetText( win, text );
 	}

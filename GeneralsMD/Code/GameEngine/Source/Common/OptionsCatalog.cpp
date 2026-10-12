@@ -46,8 +46,6 @@
 	static Int get_##field( void ) { return TheGlobalData->field; }															\
 	static void set_##field( Int value ) { TheWritableGlobalData->field = value; }
 
-OPTION_BOOL_ACCESSORS( m_useCameraConstraints )
-
 static Int get_m_cameraBoundaryMargin( void ) { return TheGlobalData->m_cameraBoundaryMargin; }
 static void set_m_cameraBoundaryMargin( Int value )
 {
@@ -67,7 +65,6 @@ OPTION_BOOL_ACCESSORS( m_nudgeBuildPlacement )
 OPTION_BOOL_ACCESSORS( m_zoomToCursor )
 OPTION_INT_ACCESSORS( m_zoomSpeed )
 OPTION_BOOL_ACCESSORS( m_isometricCamera )
-OPTION_BOOL_ACCESSORS( m_smoothMotion )
 OPTION_BOOL_ACCESSORS( m_startAtMaxZoom )
 
 // This catalog loads before there is a mouse, so the value waits in GlobalData and Mouse::parseIni
@@ -89,7 +86,6 @@ static void set_m_ambientVolume( Int value )
 		TheAudio->setVolume( value / 100.0f, (AudioAffect)(AudioAffect_Ambient | AudioAffect_SystemSetting) );
 }
 OPTION_BOOL_ACCESSORS( m_formationDrag )
-OPTION_BOOL_ACCESSORS( m_showAllyCursors )
 OPTION_BOOL_ACCESSORS( m_chromaLighting )
 OPTION_INT_ACCESSORS( m_bloomIntensity )
 OPTION_INT_ACCESSORS( m_menuTransitionSpeed )
@@ -101,12 +97,10 @@ OPTION_INT_ACCESSORS( m_msaaLevel )
 OPTION_BOOL_ACCESSORS( m_vsync )
 OPTION_BOOL_ACCESSORS( m_classicGraphics )
 OPTION_INT_ACCESSORS( m_healthBarMode )
-OPTION_INT_ACCESSORS( m_hudScale )
 OPTION_INT_ACCESSORS( m_playerColorScheme )
 OPTION_INT_ACCESSORS( m_textLanguage )
 OPTION_BOOL_ACCESSORS( m_showOrderLines )
 OPTION_BOOL_ACCESSORS( m_showNetBox )
-OPTION_INT_ACCESSORS( m_incomeRateMode )
 OPTION_BOOL_ACCESSORS( m_showEmptyBuildingPips )
 OPTION_BOOL_ACCESSORS( m_useShadowVolumesForSkins )
 OPTION_BOOL_ACCESSORS( m_shadowsForProjectiles )
@@ -115,8 +109,6 @@ OPTION_BOOL_ACCESSORS( m_shadowsForParticles )
 OPTION_BOOL_ACCESSORS( m_particleGroundBounce )
 OPTION_BOOL_ACCESSORS( m_volumetricSmokeShadows )
 OPTION_BOOL_ACCESSORS( m_smokeFireLighting )
-OPTION_BOOL_ACCESSORS( m_showSkillStrip )
-OPTION_BOOL_ACCESSORS( m_showSuperweaponStrip )
 
 //-----------------------------------------------------------------------------
 static const unsigned TheMsaaSamples[ OPTION_MSAA_LEVEL_COUNT ] = { 0, 2, 4, 8, 16 };
@@ -217,11 +209,9 @@ const OptionDef TheOptionCatalog[] =
 	// The camera and mouse habits below have no control in OptionsMenu.wnd any more.  They are
 	// not gone: an empty widgetName only makes the menu passes skip the row, so Options.ini still
 	// loads, clamps and saves each one and a player who wants the old behaviour can put the key
-	// back by hand.  The defaults in GlobalData are what everybody else gets.
-
-	{ "UseCameraConstraints", "", "",
-		OPTION_BOOL, APPLY_LIVE, 0, 1,
-		get_m_useCameraConstraints, set_m_useCameraConstraints },
+	// back by hand.  The defaults in GlobalData are what everybody else gets.  UseCameraConstraints
+	// left the catalog: the camera keeps the map's own limits as the game shipped, and only
+	// -noViewLimit lifts them.
 
 	{ "CameraBoundaryMargin", "", "",
 		OPTION_INT, APPLY_LIVE, 0, 1000,
@@ -287,12 +277,6 @@ const OptionDef TheOptionCatalog[] =
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_isometricCamera, set_m_isometricCamera },
 
-	// R1: models drawn between their last two logic states on every render frame, so motion is smooth
-	// on a panel faster than the 30 Hz logic.  The picture only, one logic tick behind; never the game.
-	// Its default is GlobalData's: on off Windows, off on Windows.  On Options > Display.
-	{ "SmoothMotion",							OPT_WND( "CheckSmoothMotion" ), "GUI:SmoothMotion",
-		OPTION_BOOL, APPLY_LIVE, 0, 1,
-		get_m_smoothMotion, set_m_smoothMotion },
 	// A match opens as far out as the wheel goes, or 300 over the ground (View::setZoomToStart).
 	// Read when the map loads, so it counts from the next match.  On Options > Controls in both
 	// interfaces.  A new key for the snaps' reason above: StartAtMaxZoom is a "yes" in old files.
@@ -319,13 +303,6 @@ const OptionDef TheOptionCatalog[] =
 	{ "FormationDrag",						"", "",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_formationDrag, set_m_formationDrag },
-
-	// In a network game, each ally's mouse is drawn on the map with their name over it and a patch
-	// of their colour under it.  Off and neither end of it happens: nothing is sent and nothing is
-	// drawn, so a player who does not want to be watched turns it off on their own machine.
-	{ "ShowAllyCursors",					"", "",
-		OPTION_BOOL, APPLY_LIVE, 0, 1,
-		get_m_showAllyCursors, set_m_showAllyCursors },
 
 	// The match on Razer hardware: the command bar on the letter keys, power on the digits,
 	// superweapons on the numpad, money on the mousepad.  Only during a match; off, and in every
@@ -418,15 +395,8 @@ const OptionDef TheOptionCatalog[] =
 		OPTION_ENUM, APPLY_LIVE, 0, HEALTH_BAR_MODE_COUNT - 1,
 		get_m_healthBarMode, set_m_healthBarMode },
 
-	// How big the command bar and the rest of the bottom HUD are drawn: 100%, 115%, 130% or 150% of
-	// the size the resolution picks.  The page lays itself out again when the scale changes.
-	{ "HudScale",									OPT_WND( "ComboBoxHudScale" ), "GUI:HudScale",
-		OPTION_ENUM, APPLY_LIVE, 0, HUD_SCALE_COUNT - 1,
-		get_m_hudScale, set_m_hudScale },
-
-	// MenuLayout (stretch or fit) used to sit here.  Every menu is fitted now, in both interfaces.
-	// InterfaceStyle is not a row either: the launcher picks it with -interface for each run, and a
-	// run without the switch is Classic whatever an older Options.ini says.
+	// MenuLayout (stretch or fit), HudScale and InterfaceStyle used to sit here.  Every menu is
+	// fitted now, and there is one interface at one size.
 
 	// Whose colour a player is drawn in.  Purely local: the match still agrees on the lobby's
 	// colours and this only changes what this screen puts on top of them, so two people in the same
@@ -449,13 +419,6 @@ const OptionDef TheOptionCatalog[] =
 	{ "ShowNetBox",								OPT_WND( "CheckNetBox" ), "GUI:NetBox",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_showNetBox, set_m_showNetBox },
-
-	// The income beside the money: per second, per minute, or automatic, which is per minute while
-	// the player earns under ten dollars a second and per second from there up.  A supply line
-	// bringing in $135 a minute reads "+2/s" per second, and losing a third of it still reads "+2/s".
-	{ "IncomeRate",								OPT_WND( "ComboBoxIncomeRate" ), "GUI:IncomeRate",
-		OPTION_ENUM, APPLY_LIVE, 0, INCOME_RATE_MODE_COUNT - 1,
-		get_m_incomeRateMode, set_m_incomeRateMode },
 
 	// The row of slots over a building that holds troops is drawn empty too: ten grey boxes over a
 	// Barracks nobody is healing in.  Off, a building wears its slots only while somebody is inside.
@@ -514,18 +477,6 @@ const OptionDef TheOptionCatalog[] =
 	{ "ParticleBounce",						OPT_WND( "CheckParticleBounce" ), "GUI:ParticleBounce",
 		OPTION_BOOL, APPLY_RESTART, 0, 1,
 		get_m_particleGroundBounce, set_m_particleGroundBounce },
-
-	// The strips over the battlefield while watching a match.  They have no control in the options
-	// menu: a spectator switches them from the drop-down in the top left corner, which writes them
-	// back itself.  Playing, every strip is drawn whatever these say.  The production queues have no
-	// switch: watching, they are on the Tab scoreboard, and playing, they are always drawn.
-	{ "ShowSkillStrip",						NULL, "GUI:HudSkillStrip",
-		OPTION_BOOL, APPLY_LIVE, 0, 1,
-		get_m_showSkillStrip, set_m_showSkillStrip },
-
-	{ "ShowSuperweaponStrip",			NULL, "GUI:HudSuperweaponStrip",
-		OPTION_BOOL, APPLY_LIVE, 0, 1,
-		get_m_showSuperweaponStrip, set_m_showSuperweaponStrip },
 
 	{ NULL, NULL, NULL, OPTION_BOOL, APPLY_LIVE, 0, 0, NULL, NULL }
 };

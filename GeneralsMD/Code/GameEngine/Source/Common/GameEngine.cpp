@@ -1243,9 +1243,7 @@ void GameEngine::init( int argc, char *argv[] )
 
 		AsciiString fname;
 		fname.format("Data\\%s\\CommandMap.ini", GetRegistryLanguage().str());
-		initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), NULL, fname.str(), "Data\\INI\\CommandMapReforged.ini");
-		// Classic answers to the game's own map and to nothing this fork binds
-		TheMetaMap->loadClassicBindings(fname);
+		initSubsystem(TheMetaMap,"TheMetaMap", MSGNEW("GameEngineSubsystem") MetaMap(), NULL, fname.str(), NULL);
 
 #if defined(_DEBUG) || defined(_INTERNAL)
 		ini.load("Data\\INI\\CommandMapDebug.ini", INI_LOAD_MULTIFILE, NULL);
@@ -1694,8 +1692,6 @@ extern Real TheSceneDrawMS;				///< ...of which the 3D world
 extern Real TheUIDrawMS;					///< ...and the interface over it
 extern Real TheUIPostDrawMS;			///< ...of which the overlays and the HUD strips
 extern Real TheWindowRepaintMS;		///< ...and the window system's repaint
-extern Real TheStripGatherMS;			///< ...of the overlays, the production strip's sweep
-extern Real TheStripDrawMS;				///< ...and the production strip's own drawing
 extern Real TheParticleUpdateMS;		///< GameClient.cpp: the three places particles cost
 extern Real TheParticleFillMS;
 extern Real TheTranslucentMS;
@@ -2705,7 +2701,6 @@ void GameEngine::update( void )
 		static UnsignedInt fpsWindowStart = Clock_Milliseconds();
 		static Real fpsRadarTotal = 0.0f, fpsAudioTotal = 0.0f, fpsDrawTotal = 0.0f, fpsDrawMax = 0.0f;
 		static Real fpsSceneTotal = 0.0f, fpsUITotal = 0.0f, fpsPostTotal = 0.0f, fpsWinTotal = 0.0f;
-		static Real fpsStripGatherTotal = 0.0f, fpsStripDrawTotal = 0.0f;
 		static Real fpsShadowTotal = 0.0f, fpsFillTotal = 0.0f, fpsTranslucentTotal = 0.0f;
 		static Real fpsPostChainTotal = 0.0f, fpsIconTotal = 0.0f;
 		static Real fpsSortTotal = 0.0f, fpsCopyTotal = 0.0f, fpsSortDrawTotal = 0.0f;
@@ -2716,7 +2711,6 @@ void GameEngine::update( void )
 		Real clientMS = 0.0f, logicMS = 0.0f, radarMS = 0.0f, audioMS = 0.0f;
 		Int logicTicks = 0;
 		TheClientDrawMS = TheSceneDrawMS = TheUIDrawMS = TheUIPostDrawMS = TheWindowRepaintMS = 0.0f;
-		TheStripGatherMS = TheStripDrawMS = 0.0f;
 		TheParticleUpdateMS = TheParticleFillMS = TheTranslucentMS = 0.0f;
 		TheTranslucentDraws = TheSortingPolygonsRefused = TheParticlesPastGroupLimit = 0;
 		TheShadowMapMS = ThePostChainMS = TheIconDrawMS = 0.0f;
@@ -2963,8 +2957,6 @@ void GameEngine::update( void )
 		fpsUITotal += TheUIDrawMS;
 		fpsPostTotal += TheUIPostDrawMS;
 		fpsWinTotal += TheWindowRepaintMS;
-		fpsStripGatherTotal += TheStripGatherMS;
-		fpsStripDrawTotal += TheStripDrawMS;
 		fpsShadowTotal += TheShadowMapMS;
 		fpsFillTotal += TheParticleFillMS;
 		fpsTranslucentTotal += TheTranslucentMS;
@@ -3012,7 +3004,7 @@ void GameEngine::update( void )
 					// 'hz' is the rate the simulation actually achieved and 'catchup' how many render
 					// frames were dropped to hold it there; hz short of m_maxFPS with catchup passes
 					// present is the logic side being genuinely over budget, not the pacer.
-					DEBUG_LOG(("FPS %.0f over %dms (%d frames, %d hz, %d catchup, logic frame %d) | client avg %.1f max %.1f (render avg %.1f max %.1f [scene %.1f, ui %.1f (post %.1f [strip gather %.1f, draw %.1f], win %.1f), present %.1f], radar %.1f, audio %.1f, rest %.1f) | logic avg %.1f max %.1f | unaccounted %.1fms\n",
+					DEBUG_LOG(("FPS %.0f over %dms (%d frames, %d hz, %d catchup, logic frame %d) | client avg %.1f max %.1f (render avg %.1f max %.1f [scene %.1f, ui %.1f (post %.1f, win %.1f), present %.1f], radar %.1f, audio %.1f, rest %.1f) | logic avg %.1f max %.1f | unaccounted %.1fms\n",
 										 fps, (Int)windowMS, fpsFrames,
 										 (Int)((Real)fpsLogicTicks * 1000.0f / (Real)windowMS + 0.5f), fpsCatchupPasses,
 										 TheGameLogic->getFrame(),
@@ -3020,7 +3012,6 @@ void GameEngine::update( void )
 										 fpsDrawTotal / fpsFrames, fpsDrawMax,
 										 fpsSceneTotal / fpsFrames, fpsUITotal / fpsFrames,
 										 fpsPostTotal / fpsFrames,
-										 fpsStripGatherTotal / fpsFrames, fpsStripDrawTotal / fpsFrames,
 										 fpsWinTotal / fpsFrames,
 										 ( fpsDrawTotal - fpsSceneTotal - fpsUITotal ) / fpsFrames,
 										 fpsRadarTotal / fpsFrames, fpsAudioTotal / fpsFrames,
@@ -3042,7 +3033,6 @@ void GameEngine::update( void )
 				fpsClientTotal = fpsLogicTotal = 0.0f;
 				fpsRadarTotal = fpsAudioTotal = fpsDrawTotal = fpsDrawMax = 0.0f;
 				fpsSceneTotal = fpsUITotal = fpsPostTotal = fpsWinTotal = 0.0f;
-				fpsStripGatherTotal = fpsStripDrawTotal = 0.0f;
 				fpsShadowTotal = fpsFillTotal = fpsTranslucentTotal = 0.0f;
 				fpsPostChainTotal = fpsIconTotal = 0.0f;
 				fpsSortTotal = fpsCopyTotal = fpsSortDrawTotal = 0.0f;

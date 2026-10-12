@@ -296,8 +296,6 @@ AsciiString GetAsciiNetCommandType(NetCommandType type) {
 		s.set("NETCOMMANDTYPE_DISCONNECTSCREENOFF");
 	} else if (type == NETCOMMANDTYPE_FRAMERESENDREQUEST) {
 		s.set("NETCOMMANDTYPE_FRAMERESENDREQUEST");
-	} else if (type == NETCOMMANDTYPE_ALLYCURSOR) {
-		s.set("NETCOMMANDTYPE_ALLYCURSOR");
 	} else {
 		s.set("UNKNOWN");
 	}

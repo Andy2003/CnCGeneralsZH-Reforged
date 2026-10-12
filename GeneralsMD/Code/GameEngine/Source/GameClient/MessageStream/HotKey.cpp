@@ -100,8 +100,7 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		}
 		// shift is allowed through: a shift-click on a build button queues a batch of units, and
 		// the label hotkey is meant to be that click's equal. Ctrl and alt still block the hotkey.
-		// Classic blocks every modifier, as the game shipped
-		if( TheGlobalData->isClassicUI() ? newModState != 0 : ( newModState & ~SHIFT ) != 0 )
+		if( ( newModState & ~SHIFT ) != 0 )
 			return disp;
 		// Ctrl+F let go of Ctrl first ends on a bare F release; it is still Ctrl+F
 		if( keyState & KEY_STATE_PRESSED_WITH_CTRL_ALT )

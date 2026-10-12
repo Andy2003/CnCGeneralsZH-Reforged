@@ -215,12 +215,9 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 	{ "ZoomToCursor",							INI::parseBool,				NULL,			offsetof( GlobalData, m_zoomToCursor ) },
 	{ "IsometricCamera",					INI::parseBool,				NULL,			offsetof( GlobalData, m_isometricCamera ) },
 	{ "FormationDrag",						INI::parseBool,				NULL,			offsetof( GlobalData, m_formationDrag ) },
-	{ "ShowAllyCursors",					INI::parseBool,				NULL,			offsetof( GlobalData, m_showAllyCursors ) },
 	{ "ChromaLighting",						INI::parseBool,				NULL,			offsetof( GlobalData, m_chromaLighting ) },
 	{ "ShowHudOverlay",						INI::parseBool,				NULL,			offsetof( GlobalData, m_showHudOverlay ) },
-	{ "ShowPlacementRangeRing",		INI::parseBool,				NULL,			offsetof( GlobalData, m_showPlacementRangeRing ) },
 	{ "WorkersReturnToSupply",		INI::parseBool,				NULL,			offsetof( GlobalData, m_workersReturnToSupply ) },
-	{ "DetailedBuildTooltips",		INI::parseBool,				NULL,			offsetof( GlobalData, m_detailedBuildTooltips ) },
 	{ "ArchiveReplays",						INI::parseBool,				NULL,			offsetof( GlobalData, m_archiveReplays ) },
 	{ "Bloom",										INI::parseInt,				NULL,			offsetof( GlobalData, m_bloomIntensity ) },
 	{ "MinCameraHeight",						INI::parseReal,				NULL,			offsetof( GlobalData, m_minCameraHeight ) },
@@ -963,9 +960,8 @@ GlobalData::GlobalData()
 	m_showObjectHealth = FALSE;
 	// what this fork has always done, so nobody's game changes until they say so
 	m_healthBarMode = HEALTH_BAR_ALWAYS;
-	m_hudScale = 0;
-	// the game as it shipped unless the launcher passes -interface reforged
-	m_interfaceStyle = INTERFACE_STYLE_CLASSIC;
+	// the game's own mouse unless the launcher passes -mouse reforged
+	m_mouseStyle = MOUSE_STYLE_CLASSIC;
 	// the lobby's own colours until somebody asks for something else
 	m_playerColorScheme = PLAYER_COLORS_ORIGINAL;
 	// the words the game shipped with until somebody picks a translation
@@ -1168,18 +1164,9 @@ GlobalData::GlobalData()
 	m_zoomToCursor = FALSE;		// the wheel zooms on the middle of the screen, as 1.04 did, until ticked
 	m_zoomSpeed = 100;				// a notch moves the camera the 60 units it always did
 	m_isometricCamera = FALSE;
-	// R1, smooth motion: the picture only, one logic tick behind, and never the game (W3DSmoothMotion.h).
-	// On by default off Windows, where 120 and 144 Hz panels are the common case; Windows keeps its
-	// picture as it was unless a player opts in.
-#if defined(_WIN32)
-	m_smoothMotion = FALSE;
-#else
-	m_smoothMotion = TRUE;
-#endif
 	m_dragTolerance = 25;		// what Mouse.ini in INIZH.big says, so nothing moves until the slider does
 	// a left drag with the move, attack move or guard key armed draws a formation line
 	m_formationDrag = TRUE;
-	m_showAllyCursors = TRUE;
 	m_chromaLighting = TRUE;	//costs nothing on a machine with no Razer server: the handshake fails once
 	m_menuTransitionSpeed = 100;
 	m_textureFilterMode = 2;	// anisotropic; retail shipped bilinear on a 2003 fill-rate budget
@@ -1201,13 +1188,8 @@ GlobalData::GlobalData()
 	m_showHudOverlay = FALSE;
 #endif
 	m_showNetBox = TRUE;
-	m_incomeRateMode = INCOME_RATE_PER_SECOND;
 	m_showEmptyBuildingPips = TRUE;
-	m_showPlacementRangeRing = TRUE;
-	m_showSkillStrip = TRUE;
-	m_showSuperweaponStrip = TRUE;
 	m_workersReturnToSupply = TRUE;
-	m_detailedBuildTooltips = TRUE;
 	m_archiveReplays = TRUE;
 
 	// Glow defaults to the options screen's Medium, 50 percent.  GameData.ini sets the field as a

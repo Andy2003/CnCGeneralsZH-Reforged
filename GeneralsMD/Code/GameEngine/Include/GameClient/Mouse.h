@@ -411,8 +411,6 @@ protected:
 	UnsignedInt m_stillTime;
 	RGBAColorInt m_tooltipTextColor;
 	RGBAColorInt m_tooltipBackColor;
-	Bool m_tooltipHasAccent;												///< the tooltip came with a colour, its owner's
-	RGBColor m_tooltipAccent;												///< that colour as it came, before the INI's alt colour rules
 
 	Int m_eventsThisFrame;
 

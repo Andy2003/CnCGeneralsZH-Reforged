@@ -435,7 +435,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 
 			// with attack move or guard armed a left drag draws the order line over in CommandXlat, so
 			// no selection box grows under it.  Classic draws no lines: its left drag is always the box
-			const Bool leftDragIsOrder = !TheGlobalData->isClassicUI()
+			const Bool leftDragIsOrder = !TheGlobalData->isClassicMouse()
 																	&& TheInGameUI->isLineOrderArmed()
 																	 && TheInGameUI->getSelectCount() > 0;
 			if (m_leftMouseButtonIsDown && !leftDragIsOrder)
@@ -581,7 +581,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 						// gathers everything of a kind may only gather what a box would - things
 						// you can click one at a time but never sweep up used to come along.  Classic keeps
 						// 1.04's rule, which put back everything that was selected
-						const Bool keep = TheGlobalData->isClassicUI() ? (draw && draw->isSelectable())
+						const Bool keep = TheGlobalData->isClassicMouse() ? (draw && draw->isSelectable())
 							: (draw && draw->isMassSelectable() && draw->isKindOf( KINDOF_STRUCTURE ) == picked->isKindOf( KINDOF_STRUCTURE ));
 						if (keep) {
 							TheInGameUI->selectDrawable(draw);
@@ -721,7 +721,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 				 only what can shoot, Ctrl removes the box from the selection instead of replacing it.
 				 Both are drag-only.  A point click has to stay exactly what it was - a filter that eats
 				 single clicks reads as a broken mouse.  Classic has neither: its Ctrl is force fire. */
-			if (!isPoint && !TheGlobalData->isClassicUI())
+			if (!isPoint && !TheGlobalData->isClassicMouse())
 			{
 				if (TheKeyboard->isAlt())
 				{
@@ -782,7 +782,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			// A box with an army in it takes the army and leaves the dozers and trucks standing among
 			// it; a box of workers alone still takes the workers.  Drag-only, like the filters above,
 			// and not in Classic, which is the 2003 box.
-			if (!isPoint && !TheGlobalData->isClassicUI())
+			if (!isPoint && !TheGlobalData->isClassicMouse())
 				prioritizeMilitaryBoxSelection(drawablesThatWillSelect, isSelectableMilitaryInBox);
 
 			SelectionInfo si;
@@ -819,7 +819,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			
 			Bool addToGroup = TheInGameUI->isInPreferSelectionMode();
 
-			const Bool classic = TheGlobalData->isClassicUI();
+			const Bool classic = TheGlobalData->isClassicMouse();
 			if (si.currentCountEnemies > 0 ||
 					si.currentCountCivilians > 0 ||
 					si.currentCountFriends > 0 ||
@@ -1231,7 +1231,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			// instead, so that click gives no order either.  Otherwise it deselects everyone: always in
 			// the default mouse, where it is the cancel button, and under the Alternate Mouse Setup only
 			// with a dozer's structure on the cursor.  The structure itself comes off in CommandXlat.
-			if( TheGlobalData->isClassicUI() )
+			if( TheGlobalData->isClassicMouse() )
 			{
 				Coord3D cameraAtRelease;
 				TheTacticalView->getPosition( &cameraAtRelease );
@@ -1354,7 +1354,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			// A screen that fills the middle of the display and answers nothing on the keyboard is
 			// the thing being fixed, so group selection gives way for as long as it is up.
 			//
-			if( TheControlBar && TheControlBar->isPurchaseScienceVisible() && !TheGlobalData->isClassicUI()
+			if( TheControlBar && TheControlBar->isPurchaseScienceVisible()
 					&& group >= 1 && group <= PURCHASE_SCIENCE_COLUMNS )
 			{
 				TheControlBar->pressPurchaseScienceColumn( group - 1 );
@@ -1427,49 +1427,6 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			// logic only fills a squad from scratch, so the squad goes out again whole as a create: its
 			// members as the logic will hold them when this lands, then the selection after them.
 			Int group = t - GameMessage::MSG_META_ADD_TEAM0;
-
-			// Classic keeps the key the way the game shipped it: the squad joins the selection, and a
-			// second press jumps the camera to it
-			if ( TheGlobalData->isClassicUI() )
-			{
-				if ( isValidHotkeySquadIndex( group ) )
-				{
-					UnsignedInt now = TheGameLogic->getFrame();
-					if ( m_lastGroupSelTime == 0 )
-						m_lastGroupSelTime = now;
-
-					if ( now - m_lastGroupSelTime < 20 && group == m_lastGroupSelGroup )
-					{
-						Player *player = ThePlayerList->getLocalPlayer();
-						Squad *selectedSquad = player ? player->getHotkeySquad(group) : NULL;
-						if (selectedSquad != NULL)
-						{
-							VecObjectPtr objlist = selectedSquad->getLiveObjects();
-							Int numObjs = objlist.size();
-							if (numObjs > 0)
-								TheTacticalView->lookAt( objlist[numObjs-1]->getDrawable()->getPosition() );
-						}
-					}
-					else
-					{
-						//Kris: Jan 12, 2005
-						//Can't select other units if you have a structure selected. So deselect the structure to prevent
-						//group force attack exploit.
-						Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
-						if( draw && draw->isKindOf( KINDOF_STRUCTURE ) )
-							TheInGameUI->deselectAllDrawables();
-
-						TheMessageStream->appendMessage((GameMessage::Type)(GameMessage::MSG_ADD_TEAM0 + group));
-						Player *player = ThePlayerList->getLocalPlayer();
-						if (player)
-							selectHotkeySquad( player, group, FALSE );
-					}
-					m_lastGroupSelTime = now;
-					m_lastGroupSelGroup = group;
-				}
-				disp = DESTROY_MESSAGE;
-				break;
-			}
 
 			if ( isValidHotkeySquadIndex( group ) )
 			{

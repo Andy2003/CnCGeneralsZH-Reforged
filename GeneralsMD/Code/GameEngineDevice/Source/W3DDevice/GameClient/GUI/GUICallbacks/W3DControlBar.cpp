@@ -718,19 +718,8 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 		return;
 	}
 
-	IRegion2D panels[ ControlBar::CB_PANEL_COUNT ];
-	Bool shown[ ControlBar::CB_PANEL_COUNT ];
-	const Image *images[ ControlBar::CB_PANEL_COUNT ];
 	for( Int p = 0; p < ControlBar::CB_PANEL_COUNT; p++ )
 	{
-		shown[ p ] = FALSE;
-		images[ p ] = NULL;
-		panels[ p ].lo.x = panels[ p ].lo.y = panels[ p ].hi.x = panels[ p ].hi.y = 0;
-
-		// a panel the minimised bar has stood down paints nothing at all
-		if( TheControlBar->isPanelHidden( p ) )
-			continue;
-
 		const ControlBarPlate *plate = ControlBarPlateForSide( man->getCurrentSide(), p );
 		if( plate == NULL )
 			plate = ControlBarPlateForSide( man->getCurrentArtTwinSide(), p );
@@ -742,23 +731,10 @@ void W3DCommandBarBackgroundDraw( GameWindow *window, WinInstanceData *instData 
 																			 TheDisplay->getHeight(), &rect ) == FALSE )
 			continue;
 
-		// ... and a panel on its way off the bottom takes its painting down with it
-		const Int slide = TheControlBar->getPanelSlideOffset( p );
-		panels[ p ].lo.x = rect.lo.x + offset.x;
-		panels[ p ].lo.y = rect.lo.y + offset.y + slide;
-		panels[ p ].hi.x = rect.hi.x + offset.x;
-		panels[ p ].hi.y = rect.hi.y + offset.y + slide;
-		shown[ p ] = TRUE;
-		images[ p ] = plateImage( plate );
+		const Image *image = plateImage( plate );
+		if( image )
+			TheDisplay->drawImage( image, rect.lo.x + offset.x, rect.lo.y + offset.y, rect.hi.x + offset.x, rect.hi.y + offset.y );
 	}
-
-	// the bar's own page, Window/Html/ControlBar.html, is drawn in the plates' place when it is there
-	if( TheInGameUI && TheInGameUI->drawControlBarPage( panels, shown, ControlBar::CB_PANEL_COUNT ) )
-		return;
-
-	for( Int p = 0; p < ControlBar::CB_PANEL_COUNT; p++ )
-		if( shown[ p ] && images[ p ] )
-			TheDisplay->drawImage( images[ p ], panels[ p ].lo.x, panels[ p ].lo.y, panels[ p ].hi.x, panels[ p ].hi.y );
 }
 
 

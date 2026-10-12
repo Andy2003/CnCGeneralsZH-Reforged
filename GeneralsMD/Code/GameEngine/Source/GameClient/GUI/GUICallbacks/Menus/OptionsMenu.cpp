@@ -113,7 +113,6 @@ static Int							menuModeCount = 0;
 static NameKeyType    comboBoxDetailID      = NAMEKEY_INVALID;
 static GameWindow *   comboBoxDetail        = NULL; 
 
-// only OptionsMenuClassic.wnd carries it: Reforged has one mouse and no box, so this stays NULL there
 static NameKeyType		checkAlternateMouseID	= NAMEKEY_INVALID;
 static GameWindow *		checkAlternateMouse		= NULL;
 
@@ -244,9 +243,7 @@ WindowLayout *OptionsLayout = NULL;
 // in the layout, parked off the right edge with HIDDEN set because there was nowhere to put them.
 // The layout now sorts the same controls into seven pages on one grid (Tools/optionsmenu_layout.py);
 // this is the two arrays that name them and the one function that decides which one you are
-// looking at.  The Classic interface opens OptionsMenuClassic.wnd instead (Shell::getOptionsLayout),
-// the same pages without the settings Classic overrules; their catalog rows find no control there
-// and keep their value.
+// looking at.  Shell::optionsLayoutFile names the file, OptionsMenuClassic.wnd.
 //-------------------------------------------------------------------------------------------------
 enum { OPTIONS_PAGE_COUNT = 7 };
 
@@ -917,8 +914,7 @@ static void setDefaults( void )
 	
 	//-------------------------------------------------------------------------------------------------
 	// Mouse Mode
-	if( checkAlternateMouse )
-		GadgetCheckBoxSetChecked(checkAlternateMouse, FALSE);
+	GadgetCheckBoxSetChecked(checkAlternateMouse, FALSE);
 	GadgetCheckBoxSetChecked(checkRetaliation, TRUE );
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, FALSE );
 
@@ -1664,12 +1660,9 @@ static void saveOptions( void )
 
 
 	//-------------------------------------------------------------------------------------------------
-	// mouse mode.  Saved only from the Classic screen, so an Accept in Reforged keeps what Classic chose
-	if( checkAlternateMouse )
-	{
-		TheWritableGlobalData->m_useAlternateMouse = GadgetCheckBoxIsChecked(checkAlternateMouse);
-		(*pref)["UseAlternateMouse"] = TheWritableGlobalData->m_useAlternateMouse ? AsciiString("yes") : AsciiString("no");
-	}
+	// mouse mode
+	TheWritableGlobalData->m_useAlternateMouse = GadgetCheckBoxIsChecked(checkAlternateMouse);
+	(*pref)["UseAlternateMouse"] = TheWritableGlobalData->m_useAlternateMouse ? AsciiString("yes") : AsciiString("no");
 
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = GadgetCheckBoxIsChecked(checkRetaliation);
 	(*pref)["Retaliation"] = TheWritableGlobalData->m_clientRetaliationModeEnabled? AsciiString("yes") : AsciiString("no");
@@ -2667,8 +2660,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 //	GadgetCheckBoxSetChecked(checkAudioSurround, TheAudio->getSpeakerSurround());
 
 	// set the mouse mode
-	if( checkAlternateMouse )
-		GadgetCheckBoxSetChecked(checkAlternateMouse, TheGlobalData->m_useAlternateMouse);
+	GadgetCheckBoxSetChecked(checkAlternateMouse, TheGlobalData->m_useAlternateMouse);
 	GadgetCheckBoxSetChecked(checkRetaliation, TheGlobalData->m_clientRetaliationModeEnabled);
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, TheGlobalData->m_doubleClickAttackMove );
 

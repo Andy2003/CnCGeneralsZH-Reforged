@@ -193,67 +193,17 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 
 
 	// Retail drew its own white nodes-and-lines here for every selected unit's goal path while
-	// isInWaypointMode() (shift held) was true. The shift queue now has its own colored, per-order
-	// hint threads (InGameUI::updateOrderHints / W3DInGameUI::drawOrderHints), which cover the same
-	// ground and stay up after the key is let go, so the white duplicate is gone rather than merely
-	// hidden - its only firing condition was this same isInWaypointMode() check.  Classic has no
-	// threads and its waypoint key is Alt, so it draws the white path the game shipped with.
-	if( TheGlobalData->isClassicUI() && TheInGameUI->isInWaypointMode() )
-	{
-		//Create a default light environment with no lights and only full ambient.
-		//@todo: Fix later by copying default scene light environement from W3DScene.cpp.
-		LightEnvironmentClass lightEnv;
-		lightEnv.Reset(Vector3(0,0,0), Vector3(1.0f,1.0f,1.0f));
-		lightEnv.Pre_Render_Update(rinfo.Camera.Get_Transform());
-		RenderInfoClass localRinfo(rinfo.Camera);
-		localRinfo.light_environment=&lightEnv;
-		Vector3 points[ MAX_DISPLAY_NODES + 1 ]; //Lines have nodes + 1 points.
-
-		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
-		{
-			Object *obj = (*it)->getObject();
-			Int numPoints = 1;
-			if( obj && ! obj->isKindOf( KINDOF_IGNORED_IN_GUI ))//so mobs and stuff sont make a gazillion lines
-			{
-				AIUpdateInterface *ai = obj->getAI();
-				Int goalSize = ai ? ai->friend_getWaypointGoalPathSize() : 0;
-				Int gpIdx = ai ? ai->friend_getCurrentGoalPathIndex() : 0;
-
-				if( ai && gpIdx >= 0 && gpIdx < goalSize )
-				{
-					const Coord3D *pos = obj->getPosition();
-					points[ 0 ].Set( Vector3( pos->x, pos->y, pos->z ) );
-
-					for( int i = gpIdx; i < goalSize; i++ )
-					{
-						const Coord3D *waypoint = ai->friend_getGoalPathPosition( i );
-						if( waypoint )
-						{
-							if( numPoints < MAX_DISPLAY_NODES + 1 )
-							{
-								points[ numPoints ].Set( Vector3( waypoint->x, waypoint->y, waypoint->z ) );
-								numPoints++;
-							}
-
-							m_waypointNodeRobj->Set_Position(Vector3(waypoint->x,waypoint->y,waypoint->z));
-							WW3D::Render(*m_waypointNodeRobj,localRinfo);
-						}
-					}
-					//Now render the lines in one pass!
-					queueLine( numPoints, points );
-				}
-			}
-		}
-	}
-
-	// Reforged draws every order the selection is on the way a building's rally point is drawn: this
+	// isInWaypointMode() (shift held) was true. The shift queue now has its own per-order hint
+	// threads (InGameUI::updateOrderHints), which cover the same ground and stay up after the key is
+	// let go, so the white duplicate is gone.
+	//
+	// Every order the selection is on is drawn the way a building's rally point is drawn: this
 	// line, the puck on each point short of the end and on any unit or building it is aimed at, and
 	// the rally flag on the last bit of ground (a drawable of its own, InGameUI::updateOrderFlags).
 	// The hints are rebuilt off the units every frame, so a puck on a target follows it.
 	// not in the water's mirror pass: the ground is left out of the reflection, and a PASS_ALWAYS
 	// line would lie on top of the water
-	if( !TheGlobalData->isClassicUI() && !TheInGameUI->getOrderHints().empty() && !ShaderClass::Is_Backface_Culling_Inverted() )
+	if( !TheInGameUI->getOrderHints().empty() && !ShaderClass::Is_Backface_Culling_Inverted() )
 	{
 		LightEnvironmentClass lightEnv;
 		lightEnv.Reset(Vector3(0,0,0), Vector3(1.0f,1.0f,1.0f));

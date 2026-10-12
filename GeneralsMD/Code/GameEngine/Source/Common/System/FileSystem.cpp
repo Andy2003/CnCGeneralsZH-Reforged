@@ -487,7 +487,7 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 Bool FileSystem::isForkOwnedPath(const AsciiString& filename)
 {
 	// What the fork installs loose next to the exe: the launcher's payload, which is the post-build copy
-	// of Code/Data (less Scenarios, Cinema and the shader cache) plus the classic bar textures.
+	// of Code/Data (less Scenarios, Cinema and the shader cache).
 	// Tests/test_gameengine.cpp walks Code/Data and fails when a master falls outside this.  Retail's own
 	// loose files (Data\Scripts\MultiplayerScripts.scb, the movies, the cursors) are not in it, so a mod
 	// still replaces those.  Nor is the fork's SkirmishScripts.scb, by the owner's call: a mod's skirmish
@@ -510,7 +510,7 @@ Bool FileSystem::isForkOwnedPath(const AsciiString& filename)
 		return TRUE;
 	return p == "data\\patch.str"
 		|| starts("data\\turkish\\") || starts("data\\german\\")
-		|| starts("art\\textures\\reforged") || starts("art\\textures\\classicwidebar")
+		|| starts("art\\textures\\reforged")
 		|| starts("window\\")
 		|| p == "install_final.bmp";
 }

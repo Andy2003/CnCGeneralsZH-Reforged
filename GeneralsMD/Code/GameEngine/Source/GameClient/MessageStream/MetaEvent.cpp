@@ -456,8 +456,7 @@ static const char * findGameMessageNameByType(GameMessage::Type type)
 //-------------------------------------------------------------------------------------------------
 static Bool metaIgnoresShift(const MetaMapRec *map)
 {
-	return !TheGlobalData->isClassicUI() &&
-				 map->m_meta >= GameMessage::MSG_META_COMMAND_SLOT01 &&
+	return map->m_meta >=GameMessage::MSG_META_COMMAND_SLOT01 &&
 				 map->m_meta <= GameMessage::MSG_META_COMMAND_SLOT18 &&
 				 (map->m_modState & SHIFT) == 0;
 }
@@ -495,11 +494,9 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 		//
 		// Tab / Shift-Tab walks the focus through a multi-selection's units on the control bar.
 		// Handled here rather than through the MetaMap because CommandMap.ini lives in the
-		// shipped game data and has no slot for it.  The game as it shipped did nothing with Tab,
-		// and neither does Classic.
+		// shipped game data and has no slot for it.  The game as it shipped did nothing with Tab.
 		//
-		if( !TheGlobalData->isClassicUI() &&
-				t == GameMessage::MSG_RAW_KEY_DOWN && key == MK_TAB &&
+		if( t == GameMessage::MSG_RAW_KEY_DOWN && key == MK_TAB &&
 				( newModState & ( CTRL | ALT ) ) == 0 &&
 				!( keyState & KEY_STATE_AUTOREPEAT ) &&
 				TheGameClient->getFrame() >= 1 &&
@@ -517,14 +514,13 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 		// the key came up while the modifier was still held.  Letting go of Ctrl first meant the
 		// key's own release carried no Ctrl, the record no longer matched, and whatever the DOWN
 		// had switched on stayed on.  Every key remembers the combinations it was pressed with, so
-		// a modifier release can finish them off in whatever order the player let go.  Classic keeps
-		// the game's own rule, where the order of letting go mattered.
+		// a modifier release can finish them off in whatever order the player let go.
 		//
 		const Bool isModifierKey = ( key == KEY_LCTRL || key == KEY_RCTRL ||
 																 key == KEY_LSHIFT || key == KEY_RSHIFT ||
 																 key == KEY_LALT || key == KEY_RALT );
 
-		if( isModifierKey && ( keyState & KEY_STATE_UP ) && !TheGlobalData->isClassicUI() )
+		if( isModifierKey && ( keyState & KEY_STATE_UP ) )
 		{
 			for( Int keyIndex = 0; keyIndex < NUM_MAPPABLE_KEYS; ++keyIndex )
 			{
@@ -601,10 +597,7 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 				disp = DESTROY_MESSAGE;
 				// every record on this modifier fires, not the first one found: shift is both "add to
 				// the selection" on the left button and "queue the order" on the right, and the two
-				// are separate records that have to come on and go off together.  Classic stops at the
-				// first, as the game did.
-				if( TheGlobalData->isClassicUI() )
-					break;
+				// are separate records that have to come on and go off together.
 				continue;
 			}
 
@@ -795,43 +788,19 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 
 //-------------------------------------------------------------------------------------------------
 MetaMap::MetaMap() :
-	m_metaMaps(NULL),
-	m_classicMaps(NULL),
-	m_parsingClassic(FALSE)
+	m_metaMaps(NULL)
 {
-}
-
-//-------------------------------------------------------------------------------------------------
-void MetaMap::freeList( MetaMapRec *&list )
-{
-	while (list)
-	{
-		MetaMapRec *next = list->m_next;
-		list->deleteInstance();
-		list = next;
-	}
 }
 
 //-------------------------------------------------------------------------------------------------
 MetaMap::~MetaMap()
 {
-	freeList( m_metaMaps );
-	freeList( m_classicMaps );
-}
-
-//-------------------------------------------------------------------------------------------------
-const MetaMapRec *MetaMap::getFirstMetaMapRec() const
-{
-	return getFirstMetaMapRec( TheGlobalData->isClassicUI() );
-}
-
-//-------------------------------------------------------------------------------------------------
-void MetaMap::loadClassicBindings( const AsciiString& languageMapFile )
-{
-	m_parsingClassic = TRUE;
-	INI ini;
-	ini.load( languageMapFile, INI_LOAD_OVERWRITE, NULL );
-	m_parsingClassic = FALSE;
+	while (m_metaMaps)
+	{
+		MetaMapRec *next = m_metaMaps->m_next;
+		m_metaMaps->deleteInstance();
+		m_metaMaps = next;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -848,8 +817,7 @@ GameMessage::Type MetaMap::findGameMessageMetaType(const char* name)
 //-------------------------------------------------------------------------------------------------
 MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 {
-	MetaMapRec *&list = m_parsingClassic ? m_classicMaps : m_metaMaps;
-	for (MetaMapRec *map = list; map; map = map->m_next)
+	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
 	{
 		if (map->m_meta == t)
 			return map;
@@ -865,8 +833,8 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 	m->m_category = CATEGORY_MISC;
 	m->m_description.clear();
 	m->m_displayName.clear();
-	m->m_next = list;
-	list = m;
+	m->m_next = m_metaMaps;
+	m_metaMaps = m;
 	
 	return m;
 }

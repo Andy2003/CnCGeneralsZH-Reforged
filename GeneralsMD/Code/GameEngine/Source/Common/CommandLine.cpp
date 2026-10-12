@@ -1775,17 +1775,17 @@ Int parseTextLanguage(char *args[], int num)
 	return 1;
 }
 
-/* -interface <classic|reforged>: the interface for this run, the only way to pick it; the launcher
-	 * passes it, and without it the run is Classic.  Client only. */
-Int parseInterfaceStyle(char *args[], int num)
+/* -mouse <classic|reforged>: the mouse for this run, the only way to pick it; the launcher passes
+	 * it, and without it the run is Classic.  Client only. */
+Int parseMouseStyle(char *args[], int num)
 {
 	if (TheWritableGlobalData && num > 1)
 	{
 		if (strcasecmp(args[1], "classic") == 0)
-			TheWritableGlobalData->m_interfaceStyle = INTERFACE_STYLE_CLASSIC;
+			TheWritableGlobalData->m_mouseStyle = MOUSE_STYLE_CLASSIC;
 		else if (strcasecmp(args[1], "reforged") == 0)
-			TheWritableGlobalData->m_interfaceStyle = INTERFACE_STYLE_REFORGED;
-		DEBUG_LOG(("-interface: %s\n", TheWritableGlobalData->m_interfaceStyle == INTERFACE_STYLE_CLASSIC ? "classic" : "reforged"));
+			TheWritableGlobalData->m_mouseStyle = MOUSE_STYLE_REFORGED;
+		DEBUG_LOG(("-mouse: %s\n", TheWritableGlobalData->m_mouseStyle == MOUSE_STYLE_CLASSIC ? "classic" : "reforged"));
 		return 2;
 	}
 	return 1;
@@ -2811,7 +2811,7 @@ static CommandLineParam params[] =
 	{ "-msaa", parseMSAA },
 	{ "-d3d9", parseDirect3D9 },
 	{ "-language", parseTextLanguage },
-	{ "-interface", parseInterfaceStyle },
+	{ "-mouse", parseMouseStyle },
 	{ "-dx11dump", parseDirect3D11Dump },
 	{ "-dx11post", parseDirect3D11Post },
 	{ "-autocamera", parseAutoCamera },

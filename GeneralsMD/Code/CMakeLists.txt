@@ -128,10 +128,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Libraries/Include)
 set(VENDORED
     ${COMP}/ZLib/deflate.c
     ${COMP}/LZHCompress/CompLibSource/Lzhl.cpp
-    # litehtml and nanosvg are common rather than Windows-only: gameengine links litehtml and
-    # compiles nanosvg into HtmlOverlay.cpp, and gameengine is what the macOS build is for.
-    ${CMAKE_CURRENT_SOURCE_DIR}/Libraries/Source/litehtml/CMakeLists.txt
-    ${CMAKE_CURRENT_SOURCE_DIR}/Libraries/Source/nanosvg/nanosvgrast.h
     # The GameSpy SDK is built everywhere since B6 (see "gamespy" below).
     ${CMAKE_CURRENT_SOURCE_DIR}/Libraries/Source/GameSpy/CMakeLists.txt)
 # The DirectX 8 headers are only read by targets this file does not define on macOS, and A2 decides
@@ -866,14 +862,6 @@ set(GS_BUILD_TESTS      OFF CACHE BOOL "" FORCE)
 set(GS_INCLUDE_VOICE    OFF CACHE BOOL "" FORCE)
 add_subdirectory(${LIBSRC}/GameSpy ${CMAKE_CURRENT_BINARY_DIR}/gamespy)
 
-# ---- litehtml -------------------------------------------------------------
-# The HTML and CSS layout engine behind the pages drawn over the battlefield (GameClient/
-# HtmlOverlay.cpp).  It lays a page out and calls back to draw each box and each run of text, so
-# the drawing stays the game's own.  Its own CMakeLists sets /permissive- and C++17 for itself
-# alone, and brings the gumbo HTML parser with it.
-set(LITEHTML_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-add_subdirectory(${LIBSRC}/litehtml ${CMAKE_CURRENT_BINARY_DIR}/litehtml)
-
 # ---- SDL3 and miniaudio: the platform layer off Windows (decision 3) -------------------------------
 # Both are fetched by Tools/vendor.sh and neither is fetched on Windows, which keeps Win32Device and
 # Miles.  Nothing links either yet: C2/C3 take SDL3's window and events, D4 its GPU API, C4 miniaudio.
@@ -1161,9 +1149,7 @@ target_include_directories(gameengine PUBLIC
   # WW3D2 is here for d3dx9math.h alone: BezierSegment carries D3DXMATRIX, and
   # DumbProjectileBehavior steers a shell with it.  dinput.h now comes out of the
   # Windows SDK like d3d9.h does.
-  ${WW}/WW3D2
-  # nanosvg's two headers, compiled into HtmlOverlay.cpp alone: the SVG pictures a page names.
-  ${LIBSRC}/nanosvg)
+  ${WW}/WW3D2)
 # _RELEASE/_DEBUG pick the game's own build flavour; IG_DEBUG_STACKTRACE and
 # Z_PREFIX are what GameEngine.dsp sets.
 target_compile_definitions(gameengine PUBLIC
@@ -1216,7 +1202,7 @@ if(ZH_PLATFORM_WINDOWS)
 endif()
 target_link_libraries(gameengine PUBLIC
   ${ZH_GAMEENGINE_WW3D2} wwlib wwmath wwsaveload wwdebug wwutil compression ${ZH_GAMEENGINE_DEBUGLIB} ${ZH_GAMEENGINE_WWDOWNLOAD}
-  benchmark ${ZH_GAMEENGINE_EABROWSERDISPATCH} ${ZH_GAMEENGINE_PROFILE} gamespy litehtml
+  benchmark ${ZH_GAMEENGINE_EABROWSERDISPATCH} ${ZH_GAMEENGINE_PROFILE} gamespy
   ${ZH_GAMEENGINE_DINPUT8} ${ZH_GAMEENGINE_WIN32_SDK_LIBS})
 
 # B1's gate: the bytes a UnicodeString puts into the replay and network CRC, before and after
@@ -1772,10 +1758,8 @@ add_custom_command(TARGET generals POST_BUILD
           ${CMAKE_CURRENT_SOURCE_DIR}/Data/Install_Final.bmp
           ${CMAKE_CURRENT_SOURCE_DIR}/../Run/
   # The three command bar plates per side, the smoke signals' ground marks and the
-  # SupW uplink's pink laser strip (Tools/pink_laser.py) and the attack, hold and move cameos
-  # (Tools/order_cameos.py).  A loose
-  # texture beats every .big, so these land in Run/Art/Textures where the W3D file
-  # system looks first.
+  # SupW uplink's pink laser strip (Tools/pink_laser.py).  A loose texture beats every .big,
+  # so these land in Run/Art/Textures where the W3D file system looks first.
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_CURRENT_SOURCE_DIR}/Data/Art/Textures
           ${CMAKE_CURRENT_SOURCE_DIR}/../Run/Art/Textures
@@ -2322,14 +2306,10 @@ set_tests_properties(test_gameengine PROPERTIES TIMEOUT 2700)
 # fxlist_reforged_ini_parses_and_keeps_its_light runs the fork's own FXList file through the real
 # INI parser, so it needs the tracked master rather than whatever sits in Run/.
 # the_options_menu_buttons_all_wear_one_font reads the tracked layout master, not Run/'s copy.
-# the_spectator_page_names_only_on_off_options reads the tracked page master the same way, and
-# the_command_grid_keys_are_the_places_and_n_sells_and_b_rallies the tracked command map.
 target_compile_definitions(test_gameengine PRIVATE
   GAMEENGINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/GameEngine"
   FXLIST_REFORGED_INI="${CMAKE_CURRENT_SOURCE_DIR}/Data/INI/FXListReforged.ini"
-  OPTIONS_MENU_WND="${CMAKE_CURRENT_SOURCE_DIR}/Data/Window/Menus/OptionsMenu.wnd"
-  SPECTATOR_HTML="${CMAKE_CURRENT_SOURCE_DIR}/Data/Window/Html/Spectator.html"
-  COMMAND_MAP_REFORGED_INI="${CMAKE_CURRENT_SOURCE_DIR}/Data/INI/CommandMapReforged.ini"
+  OPTIONS_MENU_WND="${CMAKE_CURRENT_SOURCE_DIR}/Data/Window/Menus/OptionsMenuClassic.wnd"
   PLATE_TEXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Data/Art/Textures")
 
 # W3: these three link the engine without its device and WinMain, whose Debug-only names it reads
@@ -2651,16 +2631,8 @@ if(Python3_Interpreter_FOUND)
   # synthetic one and checks the block parser did not eat an End or duplicate a key.
   add_test(NAME vfx_tune_selfcheck
            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/vfx_tune.py selfcheck)
-  # Tools/order_cameos.py paints the command bar's order key cameos: seven whole pictures in the
-  # places the mapped images name, told apart by colour, the same every run.
-  add_test(NAME order_cameos_selfcheck
-           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/run_with_modules.py numpy,PIL
-                   ${CMAKE_CURRENT_SOURCE_DIR}/Tools/order_cameos.py selfcheck)
-  # numpy and Pillow are not on every machine (a Mac's system Python has neither): without them the
-  # test is skipped and says which is missing, instead of failing on an ImportError
-  set_tests_properties(order_cameos_selfcheck PROPERTIES SKIP_RETURN_CODE 77)
   # The options screen is three tracked files that have to agree: TheOptionCatalog names a widget,
-  # Data/Window/Menus/OptionsMenu.wnd has to carry it, and Data/Patch.str has to carry its label,
+  # Data/Window/Menus/OptionsMenuClassic.wnd has to carry it, and Data/Patch.str has to carry its label,
   # its tooltip and every combo box entry.  Nothing at build time notices a typo in any of them -
   # the control is just never filled in, or the screen draws the key name - so it is checked here.
   add_test(NAME optionsmenu_selfcheck
@@ -2848,7 +2820,7 @@ endif()
 # P2: on macOS our own code may not call an API newer than the deployment target without guarding it
 # (@available / __builtin_available): that is a build error here, not a crash on a player's older Mac.
 # Every target this file defines - the game, the port's libraries, the tests - but not the vendored
-# projects add_subdirectory brings in (SDL3, freetype, glslang, SPIRV-Cross, litehtml, GameSpy), which
+# projects add_subdirectory brings in (SDL3, freetype, glslang, SPIRV-Cross, GameSpy), which
 # guard their own calls and are not ours to fail.  Clang's unguarded-availability-new covers every API
 # introduced since macOS 10.13, so it reaches everything above a 13.0 target.
 if(APPLE)
