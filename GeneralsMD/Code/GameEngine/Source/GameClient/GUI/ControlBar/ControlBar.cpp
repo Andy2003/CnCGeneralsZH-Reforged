@@ -1387,6 +1387,7 @@ ControlBar::ControlBar( void )
 {
 	Int i;
 	m_commandButtons = NULL;
+	m_barHasEvacuate = FALSE;
 	m_commandSets = NULL;
 	m_controlBarSchemeManager = NULL;
 	m_isObserverCommandBar = FALSE;
@@ -4482,13 +4483,16 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	// the key is the one the player gave the button on the launcher's Hotkeys page, or else the
 	// game's own, the letter after the '&' in the button's label - the English label's in every
 	// language, so a Turkish or German player presses what an English one does - and the button
-	// wears it in its top left corner
+	// wears it in its top left corner.  With grid keys on, a command bar button's key is its place.
 	if( TheHotKeyManager )
 	{
-		WideChar letter = HotKeyManager::playerButtonKey( commandButton->getName(),
-			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0 );
-		if( letter >= u'a' && letter <= u'z' )
-			letter -= ( u'a' - u'A' );
+		Int barSlot = -1;
+		for( Int slot = 0; slot < MAX_COMMANDS_PER_SET; slot++ )
+			if( m_commandWindows[ slot ] == button )
+				barSlot = slot;
+		const WideChar letter = HotKeyManager::playerButtonKey( commandButton->getName(),
+			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0, barSlot,
+			commandButton->getCommandType(), barSlot >= 0 && m_barHasEvacuate );
 		if( letter != 0 )
 		{
 			TheHotKeyManager->addHotKey( button, HotKeyManager::nameOf( letter ) );

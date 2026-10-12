@@ -281,6 +281,7 @@ public:
 	static void parseTerrainBridgeDefinition( INI *ini );
 	static void parseMetaMapDefinition( INI *ini );
 	static void parseCommandButtonHotKeyDefinition( INI *ini );
+	static void parseCommandBarGridDefinition( INI *ini );
 	static void parseFXListDefinition( INI *ini );
 	static void parseObjectCreationListDefinition( INI* ini );
 	static void parseMultiplayerSettingsDefinition( INI* ini );

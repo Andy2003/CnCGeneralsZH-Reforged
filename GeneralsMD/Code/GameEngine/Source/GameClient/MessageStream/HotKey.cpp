@@ -230,6 +230,8 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 			return TRUE;
  		}
 
+		const CommandButton *disabled = (const CommandButton *)GadgetButtonGetData( win );
+		DEBUG_LOG(( "HOTKEYS: %s found %s disabled\n", key.str(), disabled ? disabled->getName().str() : "a window" ));
 		AudioEventRTS disabledClick( "GUIClickDisabled" );
 		if( TheAudio )
 		{
@@ -302,13 +304,94 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 	* kept for the whole run, so it lives outside the manager, which every game client rebuilds. */
 static std::map< std::string, WideChar > s_playerButtonKeys;
 
+/** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
+	* to 14 stand two rows of seven read down the columns, so Q W E R over A S D F take the first
+	* four columns and Z X C V the next two.  A, S, R, F, C and V belong to the fixed orders
+	* (FIXED_KEYS), so their places take the next free key along the keyboard row instead: J, K, T, L,
+	* N and B.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws the
+	* same table (hotkeys.js, GRID_KEYS). */
+static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'T', 'L', 'Z', 'N', 'X', 'B' };
+static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
+static Bool s_commandGrid = FALSE;
+
+/** The owner's fixed keys, 2026-10-12, on every bar and in both modes: A attack move, S stop,
+	* G guard, R rally point, V evacuate and sell, C combat drop, and F for land mines, camo netting
+	* and the GLA's fake and real switches, which go by button name.  Where a bar has both evacuate and
+	* sell, evacuate keeps V and sell takes O.  No other button may have one of these letters.  The
+	* launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
+static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'R', 'V', 'C', 'F' };
+static const WideChar SELL_BESIDE_EVACUATE_KEY = 'O';
+static const char *const FIXED_F_BUTTONS[] =
+{
+	"command_upgradechinamines", "command_upgradeempmines", "command_upgradecamonetting", "command_upgradeglacamonetting",
+	"command_upgradeglaworkerfakecommandset", "command_upgradeglaworkerrealcommandset"
+};
+static const char FIXED_F_PREFIX[] = "command_becomerealgla";	///< a fake building's switch to the real one
+
+static WideChar fixedButtonKey( const AsciiString& lowerName, Int commandType, Bool evacuateOnBar )
+{
+	if( strncmp( lowerName.str(), FIXED_F_PREFIX, sizeof( FIXED_F_PREFIX ) - 1 ) == 0 )
+		return 'F';
+	for( Int each = 0; each < (Int)( sizeof( FIXED_F_BUTTONS ) / sizeof( FIXED_F_BUTTONS[ 0 ] ) ); each++ )
+		if( lowerName.compare( FIXED_F_BUTTONS[ each ] ) == 0 )
+			return 'F';
+	switch( commandType )
+	{
+		case GUI_COMMAND_ATTACK_MOVE:			return 'A';
+		case GUI_COMMAND_STOP:						return 'S';
+		case GUI_COMMAND_GUARD:						return 'G';
+		case GUI_COMMAND_SET_RALLY_POINT:	return 'R';
+		case GUI_COMMAND_EVACUATE:				return 'V';
+		case GUI_COMMAND_SELL:						return evacuateOnBar ? SELL_BESIDE_EVACUATE_KEY : 'V';
+		case GUI_COMMAND_COMBATDROP:			return 'C';
+	}
+	return 0;
+}
+
+static Bool isOneOf( WideChar letter, const WideChar *letters, Int count )
+{
+	for( Int each = 0; each < count; each++ )
+		if( letters[ each ] == letter )
+			return TRUE;
+	return FALSE;
+}
+
 //-----------------------------------------------------------------------------
-WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey )
+WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
+																				 Int commandType, Bool evacuateOnBar )
 {
 	AsciiString name = button;
 	name.toLower();
+	const WideChar fixed = fixedButtonKey( name, commandType, evacuateOnBar );
+	if( fixed != 0 )
+		return fixed;
+	if( s_commandGrid && barSlot >= 0 )
+		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
+
 	std::map< std::string, WideChar >::const_iterator it = s_playerButtonKeys.find( name.str() );
-	return it == s_playerButtonKeys.end() ? labelKey : it->second;
+	WideChar letter = it == s_playerButtonKeys.end() ? labelKey : it->second;
+	if( letter >= 'a' && letter <= 'z' )
+		letter -= 'a' - 'A';
+	if( isOneOf( letter, FIXED_KEYS, (Int)( sizeof( FIXED_KEYS ) / sizeof( FIXED_KEYS[ 0 ] ) ) ) )
+		return 0;
+	// a button off the bar gives a grid letter up to the bar
+	if( s_commandGrid && isOneOf( letter, GRID_KEYS, GRID_KEY_COUNT ) )
+		return 0;
+	return letter;
+}
+
+//-----------------------------------------------------------------------------
+/** CommandBarGrid, Enabled = Yes or No, End.  Only the player's own Hotkeys.ini carries it, and
+	* nothing in it reaches the INI CRC. */
+/*static*/ void INI::parseCommandBarGridDefinition( INI *ini )
+{
+	static const FieldParse fields[] =
+	{
+		{ "Enabled", INI::parseBool, NULL, 0 },
+		{ NULL, NULL, NULL, 0 }
+	};
+	ini->initFromINI( &s_commandGrid, fields );
+	DEBUG_LOG(( "HOTKEYS: grid keys %s\n", s_commandGrid ? "on" : "off" ));
 }
 
 //-----------------------------------------------------------------------------

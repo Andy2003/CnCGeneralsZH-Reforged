@@ -1255,6 +1255,7 @@ protected:
 	GameWindow *m_specialPowerShortcutParent;
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
+	Bool m_barHasEvacuate;	///< the command set populateCommand is laying out has an evacuate, which takes sell's V
 
 
 	/** A player upgrade is researched once, so it goes to exactly one of the selected buildings -
