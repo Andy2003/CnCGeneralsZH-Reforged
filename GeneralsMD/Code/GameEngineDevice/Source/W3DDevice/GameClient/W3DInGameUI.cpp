@@ -402,8 +402,6 @@ void W3DInGameUI::reset( void )
 
 }  // end reset
 
-static void drawGroundRing( const Coord3D& center, Real radius, UnsignedInt color, Real width );
-
 /// -directorrecord's lines between panes and the radar's frame: the brand's gold (zerohour.gg's
 /// --gold, #f2c230) between two edges of its ground (--bg, #0c1220), so they read on snow and on
 /// night maps alike
@@ -596,19 +594,6 @@ void W3DInGameUI::draw( void )
 	// draw the formation line if one is being dragged out
 	if( m_isFormationDragging )
 		drawFormationLine();
-
-	// the attack circle, while the left button is still sweeping it out
-	if( isAttackCircling() )
-		drawAttackCircle();
-
-	// the circle an armed guard will hold, under the cursor, at the size the wheel left it.  A drag
-	// is drawing a guard line instead, where every unit holds its own station
-	if( isAreaPicking() && !m_isFormationDragging )
-	{
-		Coord3D center;
-		TheTacticalView->screenToTerrain( &TheMouse->getMouseStatus()->pos, &center );
-		drawGroundRing( center, getAreaPickRadius(), 0xCC55CCFF, 2.0f );		// the guard blue the hints use
-	}
 
 	// for each view draw hints
 	/// @todo should the UI be iterating through views like this?
@@ -990,7 +975,7 @@ void W3DInGameUI::drawAttackCircleFill( void )
 {
 	Coord3D center;
 	Real radius;
-	if( !getAttackCircleGround( center, radius ) )
+	if( isGuardCircling() || !getAttackCircleGround( center, radius ) )
 		return;
 
 	enum { FILL_SEGMENTS = 48, FILL_RINGS = 6 };
@@ -1069,7 +1054,6 @@ void W3DInGameUI::drawFormationLine( void )
 	// the line says which order it is about to be, in the colours the order hints already use
 	const UnsignedInt color = isInAttackMoveToMode() ? 0xCCFF66CC
 											: isForceAttackArmed() ? 0xCCFF5555
-											: isGuardArmed() ? 0xCC55CCFF
 											: 0xCC33FF33;  //0xAARRGGBB
 	const std::vector<ICoord2D>& curve = m_formationDragPoints;
 	const Int points = (Int)curve.size();
@@ -1081,60 +1065,6 @@ void W3DInGameUI::drawFormationLine( void )
 													width, color );
 
 }  // end drawFormationLine
-
-//-------------------------------------------------------------------------------------------------
-/** A circle on the ground, not on the screen, so it follows the terrain the way the units it is
-	* about do */
-//-------------------------------------------------------------------------------------------------
-static void drawGroundRing( const Coord3D& center, Real radius, UnsignedInt color, Real width )
-{
-	const Int segments = 48;
-
-	ICoord2D previous;
-	Bool havePrevious = FALSE;
-	for( Int i = 0; i <= segments; ++i )
-	{
-		const Real angle = 2.0f * PI * (Real)i / (Real)segments;
-		Coord3D world;
-		world.x = center.x + radius * (Real)cos( angle );
-		world.y = center.y + radius * (Real)sin( angle );
-		world.z = TheTerrainLogic->getGroundHeight( world.x, world.y );
-
-		ICoord2D screen;
-		if( TheTacticalView->worldToScreenTriReturn( &world, &screen ) == View::WTS_INVALID )
-		{
-			havePrevious = FALSE;
-			continue;
-		}
-
-		if( havePrevious )
-			TheDisplay->drawLine( previous.x, previous.y, screen.x, screen.y, width, color );
-
-		previous = screen;
-		havePrevious = TRUE;
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-/** draw the circle a left drag is sweeping targets out of */
-//-------------------------------------------------------------------------------------------------
-void W3DInGameUI::drawAttackCircle( void )
-{
-	Coord3D center;
-	Real radius;
-	if( !getAttackCircleGround( center, radius ) )
-		return;
-
-	drawGroundRing( center, radius, 0xCCFF5555, 2.0f );		// the attack red the hints use
-
-	// and the radius itself, so the drag reads as a radius rather than a rubber band
-	ICoord2D middle;
-	center.z = TheTerrainLogic->getGroundHeight( center.x, center.y );
-	if( TheTacticalView->worldToScreenTriReturn( &center, &middle ) != View::WTS_INVALID )
-		TheDisplay->drawLine( middle.x, middle.y, getAttackCircleCursor().x,
-													getAttackCircleCursor().y, 1.0f, 0x66FF5555 );
-
-}  // end drawAttackCircle
 
 //-------------------------------------------------------------------------------------------------
 /** EA's animated ring on the ground where a move order landed, 40 client frames each.  EA's own

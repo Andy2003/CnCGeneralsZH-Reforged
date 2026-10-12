@@ -1119,10 +1119,20 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			m_leftMouseButtonIsDown = true;
 			m_selectFeedbackAnchor = msg->getArgument( 0 )->pixel;
 
-			// with the attack key armed the left button draws a circle instead of a selection box,
-			// and everything hostile inside it becomes a target list
-			if( TheInGameUI->isForceAttackArmed() && TheInGameUI->getSelectCount() > 0 )
-				TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor );
+			// with the attack key armed or Ctrl held the left button draws a circle instead of a
+			// selection box, and everything hostile inside it becomes a target list.  With a guard armed
+			// the circle is the ground to guard
+			if( TheInGameUI->getSelectCount() > 0 && TheInGameUI->getPendingPlaceType() == NULL )
+			{
+				const CommandButton *command = TheInGameUI->getGUICommand();
+				const Bool guardCommand = command && ( command->getCommandType() == GUI_COMMAND_GUARD ||
+																							 command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
+																							 command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY );
+				if( TheInGameUI->isGuardArmed() || guardCommand )
+					TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor, TRUE );
+				else if( TheInGameUI->isForceFireOn() && command == NULL )
+					TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor, FALSE );
+			}
 			break;
 		}
 
@@ -1138,22 +1148,27 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			// click that follows this release has to be eaten or it would reselect under the anchor
 			if( TheInGameUI->isAttackCircling() )
 			{
+				// a circle Ctrl started belongs to no key: undragged, the press was an ordinary Ctrl click
+				const Bool keyed = TheInGameUI->isOrderKeyArmed() || TheInGameUI->getGUICommand() != NULL;
+
 				// a press with the attack key that never became a drag is an ordinary attack click,
 				// and the click that follows this release is the order.  Only a real circle eats it
 				if( TheInGameUI->issueAttackCircle() )
 				{
 					TheInGameUI->spendOrderKey();
 					m_dragOrderJustIssued = TRUE;
+					break;
 				}
 
 				//
-				// Either way this press belonged to the attack key rather than to selection, so the
+				// A press under an armed key belonged to that key rather than to selection, so the
 				// release stops here.  Falling through reaches the deselect that ends an ordinary left
 				// click, and for a press that was not a drag - a plain attack click, or a circle small
 				// enough to have no radius - that threw the group away a moment before the click behind
 				// it arrived as the order, leaving the order with nobody to give it to.
 				//
-				break;
+				if( keyed )
+					break;
 			}
 
 			// a left drag that drew an attack move or guard line is turned into its order by CommandXlat,

@@ -1014,10 +1014,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 			// a posted unit holds its spot and shoots what walks into range, rather than chasing it
 			// off the post the player put it on
 			if (msgType == GameMessage::MSG_DO_GUARD_POSITION)
-			{
 				movemsg->appendIntegerArgument( GUARDMODE_GUARD_WITHOUT_PURSUIT );
-				movemsg->appendRealArgument( TheInGameUI->getAreaPickRadius() );
-			}
 
 		}  // end if
 	}

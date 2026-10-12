@@ -133,12 +133,6 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 				TheInGameUI->adjustPlacementRowGap( msg->getArgument( 1 )->real );
 				return DESTROY_MESSAGE;
 			}
-			// and while a guard is armed it sizes the circle the guard will hold
-			if( TheInGameUI->isAreaPicking() )
-			{
-				TheInGameUI->adjustAreaPickRadius( msg->getArgument( 1 )->real );
-				return DESTROY_MESSAGE;
-			}
 			break;
 		}
 

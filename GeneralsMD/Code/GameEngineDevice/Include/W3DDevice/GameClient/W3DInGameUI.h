@@ -82,7 +82,6 @@ protected:
 	virtual void drawBuildGrid( void );						///< the pathfinder's build grid under a pending structure
 	virtual void drawAttackCircleFill( void );		///< the wash on the ground inside an attack circle
 	virtual void drawFormationLine( void );				///< the line an armed left drag is spreading the selection along
-	virtual void drawAttackCircle( void );				///< the circle a left drag is sweeping targets out of
 
 	RenderObjClass *m_buildingPlacementAnchor;
 	RenderObjClass *m_buildingPlacementArrow;

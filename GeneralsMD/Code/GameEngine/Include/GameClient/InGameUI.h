@@ -494,7 +494,7 @@ public:  // ********************************************************************
 
 	struct OrderHint
 	{
-		OrderHint( void ) : kind( ORDER_HINT_MOVE ), owner( INVALID_ID ), bornMs( 0 ), step( 0 ), icon( NULL ), radius( 0.0f ),
+		OrderHint( void ) : kind( ORDER_HINT_MOVE ), owner( INVALID_ID ), bornMs( 0 ), step( 0 ), icon( NULL ),
 			onObject( FALSE ), mark( ORDER_MARK_NONE ) {}
 
 		Coord3D from;						///< where the unit is now
@@ -504,16 +504,17 @@ public:  // ********************************************************************
 		UnsignedInt bornMs;			///< when the marker first appeared, so it can be slid in
 		Int step;								///< its place in the order the unit will get to its points, from 1; 0 when it has only the one
 		const Image *icon;			///< the upgrade's own button art on an upgrade step, NULL otherwise
-		Real radius;						///< the circle a guard holds round 'to', 0 for every other kind
 		Bool onObject;					///< 'to' is a unit or building, read off it every frame
 		OrderHintMark mark;			///< what stands on 'to'
 	};
 	const std::vector<OrderHint>& getOrderHints( void ) const { return m_drawnOrderHints; }
 
-	// A circle dragged out with the left button while the attack key is armed.  The enemies inside
-	// it are shared across the units that can shoot, in the order both sides stand around the
-	// circle, and each unit works down its own share.
-	void beginAttackCircle( const ICoord2D& pt );
+	// A circle dragged out with the left button while the attack key is armed or Ctrl is held.  The
+	// enemies inside it are shared across the units that can shoot, in the order both sides stand
+	// around the circle, and each unit works down its own share.  Dragged with a guard armed (the G
+	// key or EA's guard button) the circle is the ground the group guards instead.
+	void beginAttackCircle( const ICoord2D& pt, Bool guards );
+	Bool isGuardCircling( void ) const { return m_isAttackCircling && m_attackCircleGuards; }
 	void updateAttackCircle( const ICoord2D& pt );
 	Bool issueAttackCircle( void );		///< FALSE when the press never became a drag, so it was an ordinary attack click
 	Int issueAttackLine( const std::vector<Coord3D>& line );	///< enemies the stroke crosses, shared along it across the units that can shoot
@@ -1137,19 +1138,11 @@ public:  // ********************************************************************
 		* stance from the first unit's */
 	void pressOrderKey( Int key );
 
-	// An order that covers a circle around the point it is given on (the guard key, EA's guard
-	// buttons) is armed with a radius: the wheel grows and shrinks it instead of zooming, a ring
-	// under the cursor shows it, and the order carries it.  The scale drops back to 1 when nothing
-	// is armed any more.
-	Bool isAreaPicking( void ) const;
-	Real getAreaPickRadius( void ) const;			///< what the next area order covers, in world units
-	void adjustAreaPickRadius( Real notches );
-
 	// the move key arms the order a right click gives, for the left button: the next order click is
 	// that move, and a left drag draws the formation line
 	void toggleMoveArmed( void )							{ m_moveArmed = !m_moveArmed; m_attackMoveToMode = FALSE; m_forceAttackArmed = FALSE; m_guardArmed = FALSE; }
 	Bool isMoveArmed( void ) const						{ return m_moveArmed; }
-	Bool isLineOrderArmed( void ) const				{ return m_attackMoveToMode || m_guardArmed || m_moveArmed; }	///< a left drag draws a move, attack move or guard line; force fire's left drag is the attack circle
+	Bool isLineOrderArmed( void ) const				{ return m_attackMoveToMode || m_moveArmed; }	///< a left drag draws a move or attack move line; force fire's and guard's left drag is a circle
 	
 	// zeroing the repeat clock makes the first quantized step happen on the very next update, so a
 	// tap of the key is one eighth and a hold is one eighth every CAMERA_SNAP_REPEAT_MS.
@@ -1332,6 +1325,7 @@ protected:
 	std::vector<OrderHint>			m_drawnOrderHints;														///< the same, units headed the same way bunched into one
 
 	Bool												m_isAttackCircling;														///< TRUE while an attack circle is being dragged (fork)
+	Bool												m_attackCircleGuards;													///< the circle being dragged is a guard area, not a target list
 	ICoord2D										m_attackCircleAnchor;													///< where the circle was started, in pixels
 	ICoord2D										m_attackCircleCursor;													///< where the cursor is now, which is the rim
 
@@ -1570,7 +1564,6 @@ protected:
 	Bool												m_attackMoveToMode;	///< are we in attack move mode?
 	Bool												m_forceAttackArmed;	///< is the attack key holding force fire for the next click?
 	Bool												m_guardArmed;				///< is the guard key holding a guard order for the next click?
-	Real												m_areaPickScale;		///< what the wheel has made of the armed guard's default radius
 	Bool												m_moveArmed;				///< is the move key holding a move for the next click?
 	Bool												m_orderKeyKeptByShift;	///< an armed key was clicked with under shift, and drops when shift comes up
 	Bool												m_preferSelection;		///< the shift key has been depressed.

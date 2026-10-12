@@ -1224,11 +1224,11 @@ InGameUI::InGameUI()
 	m_attackMoveToMode	= false;
 	m_forceAttackArmed	= false;
 	m_guardArmed				= false;
-	m_areaPickScale			= 1.0f;
 	m_moveArmed					= false;
 	m_orderKeyKeptByShift	= false;
 	m_preferSelection		= false;
 	m_isAttackCircling	= FALSE;
+	m_attackCircleGuards	= FALSE;
 
 	m_curRcType = RADIUSCURSOR_NONE;
 	
@@ -1433,8 +1433,7 @@ void InGameUI::setRadiusCursor(RadiusCursorType cursorType, const SpecialPowerTe
 			radius = w ? w->getContinueAttackRange() : 0.0f;
 			break;
 		case RADIUSCURSOR_GUARD_AREA:
-			// no decal: its size was fixed when the button was pressed, and the wheel changes the radius
-			// after that.  The area pick ring takes its place (isAreaPicking)
+			radius = AIGuardMachine::getStdGuardRange(obj);
 			break;
 		case RADIUSCURSOR_FRIENDLY_SPECIALPOWER:
 		case RADIUSCURSOR_OFFENSIVE_SPECIALPOWER:
@@ -2290,10 +2289,6 @@ void InGameUI::update( void )
 
 	updateReplaySeek();
 
-	// the wheeled radius belongs to the order it was wheeled for; a shift-kept key keeps it
-	if( !isAreaPicking() )
-		m_areaPickScale = 1.0f;
-
 	/// @todo make sure this code gets called even when the UI is not being drawn
 	if ( m_videoStream && m_videoBuffer )
 	{
@@ -2723,11 +2718,11 @@ void InGameUI::reset( void )
 	m_attackMoveToMode	= false;
 	m_forceAttackArmed	= false;
 	m_guardArmed				= false;
-	m_areaPickScale			= 1.0f;
 	m_moveArmed					= false;
 	m_orderKeyKeptByShift	= false;
 	m_preferSelection		= false;
 	m_isAttackCircling	= FALSE;
+	m_attackCircleGuards	= FALSE;
 	m_clientQuiet    = false;
 
 	// TheSuperHackers @bugfix A key or button still held when the game ended left its camera
@@ -3513,9 +3508,6 @@ void InGameUI::collectOrderHints( void )
 				if( !getGuardedSpot( ai, resolvedGoal, resolvedOnObject ) )
 					continue;
 				goalResolved = TRUE;
-				// and the circle it holds there
-				if( ai->getCurrentStateID() == AI_GUARD )
-					hint.radius = AIGuardMachine::getGuardRange( obj );
 				break;
 			}
 
@@ -3925,9 +3917,10 @@ void InGameUI::addOrderHint( OrderHint& hint, const std::vector<OrderHint>& prev
 /** The attack key is armed and the player has pressed the left button: from here a drag draws a
 	* circle rather than a selection box. */
 //-------------------------------------------------------------------------------------------------
-void InGameUI::beginAttackCircle( const ICoord2D& pt )
+void InGameUI::beginAttackCircle( const ICoord2D& pt, Bool guards )
 {
 	m_isAttackCircling = TRUE;
+	m_attackCircleGuards = guards;
 	m_attackCircleAnchor = pt;
 	m_attackCircleCursor = pt;
 	DEBUG_LOG(("attack circle: begun at %d,%d with %d selected\n", pt.x, pt.y, getSelectCount()));
@@ -3957,6 +3950,10 @@ Bool InGameUI::getAttackCircleGround( Coord3D& center, Real& radius ) const
 	const Real dy = rim.y - center.y;
 	radius = (Real)sqrt( dx * dx + dy * dy );
 
+	// logic caps a guard's circle, so the one drawn stops where the order will
+	if( m_attackCircleGuards )
+		radius = min( radius, GUARD_RADIUS_MAX );
+
 	// a press that has not been dragged anywhere is a click, not a circle
 	return radius >= 1.0f;
 }
@@ -3983,6 +3980,29 @@ Bool InGameUI::issueAttackCircle( void )
 	// click and the order belongs to the command translator, not here
 	if( !wasDragged )
 		return FALSE;
+
+	// a guard circle is one order: the group guards its centre and everything inside its rim
+	if( m_attackCircleGuards )
+	{
+		GuardMode mode = GUARDMODE_GUARD_WITHOUT_PURSUIT;		// what the G key's click gives
+		const CommandButton *command = getGUICommand();
+		if( command && command->getCommandType() == GUI_COMMAND_GUARD )
+			mode = GUARDMODE_NORMAL;
+		else if( command && command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY )
+			mode = GUARDMODE_GUARD_FLYING_UNITS_ONLY;
+		if( command )
+			setGUICommand( NULL );
+
+		if( isInWaypointMode() )
+			markNextOrderQueued( ORDER_QUEUE_APPEND );
+		GameMessage *guard = TheMessageStream->appendMessage( GameMessage::MSG_DO_GUARD_POSITION );
+		guard->appendLocationArgument( center );
+		guard->appendIntegerArgument( mode );
+		guard->appendRealArgument( radius );
+		pickAndPlayUnitVoiceResponse( getAllSelectedDrawables(), GameMessage::MSG_DO_GUARD_POSITION );
+		DEBUG_LOG(("guard circle: radius %.0f at %.0f,%.0f\n", radius, center.x, center.y));
+		return TRUE;
+	}
 
 	const Player *local = ThePlayerList->getLocalPlayer();
 
@@ -4752,6 +4772,9 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					setMouseCursor(Mouse::ARROW);
 					return;
 				}
+				// the guard key looks like EA's guard button armed: the guard range decal under the cursor
+				if( isGuardArmed() )
+					setRadiusCursor( RADIUSCURSOR_GUARD_AREA, NULL, PRIMARY_WEAPON );
 				switch (t)
 				{
 					case GameMessage::MSG_DO_MOVETO_HINT:
@@ -5512,62 +5535,6 @@ void InGameUI::adjustPlacementRowGap( Real spin )
 	}
 
 }  // end adjustPlacementRowGap
-
-static const Real AREA_PICK_RADIUS_MIN = 50.0f;
-static const Real AREA_PICK_STEP = 1.15f;		///< what one notch of the wheel multiplies the radius by
-
-//-------------------------------------------------------------------------------------------------
-/** The guard key, or one of EA's guard buttons waiting for its click. */
-//-------------------------------------------------------------------------------------------------
-Bool InGameUI::isAreaPicking( void ) const
-{
-	if( m_guardArmed )
-		return TRUE;
-
-	const CommandButton *command = m_pendingGUICommand;
-	return command && ( command->getCommandType() == GUI_COMMAND_GUARD ||
-											command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
-											command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY );
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The radius the armed order starts from before the wheel touches it.  A guard used to cover
-	* each unit's own vision, so riflemen and rocket troops on one spot held two different circles;
-	* the whole selection now takes the widest of them. */
-//-------------------------------------------------------------------------------------------------
-static Real areaPickBaseRadius( const DrawableList& selected )
-{
-	Real widest = 0.0f;
-	for( DrawableList::const_iterator it = selected.begin(); it != selected.end(); ++it )
-	{
-		const Object *obj = (*it)->getObject();
-		if( obj && obj->isLocallyControlled() && obj->getAI() )
-			widest = max( widest, AIGuardMachine::getStdGuardRange( obj ) );
-	}
-	return widest;
-}
-
-//-------------------------------------------------------------------------------------------------
-Real InGameUI::getAreaPickRadius( void ) const
-{
-	const Real radius = areaPickBaseRadius( m_selectedDrawables ) * m_areaPickScale;
-	return min( max( radius, AREA_PICK_RADIUS_MIN ), GUARD_RADIUS_MAX );
-}
-
-//-------------------------------------------------------------------------------------------------
-/** A notch away from the player grows the circle by a fixed share, so the wheel feels the same on a
-	* small circle as on a big one.  The scale stops where the radius does, so the wheel never winds
-	* up travel that has to be undone before the circle moves again. */
-//-------------------------------------------------------------------------------------------------
-void InGameUI::adjustAreaPickRadius( Real notches )
-{
-	const Real base = areaPickBaseRadius( m_selectedDrawables );
-	if( base <= 0.0f )
-		return;
-
-	m_areaPickScale *= (Real)pow( AREA_PICK_STEP, notches );
-	m_areaPickScale = min( max( m_areaPickScale, AREA_PICK_RADIUS_MIN / base ), GUARD_RADIUS_MAX / base );
-}
 
 //-------------------------------------------------------------------------------------------------
 /** The first unit of the player's in the selection with a stance to read, for the stance key's face
