@@ -602,10 +602,6 @@ void MissileAIUpdate::doAttackState(Bool turnOK)
 		} 
 	}
 
-	// a missile with a cruise height leaves it this far from the goal along a quarter sine
-	if (curLoco)
-		curLoco->setSineDescentDistance(d->m_diveDistance);
-
 	if (m_noTurnDistLeft <= 0.0f)
 	{
 		switchToState(ATTACK);

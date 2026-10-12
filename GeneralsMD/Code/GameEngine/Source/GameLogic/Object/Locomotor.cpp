@@ -93,7 +93,13 @@ static const Real INFANTRY_STOP_FRAMES = 3.0f;				// a soldier stops from top sp
 LocomotorStore *TheLocomotorStore = NULL;					///< the Locomotor store definition
 
 const Real BIGNUM = 99999.0f;
-const Real SINE_DESCENT_LOOKAHEAD_FRAMES = 4.0f;
+const Real ARC_LOOKAHEAD_FRAMES = 4.0f;
+const Real ARC_ARRIVE_RUN = 0.5f;					// cos 60: a cruise missile's curve arrives in a sixty degree dive
+const Real ARC_ARRIVE_DROP = 0.8660254f;		// sin 60
+// handles as a share of the distance left: the long leaving one spreads the turn over the top of the
+// arc, so a Scud's sharpest turn fell from 6.0 to 4.6 degrees a frame against 5.7 with even thirds
+const Real ARC_LEAVE_HANDLE = 0.6f;
+const Real ARC_ARRIVE_HANDLE = 0.3f;
 const Real INTERCEPT_EPSILON = 0.0001f;
 
 static const char *TheLocomotorPriorityNames[] = 
@@ -2726,21 +2732,30 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 	//out of the handleBehaviorZ() function
 	Coord3D pos = *obj->getPosition();
 	Real distToGoal2D = sqrt(sqr(goalPos.x - pos.x) + sqr(goalPos.y - pos.y));
-	if( m_preferredHeight != 0.0f && !getFlag(PRECISE_Z_POS) && distToGoal2D < m_sineDescentDistance )
+	if( m_preferredHeight != 0.0f && !getFlag(PRECISE_Z_POS) && obj->isKindOf(KINDOF_PROJECTILE) )
 	{
-		// Come down along height(d) = h * sin(PI/2 * d / descentDist), aiming a few frames ahead on the one
-		// such curve that passes through the missile now. A Scud is still near the top of its climb here,
-		// about 230 over the goal against a cruise height of 120, so the curve starts from where it is.
-		// Aiming at the goal itself instead was a straight dive with a kink where it began.
-		Real lookAhead = SINE_DESCENT_LOOKAHEAD_FRAMES * physics->getVelocityMagnitude();
-		if (distToGoal2D > lookAhead)
+		// A cruise missile flies one smooth curve from where it is, leaving along the way it is going and
+		// arriving in a sixty degree dive, aiming a few frames ahead on it. The curve is drawn again every
+		// frame from the missile's own heading, so it never asks for a sudden turn. Climbing to the cruise
+		// height, holding it and diving off it turned a Scud over the top of its climb at six degrees a
+		// frame for twenty frames, stopped dead in a flat glide and kinked again into the dive, and a
+		// Tomahawk levelled out and dived the same way. On the curve the turn only eases off.
+		Real speed = physics->getVelocityMagnitude();
+		Real lookAhead = ARC_LOOKAHEAD_FRAMES * speed;
+		Real dist = sqrt(sqr(goalPos.x - pos.x) + sqr(goalPos.y - pos.y) + sqr(goalPos.z - pos.z));
+		if (dist > lookAhead && distToGoal2D > 0.001f && speed > 0.001f)
 		{
-			Real aimDist = distToGoal2D - lookAhead;
-			Real aimFraction = aimDist / distToGoal2D;
-			Real heightNow = pos.z - goalPos.z;
-			localGoalPos.x = goalPos.x + (pos.x - goalPos.x) * aimFraction;
-			localGoalPos.y = goalPos.y + (pos.y - goalPos.y) * aimFraction;
-			localGoalPos.z = goalPos.z + heightNow * Sin(PI / 2 * aimDist / m_sineDescentDistance) / Sin(PI / 2 * distToGoal2D / m_sineDescentDistance);
+			const Coord3D *vel = physics->getVelocity();
+			Coord3D leave, arrive;
+			leave.set(vel->x / speed, vel->y / speed, vel->z / speed);
+			arrive.set(ARC_ARRIVE_RUN * (goalPos.x - pos.x) / distToGoal2D, ARC_ARRIVE_RUN * (goalPos.y - pos.y) / distToGoal2D, -ARC_ARRIVE_DROP);
+			Real hLeave = dist * ARC_LEAVE_HANDLE, hArrive = dist * ARC_ARRIVE_HANDLE;
+			Real t = lookAhead / dist;
+			Real u = 1.0f - t;
+			Real b0 = u * u * u, b1 = 3.0f * u * u * t, b2 = 3.0f * u * t * t, b3 = t * t * t;
+			localGoalPos.x = b0 * pos.x + b1 * (pos.x + leave.x * hLeave) + b2 * (goalPos.x - arrive.x * hArrive) + b3 * goalPos.x;
+			localGoalPos.y = b0 * pos.y + b1 * (pos.y + leave.y * hLeave) + b2 * (goalPos.y - arrive.y * hArrive) + b3 * goalPos.y;
+			localGoalPos.z = b0 * pos.z + b1 * (pos.z + leave.z * hLeave) + b2 * (goalPos.z - arrive.z * hArrive) + b3 * goalPos.z;
 		}
 	}
 	else if( m_preferredHeight != 0.0f && !getFlag(PRECISE_Z_POS) )
