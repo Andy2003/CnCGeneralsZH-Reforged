@@ -180,12 +180,14 @@ WW3DModRequest::WW3DModRequest(const char * name) : Bare(name), Own(false)
 	}
 }
 
-// The texture loader takes a .dds in place of a .tga, so either one counts as the mod's texture.
+// The texture loader opens a .dds in place of whatever three letter extension a model names
+// (DDSFileClass swaps the last three characters), so a .dds of the same name counts as the mod's
+// texture: The End of Days' models name "Tunguska-main skin.psd" and the mod ships the .dds.
 static bool Mod_Texture_Ships(const char * name)
 {
 	if (WW3D_Mod_Ships(name)) return true;
 	size_t len = strlen(name);
-	if (len < 4 || strcasecmp(name + len - 4, ".tga") != 0) return false;
+	if (len < 4 || name[len - 4] != '.') return false;
 	char dds[MAX_PATH];
 	snprintf(dds, sizeof(dds), "%.*sdds", (int)(len - 3), name);
 	return WW3D_Mod_Ships(dds);
