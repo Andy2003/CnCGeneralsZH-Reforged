@@ -863,6 +863,8 @@ private:
 	 using grantScience() instead.
 	*/
 	Bool addScience(ScienceType science);
+	/// a rank's science, and under -modfactions the player's mod's own copy of it too
+	void addRankScience(ScienceType science);
 
 public:
 	Int getSkillPoints() const						{ return m_skillPoints; }

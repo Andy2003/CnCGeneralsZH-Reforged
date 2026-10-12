@@ -207,6 +207,9 @@ public:
 	/// set.  Finders ask this on a miss, so a definition of the mod's own X never falls through to retail's.
 	Bool findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const;
 	Bool findRetailKey( NameKeyType key, ModNameType type, NameKeyType *retailKey ) const;
+	/// mod (0-based) defines a `type` called name, which its own INI then names "M<n>~name"
+	Bool defines( Int mod, ModNameType type, const AsciiString &name ) const
+	{ return mod >= 0 && mod < (Int)m_mods.size() && m_mods[ mod ].byType[ type ].count( name.str() ) != 0; }
 
 	static const char *const FactionFiles[];		///< what scanMods reads and the mod passes load, NULL-ended; no ".ini" is a directory
 

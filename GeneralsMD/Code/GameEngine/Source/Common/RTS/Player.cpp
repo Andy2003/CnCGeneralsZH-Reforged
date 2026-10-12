@@ -56,6 +56,7 @@
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
+#include "Common/INI.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
 #include "Common/PerfTimer.h"
@@ -2694,13 +2695,30 @@ void Player::resetSciences()
 		{
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
 			{
-				addScience(*it);
+				addRankScience(*it);
 			}
 		}
 	}
 
 	for (ScienceVec::const_iterator it = m_sciences.begin(); it != m_sciences.end(); ++it)
 		TheScriptEngine->notifyOfAcquiredScience(getPlayerIndex(), *it);
+}
+
+//=============================================================================
+/** Rank.ini is retail's and grants retail's SCIENCE_Rank<n>.  Under -modfactions a mod that defines its
+	* own rank sciences has every science of its generals ask for those, "M<n>~SCIENCE_Rank3", so a
+	* player of that mod's faction gets the mod's copy beside retail's or none of the mod's promotions
+	* ever has its prerequisites. */
+void Player::addRankScience(ScienceType science)
+{
+	addScience(science);
+	const Int mod = getPlayerTemplate() ? getPlayerTemplate()->getModIndex() : -1;
+	const AsciiString name = TheScienceStore->getInternalNameForScience(science);
+	if (!TheModNamespace.defines(mod, MODNAME_SCIENCE, name))
+		return;
+	AsciiString modName;
+	modName.format("M%d~%s", mod + 1, name.str());
+	addScience(TheScienceStore->getScienceFromInternalName(modName));
 }
 
 //=============================================================================
@@ -2906,7 +2924,7 @@ Bool Player::setRankLevel(Int newLevel)
 
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
 			{
-				addScience(*it);
+				addRankScience(*it);
 			}
 
 			m_levelDown = rank->m_skillPointsNeeded;
