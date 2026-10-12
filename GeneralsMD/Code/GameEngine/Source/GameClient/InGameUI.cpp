@@ -1224,11 +1224,11 @@ InGameUI::InGameUI()
 	m_attackMoveToMode	= false;
 	m_forceAttackArmed	= false;
 	m_guardArmed				= false;
+	m_guardArmedMode		= GUARDMODE_GUARD_WITHOUT_PURSUIT;
 	m_moveArmed					= false;
 	m_orderKeyKeptByShift	= false;
 	m_preferSelection		= false;
 	m_isAttackCircling	= FALSE;
-	m_attackCircleGuards	= FALSE;
 
 	m_curRcType = RADIUSCURSOR_NONE;
 	
@@ -2718,11 +2718,11 @@ void InGameUI::reset( void )
 	m_attackMoveToMode	= false;
 	m_forceAttackArmed	= false;
 	m_guardArmed				= false;
+	m_guardArmedMode		= GUARDMODE_GUARD_WITHOUT_PURSUIT;
 	m_moveArmed					= false;
 	m_orderKeyKeptByShift	= false;
 	m_preferSelection		= false;
 	m_isAttackCircling	= FALSE;
-	m_attackCircleGuards	= FALSE;
 	m_clientQuiet    = false;
 
 	// TheSuperHackers @bugfix A key or button still held when the game ended left its camera
@@ -3917,10 +3917,9 @@ void InGameUI::addOrderHint( OrderHint& hint, const std::vector<OrderHint>& prev
 /** The attack key is armed and the player has pressed the left button: from here a drag draws a
 	* circle rather than a selection box. */
 //-------------------------------------------------------------------------------------------------
-void InGameUI::beginAttackCircle( const ICoord2D& pt, Bool guards )
+void InGameUI::beginAttackCircle( const ICoord2D& pt )
 {
 	m_isAttackCircling = TRUE;
-	m_attackCircleGuards = guards;
 	m_attackCircleAnchor = pt;
 	m_attackCircleCursor = pt;
 	DEBUG_LOG(("attack circle: begun at %d,%d with %d selected\n", pt.x, pt.y, getSelectCount()));
@@ -3950,10 +3949,6 @@ Bool InGameUI::getAttackCircleGround( Coord3D& center, Real& radius ) const
 	const Real dy = rim.y - center.y;
 	radius = (Real)sqrt( dx * dx + dy * dy );
 
-	// logic caps a guard's circle, so the one drawn stops where the order will
-	if( m_attackCircleGuards )
-		radius = min( radius, GUARD_RADIUS_MAX );
-
 	// a press that has not been dragged anywhere is a click, not a circle
 	return radius >= 1.0f;
 }
@@ -3980,29 +3975,6 @@ Bool InGameUI::issueAttackCircle( void )
 	// click and the order belongs to the command translator, not here
 	if( !wasDragged )
 		return FALSE;
-
-	// a guard circle is one order: the group guards its centre and everything inside its rim
-	if( m_attackCircleGuards )
-	{
-		GuardMode mode = GUARDMODE_GUARD_WITHOUT_PURSUIT;		// what the G key's click gives
-		const CommandButton *command = getGUICommand();
-		if( command && command->getCommandType() == GUI_COMMAND_GUARD )
-			mode = GUARDMODE_NORMAL;
-		else if( command && command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY )
-			mode = GUARDMODE_GUARD_FLYING_UNITS_ONLY;
-		if( command )
-			setGUICommand( NULL );
-
-		if( isInWaypointMode() )
-			markNextOrderQueued( ORDER_QUEUE_APPEND );
-		GameMessage *guard = TheMessageStream->appendMessage( GameMessage::MSG_DO_GUARD_POSITION );
-		guard->appendLocationArgument( center );
-		guard->appendIntegerArgument( mode );
-		guard->appendRealArgument( radius );
-		pickAndPlayUnitVoiceResponse( getAllSelectedDrawables(), GameMessage::MSG_DO_GUARD_POSITION );
-		DEBUG_LOG(("guard circle: radius %.0f at %.0f,%.0f\n", radius, center.x, center.y));
-		return TRUE;
-	}
 
 	const Player *local = ThePlayerList->getLocalPlayer();
 
@@ -5058,6 +5030,22 @@ void InGameUI::setGUICommand( const CommandButton *command )
 {
 	if (TheRecorder->getMode() == RECORDERMODETYPE_PLAYBACK)
 		return;
+
+	// EA's guard buttons, and their hotkey, arm the guard key with the button's own mode instead of
+	// waiting as a pending command, so a button press and the key click and drag the same way
+	if( command && ( command->getCommandType() == GUI_COMMAND_GUARD ||
+									 command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
+									 command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY ) )
+	{
+		const GuardMode mode = command->getCommandType() == GUI_COMMAND_GUARD ? GUARDMODE_NORMAL
+			: command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ? GUARDMODE_GUARD_WITHOUT_PURSUIT
+			: GUARDMODE_GUARD_FLYING_UNITS_ONLY;
+		setGUICommand( NULL );
+		clearAttackMoveToMode();
+		m_guardArmed = TRUE;
+		m_guardArmedMode = mode;
+		return;
+	}
 
 	// sanity
 	if( command )

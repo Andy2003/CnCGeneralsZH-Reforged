@@ -141,10 +141,6 @@ void W3DWaypointBuffer::queueLine( Int numPoints, Vector3 *points )
 {
 	if( m_linesUsed >= (Int)m_linePool.size() )
 		m_linePool.push_back( new SegmentedLineClass( *m_line ) );	// copies texture, shader, width, color
-	// a pooled line keeps the colour it was made with, so it takes the current one every time
-	Vector3 color;
-	m_line->Get_Color( color );
-	m_linePool[ m_linesUsed ]->Set_Color( color );
 	m_linePool[ m_linesUsed++ ]->Set_Points( numPoints, points );
 }
 
@@ -344,9 +340,7 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
                       m_line->Set_Width( 3.0f );
 
 					            m_line->Set_Points( numPoints, points );
-					            m_line->Render( localRinfo );
-					            setDefaultLineStyle();		// queueLine takes m_line's colour
-                    }
+					            m_line->Render( localRinfo );                    }
                   }
                   //////////////////////////////////////////////////////////////////////                
 
@@ -605,26 +599,6 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 				queueLine( 2, points );
 			}
 		}
-	}
-
-	// the circle a left drag is sweeping out (attack key, Ctrl, guard) is drawn with the order lines'
-	// own line, in green, lying on the ground it covers
-	Coord3D center;
-	Real radius;
-	if( TheInGameUI->getAttackCircleGround( center, radius ) && !ShaderClass::Is_Backface_Culling_Inverted() )
-	{
-		enum { RING_SEGMENTS = 48 };
-		Vector3 ring[ RING_SEGMENTS + 1 ];
-		for( Int i = 0; i <= RING_SEGMENTS; ++i )
-		{
-			const Real angle = 2.0f * PI * (Real)i / (Real)RING_SEGMENTS;
-			const Real x = center.x + radius * (Real)cos( angle );
-			const Real y = center.y + radius * (Real)sin( angle );
-			ring[ i ].Set( x, y, TheTerrainLogic->getGroundHeight( x, y ) );
-		}
-		m_line->Set_Color( Vector3( 0.2f, 1.0f, 0.2f ) );
-		queueLine( RING_SEGMENTS + 1, ring );
-		setDefaultLineStyle();
 	}
 
 	// every line of every block above goes out after the last puck

@@ -1012,9 +1012,9 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 				movemsg->appendLocationArgument( *pos );
 
 			// a posted unit holds its spot and shoots what walks into range, rather than chasing it
-			// off the post the player put it on
+			// off the post the player put it on.  EA's guard button armed it with its own mode
 			if (msgType == GameMessage::MSG_DO_GUARD_POSITION)
-				movemsg->appendIntegerArgument( GUARDMODE_GUARD_WITHOUT_PURSUIT );
+				movemsg->appendIntegerArgument( TheInGameUI->getGuardArmedMode() );
 
 		}  // end if
 	}

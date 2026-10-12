@@ -629,10 +629,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 
 				if( command )
 				{
-					if( command->getCommandType() == GUI_COMMAND_ATTACK_MOVE ||
-							command->getCommandType() == GUI_COMMAND_GUARD ||
-							command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
-							command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY )
+					if( command->getCommandType() == GUI_COMMAND_ATTACK_MOVE )
 					{
 						//These GUI commands can take care of themselves -- don't let
 						//the selection translator meddle.
@@ -1120,19 +1117,11 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			m_selectFeedbackAnchor = msg->getArgument( 0 )->pixel;
 
 			// with the attack key armed or Ctrl held the left button draws a circle instead of a
-			// selection box, and everything hostile inside it becomes a target list.  With a guard armed
-			// the circle is the ground to guard
-			if( TheInGameUI->getSelectCount() > 0 && TheInGameUI->getPendingPlaceType() == NULL )
-			{
-				const CommandButton *command = TheInGameUI->getGUICommand();
-				const Bool guardCommand = command && ( command->getCommandType() == GUI_COMMAND_GUARD ||
-																							 command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
-																							 command->getCommandType() == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY );
-				if( TheInGameUI->isGuardArmed() || guardCommand )
-					TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor, TRUE );
-				else if( TheInGameUI->isForceFireOn() && command == NULL )
-					TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor, FALSE );
-			}
+			// selection box, and everything hostile inside it becomes a target list.  An armed line key
+			// (move, attack move, guard) keeps its line under Ctrl
+			if( TheInGameUI->isForceFireOn() && !TheInGameUI->isLineOrderArmed() && TheInGameUI->getSelectCount() > 0
+					&& TheInGameUI->getGUICommand() == NULL && TheInGameUI->getPendingPlaceType() == NULL )
+				TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor );
 			break;
 		}
 
