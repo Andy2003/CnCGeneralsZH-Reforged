@@ -2876,9 +2876,8 @@ void InGameUI::drawClassicSuperweapon( SuperweaponInfo *info, const AsciiString 
 		info->setText( name, time );
 	}
 
-	// white, flashing to EA's flash colour once ready
-	const Color white = GameMakeColor( 255, 255, 255, 255 );
-	Color color = white;
+	// 0 draws in the owner's colour, flashing to EA's flash colour once ready
+	Color color = 0;
 	if( isReady && m_superweaponFlashDuration != 0.0f )
 	{
 		if( TheGameLogic->getFrame() >= m_superweaponLastFlashFrame + (Int)m_superweaponFlashDuration )
@@ -2886,7 +2885,7 @@ void InGameUI::drawClassicSuperweapon( SuperweaponInfo *info, const AsciiString 
 			m_superweaponUsedFlashColor = !m_superweaponUsedFlashColor;
 			m_superweaponLastFlashFrame = TheGameLogic->getFrame();
 		}
-		color = m_superweaponUsedFlashColor ? white : m_superweaponFlashColor;
+		color = m_superweaponUsedFlashColor ? 0 : m_superweaponFlashColor;
 	}
 	const Color drop = GameMakeColor( 0, 0, 0, 255 );
 	info->drawName( x, *y, color, drop );
