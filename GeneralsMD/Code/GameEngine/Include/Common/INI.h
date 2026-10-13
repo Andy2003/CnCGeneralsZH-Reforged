@@ -322,6 +322,25 @@ public:
 		this game does not know used to end the match before it started. Set, an unknown field
 		name is logged and its line skipped instead of throwing. */
 	inline void setSkipUnknownFields( Bool skip ) { m_skipUnknownFields = skip; }
+
+	/** A patch INI loaded over a mod can name a special power the mod does not have. The reference
+		raises this, and ThingTemplate::parseModuleName drops the module it was read into. */
+	inline void setMissingSpecialPower( Bool missing ) { m_missingSpecialPower = missing; }
+	inline Bool hasMissingSpecialPower( void ) const { return m_missingSpecialPower; }
+
+	/** -modfactions prefixes every word a mod names a block with, and a mod can name one after an
+		engine word: The Power of the West has a ParticleSystem "Explosion", so "DamageType = Explosion"
+		arrived as "M2~Explosion".  A fixed list of names (an enum, Yes/No) is never a mod's, so its
+		scanners read past the prefix.  No retail name holds a '~'. */
+	static const char *withoutModPrefix( const char *token )
+	{
+		const char *p = token;
+		if (*p++ != 'M' || *p < '0' || *p > '9')
+			return token;
+		while (*p >= '0' && *p <= '9')
+			++p;
+		return *p == '~' ? p + 1 : token;
+	}
 	inline const char *getSeps( void ) const { return m_seps; }
 	inline const char *getSepsPercent( void ) const { return m_sepsPercent; }
 	inline const char *getSepsColon( void ) const { return m_sepsColon; }
@@ -488,6 +507,7 @@ protected:
 	const char *m_blockEndToken;							///< token to represent end of data block
 	Bool m_endOfFile;													///< TRUE when we've hit EOF
 	Bool m_skipUnknownFields;									///< log and skip an unknown field instead of throwing
+	Bool m_missingSpecialPower;								///< a patch named a special power that does not exist
 #if defined(_DEBUG) || defined(_INTERNAL)
 	char m_curBlockStart[ INI_MAX_CHARS_PER_LINE ];	///< first line of cur block
 #endif

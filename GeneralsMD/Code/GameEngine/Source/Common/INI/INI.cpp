@@ -203,6 +203,7 @@ INI::INI( void )
 	m_blockEndToken			= "END";
 	m_endOfFile					= FALSE;
 	m_skipUnknownFields	= FALSE;
+	m_missingSpecialPower = FALSE;
 	m_buffer[0]					= 0;
 #if defined(_DEBUG) || defined(_INTERNAL)
 	m_curBlockStart[0]	= 0;
@@ -602,6 +603,19 @@ void ModNamespace::finishScan( Int mod )
 	Names &names = m_mods[ mod ];
 	for (std::set<std::string>::const_iterator it = names.sides.begin(); it != names.sides.end(); ++it)
 		names.all.erase( *it );
+	// nor a word the parser reads for itself: The Power of the West has an "FXList No", and every
+	// "IsGrantable = No" became "M2~No", which is no Bool
+	static const char *const Reserved[] = { "none", "no", "yes", "true", "false", "end", "default" };
+	for (std::set<std::string>::iterator it = names.all.begin(); it != names.all.end(); )
+	{
+		Bool reserved = FALSE;
+		for (size_t i = 0; i < ARRAY_SIZE( Reserved ) && !reserved; ++i)
+			reserved = stricmp( it->c_str(), Reserved[ i ] ) == 0;
+		if (reserved)
+			it = names.all.erase( it );
+		else
+			++it;
+	}
 }
 
 /// A-Z only: the result goes into the INI checksum, so no locale may decide it
@@ -993,6 +1007,7 @@ void INI::parseBitInInt32( INI *ini, void *instance, void *store, const void* us
 /*static*/ Bool INI::scanBool(const char* token)
 {
 	// translate string yes/no into TRUE/FALSE
+	token = withoutModPrefix( token );
 	if( strcasecmp( token, "yes" ) == 0 )
 		return TRUE;
 	else if( strcasecmp( token, "no" ) == 0 )
@@ -1723,7 +1738,13 @@ void INI::parseSpecialPowerTemplate( INI* ini, void * /*instance*/, void *store,
 	}
 
 	const SpecialPowerTemplate *sPowerT = TheSpecialPowerStore->findSpecialPowerTemplate( AsciiString( token ) );
-	if( !sPowerT && strcasecmp( token, "None" ) != 0 )
+	if( !sPowerT && strcasecmp( token, "None" ) != 0 && ini->getLoadType() == INI_LOAD_MULTIFILE )
+	{
+		// a patch INI loaded over a mod, as with a missing science (scanScience): Contra has no Nuke_ carpet bomb
+		DEBUG_LOG(("[LINE: %d in '%s'] special power '%s' does not exist; the module is skipped.\n", ini->getLineNum(), ini->getFilename().str(), token));
+		ini->setMissingSpecialPower( TRUE );
+	}
+	else if( !sPowerT && strcasecmp( token, "None" ) != 0 )
 	{
 		DEBUG_CRASH( ("[LINE: %d in '%s'] Specialpower %s not found!\n", ini->getLineNum(), ini->getFilename().str(), token) );
 	}
@@ -2004,6 +2025,7 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 	}
 
 	// search for matching name
+	token = withoutModPrefix( token );
 	Int count = 0;
 	for(ConstCharPtrArray name = nameList; *name; name++, count++ )
 	{
@@ -2028,6 +2050,7 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 	}
 
 	// search for matching name
+	token = withoutModPrefix( token );
 	Bool found = false;
 	for( const LookupListRec* lookup = &lookupList[0]; lookup->name; lookup++ )
 	{

@@ -72,6 +72,8 @@
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/ModuleFactory.h"
+#include "Common/SpecialPower.h"
+#include "GameLogic/Armor.h"
 #include "Common/SimulationMathCrc.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -822,6 +824,100 @@ TEST(patch_of_a_missing_object_is_skipped)
 		delete TheWritableGlobalData;
 		TheWritableGlobalData = NULL;
 	}
+}
+
+/* FixesReforged.ini gives every China Command Center the Nuke_ and Early_ carpet bombers.  Contra has
+	 no such special powers, the module kept a NULL template, and placing the start building faulted in
+	 SpecialPowerModule's constructor.  A patch's module naming a missing power is read and dropped. */
+TEST(patch_module_with_a_missing_special_power_is_skipped)
+{
+	CHECK( bootOnce() );
+
+	GlobalData *savedGlobals = TheWritableGlobalData;
+	if( savedGlobals == NULL )
+		TheWritableGlobalData = NEW GlobalData;
+	if( TheModuleFactory == NULL )
+	{
+		TheModuleFactory = NEW ModuleFactory;
+		TheModuleFactory->init();
+	}
+	if( TheThingFactory == NULL )
+		TheThingFactory = NEW ThingFactory;
+	if( TheSpecialPowerStore == NULL )
+		TheSpecialPowerStore = NEW SpecialPowerStore;
+
+	writeFile( TEST_INI,
+		"Object MissingPowerProbe\r\n"
+		"  Behavior = DestroyDie ModuleTag_01\r\n"
+		"  End\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+
+	writeFile( TEST_INI,
+		"Object MissingPowerProbe\r\n"
+		"  AddModule\r\n"
+		"    Behavior = OCLSpecialPower ModuleTag_22Nuke_Fix\r\n"
+		"      SpecialPowerTemplate = Nuke_MissingPowerProbe\r\n"
+		"    End\r\n"
+		"  End\r\n"
+		"  BuildCost = 900\r\n"
+		"End\r\n" );
+	Bool threw = FALSE;
+	try
+	{
+		INI patch;
+		patch.load( AsciiString( TEST_INI ), INI_LOAD_MULTIFILE, NULL );
+	}
+	catch( ... )
+	{
+		threw = TRUE;
+	}
+	CHECK( threw == FALSE );
+
+	const ThingTemplate *probe = TheThingFactory->findTemplate( "MissingPowerProbe" );
+	CHECK( probe != NULL );
+	if( probe != NULL )
+	{
+		CHECK_EQ( probe->getBehaviorModuleInfo().getCount(), 1 );
+		CHECK_EQ( probe->friend_getBuildCost(), 900 );
+	}
+
+	remove( TEST_INI );
+	if( savedGlobals == NULL )
+	{
+		delete TheWritableGlobalData;
+		TheWritableGlobalData = NULL;
+	}
+}
+
+/* The Power of the West's Armor.ini has "Armor = INFANTRY_MISSIL 100%".  EA's parse let it through,
+	 264e2180 made it throw and the mod stopped at start.  An unknown damage type skips its line; a
+	 line with no percentage is still a syntax error. */
+TEST(armor_skips_an_unknown_damage_type)
+{
+	CHECK( bootOnce() );
+
+	if( TheArmorStore == NULL )
+		TheArmorStore = NEW ArmorStore;
+
+	writeFile( TEST_INI,
+		"Armor UnknownDamageProbe\r\n"
+		"  Armor = INFANTRY_MISSIL 100%\r\n"
+		"  Armor = SMALL_ARMS 50%\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+	const ArmorTemplate *armor = TheArmorStore->findArmorTemplate( "UnknownDamageProbe" );
+	CHECK( armor != NULL );
+	if( armor != NULL )
+		CHECK_NEAR( armor->adjustDamage( DAMAGE_SMALL_ARMS, 100.0f ), 50.0f, 0.01f );
+
+	writeFile( TEST_INI,
+		"Armor UnknownDamageProbeBroken\r\n"
+		"  Armor = SMALL_ARMS\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) == FALSE );
+
+	remove( TEST_INI );
 }
 
 /* Data\INI\FXListReforged.ini is the fork's own explosion light: 89 of EA's FXLists, each repeated
@@ -16495,6 +16591,37 @@ TEST(modfactions_prefix_only_the_mods_own_names)
 	NameKeyType key;
 	CHECK( names.findRetailKey( NAMEKEY( "M1~Upgrade_Retail" ), MODNAME_UPGRADE, &key ) );
 	CHECK_EQ( key, NAMEKEY( "Upgrade_Retail" ) );
+}
+
+// The Power of the West defines "FXList No", and -modfactions made every "IsGrantable = No" an
+// "M2~No" that parseBool refused: a word the parser reads for itself is never the mod's name.
+TEST(modfactions_never_prefix_a_reserved_word)
+{
+	bootOnce();
+	ModNamespace names;
+	names.scanLine( 0, "FXList No" );
+	names.scanLine( 0, "Upgrade None" );
+	names.scanLine( 0, "FXList FX_Nope" );
+	names.finishScan( 0 );
+	names.setActive( 0 );
+
+	char line[ 64 ];
+	strcpy( line, "  IsGrantable = No" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  IsGrantable = No" );
+	strcpy( line, "  PrerequisiteSciences = None" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  PrerequisiteSciences = None" );
+	strcpy( line, "  FX = FX_Nope" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  FX = M1~FX_Nope" );
+
+	// and a name it gave a block that is also an engine word ("ParticleSystem Explosion") still reads as
+	// that word where only engine words go
+	CHECK( INI::scanBool( "M2~Yes" ) );
+	CHECK_EQ( INI::scanIndexList( "M2~SMALL_ARMS", DamageTypeFlags::getBitNames() ), (Int)DAMAGE_SMALL_ARMS );
+	CHECK_STR( INI::withoutModPrefix( "M~Explosion" ), "M~Explosion" );
+	CHECK_STR( INI::withoutModPrefix( "MX2~Explosion" ), "MX2~Explosion" );
 }
 
 class ModTestArchiveFile : public ArchiveFile

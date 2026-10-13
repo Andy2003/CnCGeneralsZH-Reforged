@@ -127,8 +127,9 @@ class GameFiles:
         for big in bigs:
             self._index(big, big.name.lower().startswith("patch"))
         if mod:
-            # a folder's archives in FilenameList order (case-insensitive, subfolders too), each with overwrite
-            for big in sorted(mod.rglob("*.big"), key=lambda big: str(big).lower()):
+            # a folder's archives against FilenameList order (case-insensitive, subfolders too), each with
+            # overwrite, so the first name wins as in retail's own pass ("!!" or "00_" is the mod's patch)
+            for big in sorted(mod.rglob("*.big"), key=lambda big: str(big).lower(), reverse=True):
                 if not is_reforged_archive(big):
                     self._index(big, True)
             for big in bigs:

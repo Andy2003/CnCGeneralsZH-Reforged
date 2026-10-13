@@ -618,7 +618,15 @@ void ThingTemplate::parseModuleName(INI* ini, void *instance, void* store, const
 		throw INI_INVALID_DATA;
 	}
 
+	ini->setMissingSpecialPower(FALSE);
 	ModuleData* data = TheModuleFactory->newModuleDataFromINI(ini, tokenStr, type, moduleTagStr);
+	if (ini->hasMissingSpecialPower())
+	{
+		// read to its End and dropped: a special power module with no template faults placing the object
+		DEBUG_LOG(("[LINE: %d - FILE: '%s'] %s %s on %s is skipped.\n",
+			ini->getLineNum(), ini->getFilename().str(), tokenStr.str(), moduleTagStr.str(), self->getName().str()));
+		return;
+	}
 
 	if (data->isAiModuleData())
 	{

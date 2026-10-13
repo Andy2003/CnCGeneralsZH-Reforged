@@ -212,8 +212,9 @@ void ArchiveFileSystem::loadMods() {
 
 	// In command-line order, each with overwrite: a later -mod wins over an earlier one, and all of them
 	// over the retail archives.  Under -modfactions a -modpatch goes over the full mod it was given
-	// after, in that mod's own tree, or over retail's when it came first (-1).  A folder's archives go
-	// in the order Win32BIGFileSystem's own pass uses.
+	// after, in that mod's own tree, or over retail's when it came first (-1).  Inside one folder the
+	// first name wins, as in Win32BIGFileSystem's plain pass, so a mod's "!!" or "00_" archive is its
+	// patch: the folder goes in descending name order, each with overwrite.
 	std::vector< std::pair<Int, AsciiString> > layers;
 	for (size_t i = 0; i < TheGlobalData->m_retailPatches.size(); ++i)
 		layers.push_back(std::make_pair(-1, TheGlobalData->m_retailPatches[i]));
@@ -232,7 +233,7 @@ void ArchiveFileSystem::loadMods() {
 		else
 			archives.insert(mod);
 
-		for (FilenameListIter it = archives.begin(); it != archives.end(); ++it)
+		for (FilenameList::reverse_iterator it = archives.rbegin(); it != archives.rend(); ++it)
 		{
 			if (isReforgedArchiveName(*it))
 			{
