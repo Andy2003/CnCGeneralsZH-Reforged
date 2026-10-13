@@ -570,7 +570,34 @@ void MainMenuInit( WindowLayout *layout, void *userData )
 		dropDownWindows[i]->winHide(TRUE);
 
 	initialHide();
-	
+
+#if defined(_WIN32)
+	//
+	// The launcher owns every setting on Windows, so the main menu has no Options button.  It is
+	// destroyed rather than hidden because the menu's transitions show every window they name; a
+	// destroyed one is not found and they skip it.  Credits and Exit move up into the gap and the
+	// panel behind them gives up the row.  The shell runs this init again on the same windows each
+	// time a screen above the main menu is popped, and then the button is already gone.
+	//
+	if( buttonOptions )
+	{
+		Int x, optionsY, creditsY, exitY, width, height;
+		buttonOptions->winGetPosition( &x, &optionsY );
+		buttonCredits->winGetPosition( &x, &creditsY );
+		buttonExit->winGetPosition( &x, &exitY );
+		const Int row = creditsY - optionsY;
+		buttonCredits->winSetPosition( x, optionsY );
+		buttonExit->winSetPosition( x, creditsY );
+		GameWindow *panel = buttonExit->winGetParent();
+		panel->winGetSize( &width, &height );
+		panel->winSetSize( width, height - row );
+		dropDownWindows[DROPDOWN_MAIN]->winGetSize( &width, &height );
+		dropDownWindows[DROPDOWN_MAIN]->winSetSize( width, height - row );
+		TheWindowManager->winDestroy( buttonOptions );
+		buttonOptions = NULL;
+	}
+#endif
+
 	showSelectiveButtons(SHOW_NONE);
 	// Set up the version number
 #if defined _DEBUG || defined _INTERNAL || defined _PROFILE

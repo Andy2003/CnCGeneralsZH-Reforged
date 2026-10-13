@@ -671,6 +671,9 @@ void LANAPI::RequestGameJoin( LANGameInfo *game, UnsignedInt ip /* = 0 */ )
 	// and the far end reads these as C strings out of the packet.
 	strlcpy(msg.GameToJoin.serial, s.str(), ARRAY_SIZE(msg.GameToJoin.serial));
 	msg.GameToJoin.serial[g_maxSerialLength-1] = '\0';
+	// so a host whose INI set differs can tell the player it is the mod and which one (handleRequestJoin)
+	WideCharFromUtf8(TheGlobalData->m_modName.str(), msg.GameToJoin.modName, ARRAY_SIZE(msg.GameToJoin.modName));
+	msg.GameToJoin.baseExeCRC = TheGlobalData->m_baseExeCRC;
 
 	sendMessage(&msg, ip);
 

@@ -1648,6 +1648,9 @@ WeaponTemplate *WeaponStore::findWeaponTemplatePrivate( NameKeyType key ) const
 	if( it != m_weaponTemplateHashMap.end() )
 		return it->second;
 
+	NameKeyType retailKey;
+	if( TheModNamespace.findRetailKey( key, MODNAME_WEAPON, &retailKey ) )
+		return findWeaponTemplatePrivate( retailKey );
 	return NULL;
 
 }

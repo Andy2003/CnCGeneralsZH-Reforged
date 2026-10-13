@@ -60,6 +60,13 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/GameText.h"
 #include "Common/AudioEventRTS.h"
+#include "Common/GlobalData.h"
+#include "Common/INI.h"
+#include "Common/ThingTemplate.h"
+#include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/GadgetPushButton.h"
+#include "GameClient/InGameUI.h"
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -100,8 +107,7 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		}
 		// shift is allowed through: a shift-click on a build button queues a batch of units, and
 		// the label hotkey is meant to be that click's equal. Ctrl and alt still block the hotkey.
-		// Classic blocks every modifier, as the game shipped
-		if( TheGlobalData->isClassicUI() ? newModState != 0 : ( newModState & ~SHIFT ) != 0 )
+		if( ( newModState & ~SHIFT ) != 0 )
 			return disp;
 		// Ctrl+F let go of Ctrl first ends on a bare F release; it is still Ctrl+F
 		if( keyState & KEY_STATE_PRESSED_WITH_CTRL_ALT )
@@ -208,6 +214,11 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 	{
 		if( BitTest( win->winGetStatus(), WIN_STATUS_ENABLED ) )
  		{
+			// what a player's own key (Hotkeys.ini) pressed can be read back from the log
+			const CommandButton *command = (const CommandButton *)GadgetButtonGetData( win );
+			const DrawableList *selected = TheInGameUI ? TheInGameUI->getAllSelectedDrawables() : NULL;
+			DEBUG_LOG(( "HOTKEYS: %s pressed %s, selection led by %s\n", key.str(), command ? command->getName().str() : "a window",
+				( selected && !selected->empty() ) ? selected->front()->getTemplate()->getName().str() : "nothing" ));
  			TheWindowManager->winSendSystemMsg( win->winGetParent(), GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
  
  			// here we make the same click sound that the GUI uses when you click a button
@@ -220,6 +231,8 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 			return TRUE;
  		}
 
+		const CommandButton *disabled = (const CommandButton *)GadgetButtonGetData( win );
+		DEBUG_LOG(( "HOTKEYS: %s found %s disabled\n", key.str(), disabled ? disabled->getName().str() : "a window" ));
 		AudioEventRTS disabledClick( "GUIClickDisabled" );
 		if( TheAudio )
 		{
@@ -284,6 +297,188 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 		marker++;
 	}
 	return AsciiString::TheEmptyString;	
+}
+
+//-----------------------------------------------------------------------------
+/** The player's command button keys from Hotkeys.ini, by button name in lower case: an upper case
+	* letter, or 0 for a button the player wants without a key.  Read once while the engine starts and
+	* kept for the whole run, so it lives outside the manager, which every game client rebuilds. */
+static std::map< std::string, WideChar > s_playerButtonKeys;
+
+/** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
+	* to 14 stand two rows of seven read down the columns, so Q W E R T Y over A S D F G H take the
+	* first six columns and the keyboard's third row, Z X C V B N, has no place.  A, S, G, Y and H
+	* belong to the fixed orders (FIXED_KEYS), so their places take a key off the grid instead: J, K,
+	* M, U and L.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws
+	* the same table (hotkeys.js, GRID_KEYS). */
+static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'R', 'F', 'T', 'M', 'U', 'L' };
+static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
+static Bool s_commandGrid = FALSE;
+
+/** The owner's fixed keys, 2026-10-12, on every bar and in both modes: A attack move, S stop,
+	* G guard, Y rally point, V evacuate, N sell, C combat drop, and H for land mines, camo netting
+	* and the GLA's fake and real switches, which go by button name.  No other button may have one of
+	* these letters.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
+static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'N', 'C', 'H' };
+static const char *const FIXED_H_BUTTONS[] =
+{
+	"command_upgradechinamines", "command_upgradeempmines", "command_upgradecamonetting", "command_upgradeglacamonetting",
+	"command_upgradeglaworkerfakecommandset", "command_upgradeglaworkerrealcommandset"
+};
+static const char FIXED_H_PREFIX[] = "command_becomerealgla";	///< a fake building's switch to the real one
+
+static WideChar fixedButtonKey( const AsciiString& lowerName, Int commandType )
+{
+	if( strncmp( lowerName.str(), FIXED_H_PREFIX, sizeof( FIXED_H_PREFIX ) - 1 ) == 0 )
+		return 'H';
+	for( Int each = 0; each < (Int)( sizeof( FIXED_H_BUTTONS ) / sizeof( FIXED_H_BUTTONS[ 0 ] ) ); each++ )
+		if( lowerName.compare( FIXED_H_BUTTONS[ each ] ) == 0 )
+			return 'H';
+	switch( commandType )
+	{
+		case GUI_COMMAND_ATTACK_MOVE:			return 'A';
+		case GUI_COMMAND_STOP:						return 'S';
+		case GUI_COMMAND_GUARD:						return 'G';
+		case GUI_COMMAND_SET_RALLY_POINT:	return 'Y';
+		case GUI_COMMAND_EVACUATE:				return 'V';
+		case GUI_COMMAND_SELL:						return 'N';
+		case GUI_COMMAND_COMBATDROP:			return 'C';
+	}
+	return 0;
+}
+
+/** The scope Hotkeys.ini names mod `mod`'s buttons by, "<scope>:<button>": the -mod folder's name,
+	* lower case and without spaces.  The launcher's Hotkeys page uses the same (hotkeys.js, modScope). */
+static std::string modScope( Int mod )
+{
+	std::string path( TheGlobalData->m_mods[ mod ].str() );
+	while( !path.empty() && ( path[ path.size() - 1 ] == '\\' || path[ path.size() - 1 ] == '/' ) )
+		path.erase( path.size() - 1 );
+	const size_t slash = path.find_last_of( "\\/" );
+	if( slash != std::string::npos )
+		path.erase( 0, slash + 1 );
+	std::string scope;
+	for( size_t at = 0; at < path.size(); at++ )
+		if( !isspace( (unsigned char)path[ at ] ) )
+			scope += (char)tolower( (unsigned char)path[ at ] );
+	return scope;
+}
+
+/** A lower case button name without the "m<n>~" -modfactions puts on a mod's own names; *mod gets
+	* that mod's index, or -1 for a name with no prefix. */
+static std::string withoutModPrefix( const char *lowerName, Int *mod )
+{
+	*mod = -1;
+	const char *tilde = strchr( lowerName, '~' );
+	if( lowerName[ 0 ] != 'm' || tilde == NULL || tilde == lowerName + 1 )
+		return lowerName;
+	for( const char *digit = lowerName + 1; digit < tilde; digit++ )
+		if( !isdigit( (unsigned char)*digit ) )
+			return lowerName;
+	*mod = atoi( lowerName + 1 ) - 1;
+	return tilde + 1;
+}
+
+/** The player's key for a button, into *letter; FALSE leaves it alone.  A mod's own button (ownMod,
+	* under -modfactions) takes only its mod's "<scope>:<button>" entry.  A plain name, which under a
+	* plain -mod may be any loaded mod's, takes the last loaded mod's scoped entry that exists, then
+	* the unscoped one, which is retail's. */
+static Bool findPlayerKey( const std::string& bare, Int ownMod, WideChar *letter )
+{
+	std::map< std::string, WideChar >::const_iterator it;
+	const Int modCount = TheGlobalData ? (Int)TheGlobalData->m_mods.size() : 0;
+	for( Int mod = modCount - 1; mod >= 0; mod-- )
+	{
+		if( ownMod >= 0 && mod != ownMod )
+			continue;
+		it = s_playerButtonKeys.find( modScope( mod ) + ":" + bare );
+		if( it != s_playerButtonKeys.end() )
+		{
+			*letter = it->second;
+			return TRUE;
+		}
+	}
+	if( ownMod >= 0 )
+		return FALSE;
+	it = s_playerButtonKeys.find( bare );
+	if( it == s_playerButtonKeys.end() )
+		return FALSE;
+	*letter = it->second;
+	return TRUE;
+}
+
+static Bool isOneOf( WideChar letter, const WideChar *letters, Int count )
+{
+	for( Int each = 0; each < count; each++ )
+		if( letters[ each ] == letter )
+			return TRUE;
+	return FALSE;
+}
+
+//-----------------------------------------------------------------------------
+WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
+																				 Int commandType )
+{
+	AsciiString lower = button;
+	lower.toLower();
+	Int ownMod = -1;
+	const std::string bare = withoutModPrefix( lower.str(), &ownMod );
+	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType );
+	if( fixed != 0 )
+		return fixed;
+	if( s_commandGrid && barSlot >= 0 )
+		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
+
+	WideChar letter = labelKey;
+	findPlayerKey( bare, ownMod, &letter );
+	if( letter >= 'a' && letter <= 'z' )
+		letter -= 'a' - 'A';
+	if( isOneOf( letter, FIXED_KEYS, (Int)( sizeof( FIXED_KEYS ) / sizeof( FIXED_KEYS[ 0 ] ) ) ) )
+		return 0;
+	// a button off the bar gives a grid letter up to the bar
+	if( s_commandGrid && isOneOf( letter, GRID_KEYS, GRID_KEY_COUNT ) )
+		return 0;
+	return letter;
+}
+
+//-----------------------------------------------------------------------------
+/** CommandBarGrid, Enabled = Yes or No, End.  Only the player's own Hotkeys.ini carries it, and
+	* nothing in it reaches the INI CRC. */
+/*static*/ void INI::parseCommandBarGridDefinition( INI *ini )
+{
+	static const FieldParse fields[] =
+	{
+		{ "Enabled", INI::parseBool, NULL, 0 },
+		{ NULL, NULL, NULL, 0 }
+	};
+	ini->initFromINI( &s_commandGrid, fields );
+	DEBUG_LOG(( "HOTKEYS: grid keys %s\n", s_commandGrid ? "on" : "off" ));
+}
+
+//-----------------------------------------------------------------------------
+/** CommandButtonHotKey <button name>, Key = one letter or NONE, End.  Only the player's own
+	* Hotkeys.ini carries these, and nothing in it reaches the INI CRC. */
+/*static*/ void INI::parseCommandButtonHotKeyDefinition( INI *ini )
+{
+	AsciiString name = ini->getNextToken();
+	name.toLower();
+
+	static const FieldParse fields[] =
+	{
+		{ "Key", INI::parseAsciiString, NULL, 0 },
+		{ NULL, NULL, NULL, 0 }
+	};
+	AsciiString key;
+	ini->initFromINI( &key, fields );
+
+	WideChar letter = 0;
+	if( key.getLength() == 1 && isalpha( (unsigned char)key.getCharAt( 0 ) ) )
+		letter = (WideChar)toupper( (unsigned char)key.getCharAt( 0 ) );
+	else if( key.compareNoCase( "NONE" ) != 0 )
+		throw INI_INVALID_DATA;
+
+	s_playerButtonKeys[ name.str() ] = letter;
+	DEBUG_LOG(( "HOTKEYS: button %s key %s\n", name.str(), key.str() ));
 }
 
 //-----------------------------------------------------------------------------

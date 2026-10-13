@@ -261,6 +261,12 @@ static void AIUpdate_traceMove( const Object *obj, const Coord3D& framePos, Bool
 
 		NameKeyType locoKey = NAMEKEY(locoName);
 		const LocomotorTemplate* lt = TheLocomotorStore->findLocomotorTemplate(locoKey);
+		if (!lt && ini->getLoadType() == INI_LOAD_MULTIFILE)
+		{
+			// a patch INI loaded over a mod can name a locomotor the mod renamed or removed
+			DEBUG_LOG(("[LINE: %d in '%s'] locomotor '%s' does not exist; the reference is skipped.\n", ini->getLineNum(), ini->getFilename().str(), locoName));
+			continue;
+		}
 		if (!lt)
 		{
 			DEBUG_CRASH(("Locomotor %s not found!\n",locoName));

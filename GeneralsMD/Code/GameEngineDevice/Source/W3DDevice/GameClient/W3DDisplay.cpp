@@ -2188,10 +2188,9 @@ static Bool s_smoothApplied = FALSE;
 
 static void smoothMotionBegin()
 {
-	// -recordfps's pictures between two logic frames are nothing but the blend, so it is on for them
-	// whatever the option and the interface say, from the frame before the first so that one is captured
-	TheSmoothMotionActive = !TheGlobalData->m_headless
-		&& ((TheGlobalData->m_smoothMotion && !TheGlobalData->isClassicUI()) || GameEngine_videoBlends());
+	// only -recordfps's pictures between two logic frames blend, from the frame before the first so
+	// that one is captured
+	TheSmoothMotionActive = !TheGlobalData->m_headless && GameEngine_videoBlends();
 	TheSmoothMotionAlpha = TheSmoothMotionActive ? GameEngine_logicTickFraction() : 1.0f;
 	if (!TheSmoothMotionActive)
 		return;

@@ -921,7 +921,8 @@ const FXList *FXListStore::findFXList(const char* name) const
 	{
 		return &(*it).second;
 	}
-	return NULL;
+	AsciiString retailName;
+	return TheModNamespace.findRetailName(AsciiString(name), MODNAME_FXLIST, &retailName) ? findFXList(retailName.str()) : NULL;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -123,8 +123,8 @@ static Coord2D edgeScrollPull( const ICoord2D& pos )
 {
 	const Int width  = (Int)TheDisplay->getWidth();
 	const Int height = (Int)TheDisplay->getHeight();
-	// Classic is the game as shipped: the last three pixels, at full speed, and nothing deeper
-	const Int band = ( TheGlobalData->isClassicUI() || isOverWindow( pos ) ) ? edgeScrollSize : EdgeScroll_bandForHeight( height );
+	// the Classic mouse is the game as shipped: the last three pixels, at full speed, and nothing deeper
+	const Int band = ( TheGlobalData->isClassicMouse() || isOverWindow( pos ) ) ? edgeScrollSize : EdgeScroll_bandForHeight( height );
 
 	Coord2D pull;
 	pull.x = EdgeScroll_strength( width - 1 - pos.x, band ) - EdgeScroll_strength( pos.x, band );
@@ -152,7 +152,7 @@ void LookAtTranslator::setScrolling(Int x)
 	TheTacticalView->setMouseLock( TRUE );
 	m_scrollType = x;
 	// A manual pan restores map constraints widened by scripted camera paths.
-	if ((TheGlobalData->m_useCameraConstraints || TheGlobalData->isClassicUI()) && TheGlobalData->m_cameraBoundaryMargin > 0)
+	if (TheGlobalData->m_useCameraConstraints && TheGlobalData->m_cameraBoundaryMargin > 0)
 		TheTacticalView->forceCameraConstraintRecalc();
 	if(TheStatsCollector)
 		TheStatsCollector->startScrollTime();
@@ -239,8 +239,7 @@ static const UnsignedInt CAMERA_NETWORK_FRAMES = LOGICFRAMES_PER_SECOND / 5;
 	* machines, only from somebody still playing, and only when it moved since the last one went. */
 Bool LookAtTranslator::networkCameraDue( const ViewLocation &view )
 {
-	// Classic sends what the game as shipped sent, and that was no camera in a network game
-	if( TheGlobalData->isClassicUI() || !TheGameLogic->isInMultiplayerGame() || !ThePlayerList->getLocalPlayer()->isPlayerActive() )
+	if( !TheGameLogic->isInMultiplayerGame() || !ThePlayerList->getLocalPlayer()->isPlayerActive() )
 		return FALSE;
 
 	const UnsignedInt frame = TheGameLogic->getFrame();
@@ -329,9 +328,9 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			m_lastMouseMoveFrame = TheGameLogic->getFrame();
 			m_anchor = msg->getArgument( 0 )->pixel;
 
-			// Classic is 1.04's scroll, which starts on the press itself, so a click that wobbles
-			// nudges the camera.  Its second press of a quick pair started nothing, as there.
-			if (TheGlobalData->isClassicUI())
+			// the Classic mouse is 1.04's scroll, which starts on the press itself, so a click that
+			// wobbles nudges the camera.  Its second press of a quick pair started nothing, as there.
+			if (TheGlobalData->isClassicMouse())
 			{
 				if (msg->getType() == GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN)
 				{
@@ -433,8 +432,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			// edge, so believing it would scroll the map for as long as the mouse sat on the desktop.
 			// Nor while a watcher's director or player camera drives: the spectator page stands on the
 			// top and right edges, and the pointer on its way to it took the camera away (ObserverCamera.h).
-			// Classic keeps retail's rule whatever Options.ini says.
-			const Bool edgeScrollAllowed = (!TheGlobalData->m_windowed || (TheGlobalData->m_edgeScrollInWindowedMode && !TheGlobalData->isClassicUI()))
+			// The Classic mouse keeps retail's rule whatever Options.ini says.
+			const Bool edgeScrollAllowed = (!TheGlobalData->m_windowed || (TheGlobalData->m_edgeScrollInWindowedMode && !TheGlobalData->isClassicMouse()))
 																			&& TheMouse->isCursorInWindow() && !TheObserverCamera.isDriving();
 
 			if (m_isScrolling)
@@ -511,8 +510,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			// cannot hit an exact eighth of a turn.  Eaten so the same notch does not also zoom.
 			//
 			// Whole notches only: half a touchpad swipe is not a 45 degree turn.
-			// Classic's wheel only ever zooms, as the game shipped, so none of the Ctrl uses below.
-			const Bool classic = TheGlobalData->isClassicUI();
+			// The Classic mouse's wheel only ever zooms, as the game shipped, so none of the Ctrl uses below.
+			const Bool classic = TheGlobalData->isClassicMouse();
 			const Int rotateSteps = (Int)spin;
 			if (!classic && TheKeyboard->isCtrl() && rotateSteps != 0 &&
 					TheInGameUI->rotatePendingPlacement( rotateSteps ))

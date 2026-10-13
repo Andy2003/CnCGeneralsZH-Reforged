@@ -57,14 +57,6 @@ static InGameChatType inGameChatType;
 static const UnsignedInt SAME_PRESS_MS = 150;	///< ToggleInGameChat: two calls this close are one Enter
 
 // ------------------------------------------------------------------------------------------------
-/** Window/Html/Chat.html draws the chat: the typed line with the lines over it.  The layout's
-	* windows keep the keys and draw nothing. */
-// ------------------------------------------------------------------------------------------------
-static void drawChatNothing( GameWindow *window, WinInstanceData *instData )
-{
-}
-
-// ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 void ShowInGameChat( Bool immediate )
 {
@@ -96,14 +88,6 @@ void ShowInGameChat( Bool immediate )
 
 		static NameKeyType chatTypeStaticTextID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" );
 		chatTypeStaticText = TheWindowManager->winGetWindowFromId( NULL, chatTypeStaticTextID );
-
-		// the Classic interface has no page: EA's layout draws itself where InGameChat.wnd puts it
-		if( !TheGlobalData->isClassicUI() )
-		{
-			chatWindow->winSetDrawFunc( drawChatNothing );
-			for( GameWindow *child = chatWindow->winGetChild(); child; child = child->winGetNext() )
-				child->winSetDrawFunc( drawChatNothing );
-		}
 	}
 	TheWindowManager->winSetFocus( chatTextEntry );
 	SetInGameChatType( INGAME_CHAT_EVERYONE );

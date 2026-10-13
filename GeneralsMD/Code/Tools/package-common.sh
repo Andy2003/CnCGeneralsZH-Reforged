@@ -83,8 +83,6 @@ license_entry() {
 				"(FreeType-GPLv2.txt), as NOTICE.md in the game's source says." > "$L/FreeType-OPTION.txt";;
 		glslang) cp "$s/glslang/LICENSE.txt" "$L/glslang-LICENSE.txt";;
 		spirv-cross) cp "$s/SPIRV-Cross/LICENSE" "$L/SPIRV-Cross-LICENSE.txt";;
-		litehtml) cp "$s/litehtml/LICENSE" "$L/litehtml-LICENSE.txt";;
-		gumbo) cp "$s/litehtml/src/gumbo/LICENSE" "$L/gumbo-LICENSE.txt";;
 		miniaudio) cp "$s/miniaudio/LICENSE" "$L/miniaudio-LICENSE.txt";;
 		gamespy) cp "$s/GameSpy/LICENSE" "$L/GameSpy-LICENSE.txt";;
 		lzhl)		# LZH-Light's notice is the comment that opens lzhl.h (inside libcompression, unaltered)
@@ -93,7 +91,6 @@ license_entry() {
 		zlib)		# zlib's licence is the comment that opens zlib.h
 			awk 'NR == 1 && !/^\/\*/ { exit 1 } { print } /\*\// { exit }' "$s/Compression/ZLib/zlib.h" > "$L/zlib-LICENSE.txt" &&
 			grep -q "This notice may not be removed" "$L/zlib-LICENSE.txt";;
-		nanosvg) cp "$s/nanosvg/LICENSE.txt" "$L/nanosvg-LICENSE.txt";;
 		*) echo "no license_entry named $1" >&2; return 1;;
 	esac
 }

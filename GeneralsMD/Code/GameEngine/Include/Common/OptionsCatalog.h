@@ -143,6 +143,10 @@ enum { TEXTURE_FILTER_MODE_COUNT = 3 };
 // stores the level; the thickness each level stands for is in OptionsCatalog.cpp.
 enum { SMOKE_LEVEL_COUNT = 3 };
 
+// Shadow quality is the size of the sun's depth map, low, medium and high: 1024, 2048 and 4096
+// texels a side (W3DVolumetricShadow.cpp, renderShadowMap).  Medium is the size the map always had.
+enum { SHADOW_QUALITY_COUNT = 3 };
+
 /** Options.ini -> TheWritableGlobalData, for every row.  A key that is absent leaves the field at
 	* whatever GlobalData's constructor put there, which is what makes an old Options.ini keep
 	* working when a row is added. */

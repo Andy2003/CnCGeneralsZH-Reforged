@@ -122,9 +122,10 @@ const ArmorTemplate* ArmorStore::findArmorTemplate(AsciiString name) const
 {
 	NameKeyType namekey = TheNameKeyGenerator->nameToKey(name);
   ArmorTemplateMap::const_iterator it = m_armorTemplates.find(namekey);
-  if (it == m_armorTemplates.end()) 
+  if (it == m_armorTemplates.end())
 	{
-		return NULL;
+		AsciiString retailName;
+		return TheModNamespace.findRetailName(name, MODNAME_ARMOR, &retailName) ? findArmorTemplate(retailName) : NULL;
 	}
 	else
 	{

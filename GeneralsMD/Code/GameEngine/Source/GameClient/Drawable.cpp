@@ -5806,9 +5806,8 @@ Bool Drawable::isSelectable( void ) const
 //-------------------------------------------------------------------------------------------------
 Bool Drawable::isMassSelectable( void ) const
 {
-	// Classic is the game as shipped, where a structure was only ever selected on its own
-	return getObject() && getObject()->isMassSelectable()
-				 && !( TheGlobalData->isClassicUI() && getObject()->isKindOf( KINDOF_STRUCTURE ) );
+	// the game as shipped, where a structure was only ever selected on its own
+	return getObject() && getObject()->isMassSelectable() && !getObject()->isKindOf( KINDOF_STRUCTURE );
 }
 
 //-------------------------------------------------------------------------------------------------

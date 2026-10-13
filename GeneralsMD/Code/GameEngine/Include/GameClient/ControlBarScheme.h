@@ -51,10 +51,6 @@
 #define __CONTROL_BAR_SCHEME_H_
 
 //-----------------------------------------------------------------------------
-// SYSTEM INCLUDES ////////////////////////////////////////////////////////////
-//-----------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
 // USER INCLUDES //////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 #include "GameClient/Color.h"
@@ -276,6 +272,11 @@ public:
 		* is really showing.  Empty when nothing else shares it. */
 	AsciiString getCurrentArtTwinSide( void ) const;
 
+	/// the bar on screen wears its scheme's own painting, ControlBar Pro's
+	Bool isCurrentSchemePainted( void ) const;
+	/// the scheme's painting, cut at the panel seams and each piece drawn where its panel stands
+	void drawPainting( ICoord2D offset, Bool foreground );
+
 
 	// parse Functions for the INI file
 	const FieldParse *getFieldParse() const { return m_controlBarSchemeFieldParseTable; }								///< returns the parsing fields
@@ -291,6 +292,7 @@ public:
 
 private:
 	ControlBarScheme *findSchemeForSide( const AsciiString& side ) const;	///< the widest of that side's schemes the screen can wear
+	ControlBarScheme *findSchemeForFaction( AsciiString side, const PlayerTemplate *pt, Bool useSmall ) const;	///< a mod faction wears America's (ControlBarIsModFaction)
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
 	Coord2D m_multiplyer;																	
@@ -307,5 +309,7 @@ private:
 //-----------------------------------------------------------------------------
 // EXTERNALS //////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
+/// a mod's faction, which wears our American bar and tray whatever bar the mod ships (owner's call)
+Bool ControlBarIsModFaction( const PlayerTemplate *pt );
 
 #endif // __CONTROL_BAR_SCHEME_H_

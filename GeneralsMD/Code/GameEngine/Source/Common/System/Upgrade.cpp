@@ -374,6 +374,9 @@ const UpgradeTemplate *UpgradeCenter::findUpgradeByKey( NameKeyType key ) const
 		if( upgrade->getUpgradeNameKey() == key )
 			return upgrade;
 
+	NameKeyType retailKey;
+	if( TheModNamespace.findRetailKey( key, MODNAME_UPGRADE, &retailKey ) )
+		return findUpgradeByKey( retailKey );
 	// item not found
 	return NULL;
 }
@@ -393,6 +396,12 @@ const UpgradeTemplate *UpgradeCenter::findUpgrade( const AsciiString& name ) con
 //-------------------------------------------------------------------------------------------------
 UpgradeTemplate *UpgradeCenter::newUpgrade( const AsciiString& name )
 {
+	// every upgrade is one bit of UpgradeMaskType; -modfactions puts every mod's beside retail's
+	if( m_nextTemplateMaskBit >= UPGRADE_MAX_COUNT )
+	{
+		DEBUG_LOG(( "Upgrade %s would be upgrade number %d, and UPGRADE_MAX_COUNT is %d\n", name.str(), m_nextTemplateMaskBit + 1, UPGRADE_MAX_COUNT ));
+		throw INI_INVALID_DATA;
+	}
 	UpgradeTemplate *newUpgrade = newInstance(UpgradeTemplate);
 
 	// copy data from the default upgrade
@@ -410,7 +419,6 @@ UpgradeTemplate *UpgradeCenter::newUpgrade( const AsciiString& name )
 	newMask.set( m_nextTemplateMaskBit );
 	//Int64 newMask = 1i64 << m_nextTemplateMaskBit;
 	m_nextTemplateMaskBit++;
-	DEBUG_ASSERTCRASH( m_nextTemplateMaskBit < UPGRADE_MAX_COUNT, ("Can't have over %d types of Upgrades and have a Bitfield function.", UPGRADE_MAX_COUNT) );
 	newUpgrade->friend_setUpgradeMask( newMask );
 
 	// link upgrade

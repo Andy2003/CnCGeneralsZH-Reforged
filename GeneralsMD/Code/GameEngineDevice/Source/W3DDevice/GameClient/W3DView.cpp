@@ -364,7 +364,7 @@ void W3DView::setOrigin( Int x, Int y)
 // only the manual zoom limit is stretched - the default/scripted views still use
 // m_maxHeightAboveGround, so a map still opens framed the way its author meant it to.
 // 2.9 puts the ceiling at 899 over GameData.ini's MaxCameraHeight of 310; it was 3.2 (992).
-// Classic shares the reach and keeps EA's 10 unit wheel step (View.cpp).
+// The wheel keeps EA's 10 unit step (View.cpp).
 #define ZOOM_OUT_LIMIT_FACTOR (2.9f)
 void W3DView::buildCameraTransform( Matrix3D *transform )
 {
@@ -381,8 +381,7 @@ void W3DView::buildCameraTransform( Matrix3D *transform )
 	pos.x += m_shakeOffset.x;
 	pos.y += m_shakeOffset.y;
 
-	// Classic keeps the game's own constraint whatever Options.ini says
-	if ((TheGlobalData->m_useCameraConstraints || TheGlobalData->isClassicUI()) && m_cameraConstraintValid)
+	if (TheGlobalData->m_useCameraConstraints && m_cameraConstraintValid)
 	{
 		pos = constrainCameraPosition(pos, m_cameraConstraint);
 	}
@@ -608,7 +607,7 @@ void W3DView::buildCameraTransform( Matrix3D *transform )
 void W3DView::applyCameraConstraint( void )
 {
 	// the freecam owns the camera and is held to no constraint, as in setCameraTransform
-	if (m_freeCamera || !(TheGlobalData->m_useCameraConstraints || TheGlobalData->isClassicUI()))
+	if (m_freeCamera || !TheGlobalData->m_useCameraConstraints)
 		return;
 
 	if (!m_cameraConstraintValid)

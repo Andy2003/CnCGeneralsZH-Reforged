@@ -215,12 +215,9 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 	{ "ZoomToCursor",							INI::parseBool,				NULL,			offsetof( GlobalData, m_zoomToCursor ) },
 	{ "IsometricCamera",					INI::parseBool,				NULL,			offsetof( GlobalData, m_isometricCamera ) },
 	{ "FormationDrag",						INI::parseBool,				NULL,			offsetof( GlobalData, m_formationDrag ) },
-	{ "ShowAllyCursors",					INI::parseBool,				NULL,			offsetof( GlobalData, m_showAllyCursors ) },
 	{ "ChromaLighting",						INI::parseBool,				NULL,			offsetof( GlobalData, m_chromaLighting ) },
 	{ "ShowHudOverlay",						INI::parseBool,				NULL,			offsetof( GlobalData, m_showHudOverlay ) },
-	{ "ShowPlacementRangeRing",		INI::parseBool,				NULL,			offsetof( GlobalData, m_showPlacementRangeRing ) },
 	{ "WorkersReturnToSupply",		INI::parseBool,				NULL,			offsetof( GlobalData, m_workersReturnToSupply ) },
-	{ "DetailedBuildTooltips",		INI::parseBool,				NULL,			offsetof( GlobalData, m_detailedBuildTooltips ) },
 	{ "ArchiveReplays",						INI::parseBool,				NULL,			offsetof( GlobalData, m_archiveReplays ) },
 	{ "Bloom",										INI::parseInt,				NULL,			offsetof( GlobalData, m_bloomIntensity ) },
 	{ "MinCameraHeight",						INI::parseReal,				NULL,			offsetof( GlobalData, m_minCameraHeight ) },
@@ -694,6 +691,7 @@ GlobalData::GlobalData()
 	m_shadowsForParticles = TRUE;	//on by default: the shipped INI has no entry for it
 	m_volumetricSmokeShadows = TRUE;
 	m_smokeFireLighting = TRUE;
+	m_shadowQuality = 1;					//medium, the 2048 map the shadows always had
 	m_classicGraphics = FALSE;
 	m_lightingStyle = LIGHTING_STYLE_REFORGED;
 	m_shadowMap = TRUE;						//the sun's own shadows are what the game draws with now
@@ -964,9 +962,8 @@ GlobalData::GlobalData()
 	m_showObjectHealth = FALSE;
 	// what this fork has always done, so nobody's game changes until they say so
 	m_healthBarMode = HEALTH_BAR_ALWAYS;
-	m_hudScale = 0;
-	// the game as it shipped unless the launcher passes -interface reforged
-	m_interfaceStyle = INTERFACE_STYLE_CLASSIC;
+	// the game's own mouse unless the launcher passes -mouse reforged
+	m_mouseStyle = MOUSE_STYLE_CLASSIC;
 	// the lobby's own colours until somebody asks for something else
 	m_playerColorScheme = PLAYER_COLORS_ORIGINAL;
 	// the words the game shipped with until somebody picks a translation
@@ -1106,6 +1103,7 @@ GlobalData::GlobalData()
 
 	m_isBreakableMovie = FALSE;
 	m_breakTheMovie = FALSE;
+	m_modFactions = FALSE;
 
 	setTimeOfDay( m_timeOfDay );
 
@@ -1168,18 +1166,9 @@ GlobalData::GlobalData()
 	m_zoomToCursor = FALSE;		// the wheel zooms on the middle of the screen, as 1.04 did, until ticked
 	m_zoomSpeed = 100;				// a notch moves the camera the 60 units it always did
 	m_isometricCamera = FALSE;
-	// R1, smooth motion: the picture only, one logic tick behind, and never the game (W3DSmoothMotion.h).
-	// On by default off Windows, where 120 and 144 Hz panels are the common case; Windows keeps its
-	// picture as it was unless a player opts in.
-#if defined(_WIN32)
-	m_smoothMotion = FALSE;
-#else
-	m_smoothMotion = TRUE;
-#endif
 	m_dragTolerance = 25;		// what Mouse.ini in INIZH.big says, so nothing moves until the slider does
 	// a left drag with the move, attack move or guard key armed draws a formation line
 	m_formationDrag = TRUE;
-	m_showAllyCursors = TRUE;
 	m_chromaLighting = TRUE;	//costs nothing on a machine with no Razer server: the handshake fails once
 	m_menuTransitionSpeed = 100;
 	m_textureFilterMode = 2;	// anisotropic; retail shipped bilinear on a 2003 fill-rate budget
@@ -1201,13 +1190,8 @@ GlobalData::GlobalData()
 	m_showHudOverlay = FALSE;
 #endif
 	m_showNetBox = TRUE;
-	m_incomeRateMode = INCOME_RATE_PER_SECOND;
 	m_showEmptyBuildingPips = TRUE;
-	m_showPlacementRangeRing = TRUE;
-	m_showSkillStrip = TRUE;
-	m_showSuperweaponStrip = TRUE;
 	m_workersReturnToSupply = TRUE;
-	m_detailedBuildTooltips = TRUE;
 	m_archiveReplays = TRUE;
 
 	// Glow defaults to the options screen's Medium, 50 percent.  GameData.ini sets the field as a
@@ -1230,43 +1214,9 @@ GlobalData::GlobalData()
 		 a binary modified after the build.  Its four bytes go in as the platform stores them, which is the
 		 same on every platform the game builds for (little-endian).  The version and the two multiplayer
 		 scripts follow, as before. */
-	const Int blockSize = 65536;
-	CRC exeCRC;
-	const UnsignedInt buildFingerprint = ZH_BUILD_FINGERPRINT;
-	exeCRC.computeCRC( &buildFingerprint, sizeof( buildFingerprint ) );
-	File *fp = NULL;
-	if (TheVersion)
-	{
-		UnsignedInt version = TheVersion->getVersionNumber();
-		exeCRC.computeCRC( &version, sizeof(UnsignedInt) );
-	}
-	// Add in MP scripts to the EXE CRC, since the game will go out of sync if they change
-	fp = TheFileSystem->openFile("Data\\Scripts\\SkirmishScripts.scb", File::READ | File::BINARY);
-	if (fp != NULL) {
-		unsigned char crcBlock[blockSize];
-		Int amtRead = 0;
-		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
-		{
-			exeCRC.computeCRC(crcBlock, amtRead);
-		}
-		fp->close();
-		fp = NULL;
-	}
-	fp = TheFileSystem->openFile("Data\\Scripts\\MultiplayerScripts.scb", File::READ | File::BINARY);
-	if (fp != NULL) {
-		unsigned char crcBlock[blockSize];
-		Int amtRead = 0;
-		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
-		{
-			exeCRC.computeCRC(crcBlock, amtRead);
-		}
-		fp->close();
-		fp = NULL;
-	}
+	computeExeCRC();
+	m_baseExeCRC = m_exeCRC;
 
-	m_exeCRC = exeCRC.get();
-	DEBUG_LOG(("EXE CRC: 0x%8.8X\n", m_exeCRC));
-	
 	m_movementPenaltyDamageState = BODY_REALLYDAMAGED;
 	
 	m_shouldUpdateTGAToDDS = FALSE;
@@ -1458,6 +1408,43 @@ GlobalData *GlobalData::newOverride( void )
 	return override;
 
 }  // end newOveride
+
+//-------------------------------------------------------------------------------------------------
+/** The build fingerprint, the version and the two multiplayer scripts as they resolve now: once at
+	* construction, and again after -mod mounts its archives (parseCommandLine), since a mod's
+	* SkirmishScripts.scb or MultiplayerScripts.scb is the one the match runs.  Without -mod it runs once
+	* and the value is what it always was. */
+//-------------------------------------------------------------------------------------------------
+void GlobalData::computeExeCRC( void )
+{
+	const Int blockSize = 65536;
+	CRC exeCRC;
+	const UnsignedInt buildFingerprint = ZH_BUILD_FINGERPRINT;
+	exeCRC.computeCRC( &buildFingerprint, sizeof( buildFingerprint ) );
+	if (TheVersion)
+	{
+		UnsignedInt version = TheVersion->getVersionNumber();
+		exeCRC.computeCRC( &version, sizeof(UnsignedInt) );
+	}
+	// Add in MP scripts to the EXE CRC, since the game will go out of sync if they change
+	const char *scripts[] = { "Data\\Scripts\\SkirmishScripts.scb", "Data\\Scripts\\MultiplayerScripts.scb" };
+	for (Int s = 0; s < 2; ++s)
+	{
+		File *fp = TheFileSystem->openFile(scripts[s], File::READ | File::BINARY);
+		if (fp == NULL)
+			continue;
+		unsigned char crcBlock[blockSize];
+		Int amtRead = 0;
+		while ( (amtRead=fp->read(crcBlock, blockSize)) > 0 )
+		{
+			exeCRC.computeCRC(crcBlock, amtRead);
+		}
+		fp->close();
+	}
+
+	m_exeCRC = exeCRC.get();
+	DEBUG_LOG(("EXE CRC: 0x%8.8X\n", m_exeCRC));
+}
 
 //-------------------------------------------------------------------------------------------------
 void GlobalData::init( void )

@@ -41,6 +41,8 @@
 #include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
+#include "Common/GlobalData.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/Science.h"
 #include "Common/StackDump.h"	// g_LastErrorDump, see prepFile
 #include "Common/SpecialPower.h"
@@ -96,6 +98,8 @@ static const BlockParse theTypeTable[] =
 	{ "Campaign",						INI::parseCampaignDefinition },
  	{ "ChallengeGenerals",				INI::parseChallengeModeDefinition },
 	{ "CommandButton",			INI::parseCommandButtonDefinition },
+	{ "CommandButtonHotKey",	INI::parseCommandButtonHotKeyDefinition },
+	{ "CommandBarGrid",			INI::parseCommandBarGridDefinition },
 	{ "CommandMap",					INI::parseMetaMapDefinition },
 	{ "CommandSet",					INI::parseCommandSetDefinition },
 	{ "ControlBarScheme",		INI::parseControlBarSchemeDefinition },
@@ -434,6 +438,327 @@ void INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 }  // end load
 
 //-------------------------------------------------------------------------------------------------
+/** -modfactions: one pass of path per -mod, each seeing only its own files and reading its own names
+	* with the mod's prefix.  Without the switch this does nothing. */
+//-------------------------------------------------------------------------------------------------
+void INI::loadModPasses( const char *path, Xfer *pXfer, Bool directory )
+{
+	// the engine tests bring the control bar and the particle systems up without any GlobalData
+	if (TheGlobalData == NULL || !TheGlobalData->m_modFactions)
+		return;
+
+	for (Int mod = 0; mod < (Int)TheGlobalData->m_mods.size(); ++mod)
+	{
+		TheFileSystem->setFocus( mod );
+		TheModNamespace.setActive( mod );
+		INI ini;
+		if (directory)
+			ini.loadDirectory( AsciiString( path ), TRUE, INI_LOAD_OVERWRITE, pXfer );
+		else if (TheFileSystem->doesFileExist( path ))
+			ini.load( AsciiString( path ), INI_LOAD_OVERWRITE, pXfer );
+		TheModNamespace.setActive( -1 );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// ModNamespace
+//-------------------------------------------------------------------------------------------------
+ModNamespace TheModNamespace;
+
+const char *const ModNamespace::FactionFiles[] =
+{
+	"Data\\INI\\Science.ini", "Data\\INI\\PlayerTemplate.ini", "Data\\INI\\FXList.ini", "Data\\INI\\Weapon.ini",
+	"Data\\INI\\ObjectCreationList.ini", "Data\\INI\\Locomotor.ini", "Data\\INI\\SpecialPower.ini",
+	"Data\\INI\\DamageFX.ini", "Data\\INI\\Armor.ini", "Data\\INI\\Object", "Data\\INI\\Upgrade.ini",
+	"Data\\INI\\CommandButton.ini", "Data\\INI\\CommandSet.ini", "Data\\INI\\ParticleSystem.ini",
+	"Data\\INI\\MappedImages", "Data\\INI\\Music.ini",
+	"Data\\INI\\SoundEffects.ini", "Data\\INI\\Speech.ini", "Data\\INI\\Voice.ini",
+	NULL
+};
+
+/// where a mod's art and sound sit; a word in its INI that names one of these files is read as the mod's copy
+static const char *const ModAssetFolders[] = { "Art\\W3D\\", "Art\\Textures\\", "Data\\Audio\\" };
+
+/// the block keywords whose second word is a name the mod defines
+static const struct { const char *keyword; ModNameType type; } ModBlockTypes[] =
+{
+	{ "Object", MODNAME_OBJECT }, { "ObjectReskin", MODNAME_OBJECT }, { "ChildObject", MODNAME_OBJECT },
+	{ "Weapon", MODNAME_WEAPON }, { "Armor", MODNAME_ARMOR }, { "DamageFX", MODNAME_DAMAGEFX },
+	{ "Upgrade", MODNAME_UPGRADE }, { "Science", MODNAME_SCIENCE }, { "SpecialPower", MODNAME_SPECIALPOWER },
+	{ "CommandSet", MODNAME_COMMANDSET }, { "CommandButton", MODNAME_COMMANDBUTTON }, { "FXList", MODNAME_FXLIST },
+	{ "ObjectCreationList", MODNAME_OCL }, { "ParticleSystem", MODNAME_PARTICLESYSTEM },
+	{ "Locomotor", MODNAME_LOCOMOTOR }, { "PlayerTemplate", MODNAME_PLAYERTEMPLATE },
+	{ "MappedImage", MODNAME_MAPPEDIMAGE },
+	{ "AudioEvent", MODNAME_AUDIOEVENT }, { "DialogEvent", MODNAME_AUDIOEVENT }, { "MusicTrack", MODNAME_AUDIOEVENT },
+};
+
+void ModNamespace::scanMods( void )
+{
+	m_mods.assign( TheGlobalData->m_mods.size(), Names() );
+	for (Int mod = 0; mod < (Int)m_mods.size(); ++mod)
+	{
+		TheFileSystem->setFocus( mod );
+		FilenameList files;
+		for (const char *const *path = FactionFiles; *path != NULL; ++path)
+		{
+			if (strstr( *path, ".ini" ) == NULL)
+			{
+				AsciiString dir( *path );
+				dir.concat( '\\' );
+				TheFileSystem->getFileListInDirectory( dir, "*.ini", files, TRUE );
+			}
+			else if (TheFileSystem->doesFileExist( *path ))
+			{
+				files.insert( AsciiString( *path ) );
+			}
+		}
+		for (FilenameListIter it = files.begin(); it != files.end(); ++it)
+		{
+			File *file = TheFileSystem->openFile( it->str(), File::READ );
+			const Int size = file->size();
+			char *contents = file->readEntireAndClose();
+			std::string text( contents, size );
+			delete [] contents;
+			for (size_t start = 0; start < text.size(); )
+			{
+				size_t end = text.find( '\n', start );
+				if (end == std::string::npos)
+					end = text.size();
+				scanLine( mod, text.substr( start, end - start ).c_str() );
+				start = end + 1;
+			}
+		}
+		finishScan( mod );
+
+		FilenameList assetFiles;
+		for (size_t folder = 0; folder < ARRAY_SIZE( ModAssetFolders ); ++folder)
+			TheFileSystem->getFileListInDirectory( AsciiString( ModAssetFolders[ folder ] ), "*.*", assetFiles, TRUE );
+		for (FilenameListIter it = assetFiles.begin(); it != assetFiles.end(); ++it)
+			addAsset( mod, it->str() );
+		TheGameText->loadModStrings( mod );
+		TheFileSystem->setFocus( FILE_FOCUS_ALL );
+
+		const Names &names = m_mods[ mod ];
+		DEBUG_LOG(( "MODNS M%d~ is '%s': %d names from %d files, %d objects, %d weapons, %d upgrades, %d sciences, %d player templates, %d images, %d audio events, %d asset names\n",
+			mod + 1, TheGlobalData->m_modNames[ mod ].str(), (Int)names.all.size(), (Int)files.size(),
+			(Int)names.byType[ MODNAME_OBJECT ].size(), (Int)names.byType[ MODNAME_WEAPON ].size(),
+			(Int)names.byType[ MODNAME_UPGRADE ].size(), (Int)names.byType[ MODNAME_SCIENCE ].size(),
+			(Int)names.byType[ MODNAME_PLAYERTEMPLATE ].size(), (Int)names.byType[ MODNAME_MAPPEDIMAGE ].size(),
+			(Int)names.byType[ MODNAME_AUDIOEVENT ].size(), (Int)names.assets.size() ));
+	}
+}
+
+void ModNamespace::scanLine( Int mod, const char *line )
+{
+	static const char *SPACE = " \t\r\n";
+	static const char *WORD_END = " \t\r\n=";
+	std::string text( line );
+	const size_t comment = text.find( ';' );
+	if (comment != std::string::npos)
+		text.erase( comment );
+
+	const size_t keywordAt = text.find_first_not_of( SPACE );
+	if (keywordAt == std::string::npos)
+		return;
+	const size_t keywordEnd = text.find_first_of( WORD_END, keywordAt );
+	if (keywordEnd == std::string::npos)
+		return;
+	const std::string keyword = text.substr( keywordAt, keywordEnd - keywordAt );
+	size_t nameAt = text.find_first_not_of( SPACE, keywordEnd );
+	if (nameAt == std::string::npos)
+		return;
+
+	if ((Int)m_mods.size() <= mod)
+		m_mods.resize( mod + 1 );
+	Names &names = m_mods[ mod ];
+	if (keyword == "Side" || keyword == "BaseSide")
+	{
+		if (text[ nameAt ] == '=')
+			nameAt = text.find_first_not_of( SPACE, nameAt + 1 );
+		if (nameAt != std::string::npos)
+			names.sides.insert( text.substr( nameAt, text.find_first_of( WORD_END, nameAt ) - nameAt ) );
+		return;
+	}
+	// "Weapon = PRIMARY X" is a field, "Weapon X" a definition
+	if (text[ nameAt ] == '=')
+		return;
+
+	for (size_t i = 0; i < ARRAY_SIZE( ModBlockTypes ); ++i)
+	{
+		if (keyword == ModBlockTypes[ i ].keyword)
+		{
+			const std::string name = text.substr( nameAt, text.find_first_of( WORD_END, nameAt ) - nameAt );
+			names.all.insert( name );
+			names.byType[ ModBlockTypes[ i ].type ].insert( name );
+			return;
+		}
+	}
+}
+
+void ModNamespace::finishScan( Int mod )
+{
+	// a side is compared as text everywhere (Side = GLA), and The End of Days names a CommandSet "GLA"
+	Names &names = m_mods[ mod ];
+	for (std::set<std::string>::const_iterator it = names.sides.begin(); it != names.sides.end(); ++it)
+		names.all.erase( *it );
+}
+
+/// A-Z only: the result goes into the INI checksum, so no locale may decide it
+static std::string foldAscii( const std::string &text )
+{
+	std::string folded( text );
+	for (size_t i = 0; i < folded.size(); ++i)
+	{
+		if (folded[ i ] >= 'A' && folded[ i ] <= 'Z')
+			folded[ i ] = (char)(folded[ i ] - 'A' + 'a');
+	}
+	return folded;
+}
+
+void ModNamespace::addAsset( Int mod, const char *fileName )
+{
+	const char *slash = strrchr( fileName, '\\' );
+	const std::string name = foldAscii( slash != NULL ? slash + 1 : fileName );
+	const size_t dot = name.rfind( '.' );
+	if (dot == std::string::npos)
+		return;
+	const std::string base = name.substr( 0, dot );
+	const std::string extension = name.substr( dot + 1 );
+	if ((Int)m_mods.size() <= mod)
+		m_mods.resize( mod + 1 );
+	std::set<std::string> &assets = m_mods[ mod ].assets;
+	// INI names a model or a sound without its extension, and a texture as .tga when the file is a .dds
+	if (extension == "w3d" || extension == "wav" || extension == "mp3")
+		assets.insert( base );
+	else if (extension == "dds" || extension == "tga")
+	{
+		assets.insert( base + ".tga" );
+		assets.insert( base + ".dds" );
+	}
+	else
+		assets.insert( name );
+}
+
+Bool ModNamespace::isAsset( const Names &names, const std::string &word )
+{
+	const std::string name = foldAscii( word );
+	if (names.assets.count( name ) != 0)
+		return TRUE;
+	// an animation is "<hierarchy>.<animation>", and the file is the animation's
+	const size_t dot = name.find( '.' );
+	if (dot != std::string::npos)
+		return names.assets.count( name.substr( dot + 1 ) ) != 0;
+	// a shadow or radius decal names its texture with no extension, and the engine appends ".tga"
+	return names.assets.count( name + ".tga" ) != 0;
+}
+
+Bool ModNamespace::isAssetField( const std::string &field )
+{
+	// what a mod pass reads that names a file: draw modules, trees and props, debris, beams, particles,
+	// shadows, mapped images and audio.  ShowSubObject and the bone fields stay out, their words are
+	// names inside a model and can match a file
+	static const char *const AssetFields[] =
+	{
+		"Model", "Animation", "IdleAnimation", "ModelName", "ModelNames", "AnimationSet", "TextureName",
+		"Texture", "ParticleName", "TrackMarks", "ShadowTexture",
+		"Sounds", "SoundsMorning", "SoundsEvening", "SoundsNight", "Attack", "Decay", "Filename",
+	};
+	for (size_t i = 0; i < ARRAY_SIZE( AssetFields ); ++i)
+	{
+		if (stricmp( field.c_str(), AssetFields[ i ] ) == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+Bool ModNamespace::isNameOrAsset( const std::string &word, Bool assetField ) const
+{
+	const Names &names = m_mods[ m_active ];
+	return names.all.count( word ) != 0 || (assetField && isAsset( names, word ));
+}
+
+Bool ModNamespace::isModLabel( const std::string &word, Bool ) const
+{
+	// the engine tests read mod INI with no GameText up
+	return word.find( ':' ) != std::string::npos && TheGameText != NULL
+		&& TheGameText->hasModLabel( m_active, word.c_str() );
+}
+
+Bool ModNamespace::rewriteLine( char *line, size_t capacity ) const
+{
+	return prefixWords( line, capacity, &ModNamespace::isNameOrAsset );
+}
+
+Bool ModNamespace::rewriteLabels( char *line, size_t capacity ) const
+{
+	return prefixWords( line, capacity, &ModNamespace::isModLabel );
+}
+
+Bool ModNamespace::prefixWords( char *line, size_t capacity, WordTest test ) const
+{
+	char prefix[ 16 ];
+	snprintf( prefix, sizeof( prefix ), "M%d~", m_active + 1 );
+
+	// INI's own separators; readLine has already turned every other control character into a space
+	std::string out;
+	Bool first = TRUE;
+	Bool assetField = FALSE;
+	for (const char *p = line; *p != 0; )
+	{
+		if (*p == ' ' || *p == '=')
+		{
+			out += *p++;
+			continue;
+		}
+		const char *start = p;
+		while (*p != 0 && *p != ' ' && *p != '=')
+			++p;
+		const std::string word( start, p - start );
+		if (first)
+		{
+			// only a field that names a file: a bone or sub-object can share a model's name
+			assetField = isAssetField( word );
+			out += word;
+			first = FALSE;
+			continue;
+		}
+		if ((this->*test)( word, assetField ))
+			out += prefix;
+		out += word;
+	}
+	if (out.size() >= capacity)
+		return FALSE;
+	memcpy( line, out.c_str(), out.size() + 1 );
+	return TRUE;
+}
+
+Bool ModNamespace::findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const
+{
+	const char *text = name.str();
+	// image and sound names may have been lowercased on the way here
+	if (m_mods.empty() || (text[ 0 ] != 'M' && text[ 0 ] != 'm'))
+		return FALSE;
+	char *tilde = NULL;
+	const long mod = strtol( text + 1, &tilde, 10 );
+	if (tilde == text + 1 || *tilde != '~' || mod < 1 || mod > (long)m_mods.size())
+		return FALSE;
+	if (m_mods[ mod - 1 ].byType[ type ].count( tilde + 1 ) != 0)
+		return FALSE;
+	*retailName = tilde + 1;
+	return TRUE;
+}
+
+Bool ModNamespace::findRetailKey( NameKeyType key, ModNameType type, NameKeyType *retailKey ) const
+{
+	AsciiString retailName;
+	if (m_mods.empty() || !findRetailName( TheNameKeyGenerator->keyToName( key ), type, &retailName ))
+		return FALSE;
+	*retailKey = TheNameKeyGenerator->nameToKey( retailName );
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Read a line from the already open file.  Any comments will be remved and
 	* therefore ignored from any given line */
 //-------------------------------------------------------------------------------------------------
@@ -498,11 +823,26 @@ void INI::readLine( void )
 		}  // end if
   }
 
+	// -modfactions: the mod's own names, before the checksum below reads the line
+	if (TheModNamespace.getActive() >= 0 && !TheModNamespace.rewriteLine(m_buffer, sizeof(m_buffer)))
+	{
+		g_LastErrorDump.format("INI::readLine: line %d of '%s' is too long once its mod names are prefixed\n", m_lineNum, m_filename.str());
+		DEBUG_LOG(("%s", g_LastErrorDump.str()));
+		throw INI_BUFFER_TOO_SMALL;
+	}
+
 	if (s_xfer)
 	{
 		s_xfer->xferUser( m_buffer, sizeof( char ) * strlen( m_buffer ) );
 		//DEBUG_LOG(("Xfer val is now 0x%8.8X in %s, line %s\n", ((XferCRC *)s_xfer)->getCRC(),
 			//m_filename.str(), m_buffer));
+	}
+
+	if (TheModNamespace.getActive() >= 0 && !TheModNamespace.rewriteLabels(m_buffer, sizeof(m_buffer)))
+	{
+		g_LastErrorDump.format("INI::readLine: line %d of '%s' is too long once its mod labels are prefixed\n", m_lineNum, m_filename.str());
+		DEBUG_LOG(("%s", g_LastErrorDump.str()));
+		throw INI_BUFFER_TOO_SMALL;
 	}
 }
 
@@ -725,7 +1065,9 @@ void INI::parseAsciiStringVectorAppend( INI* ini, void * /*instance*/, void *sto
 			asv->clear();
 			return;
 		}
-		asv->push_back(INI::scanScience( token ));
+		ScienceType science = INI::scanScience( ini, token );
+		if (science != SCIENCE_INVALID)
+			asv->push_back(science);
 	}
 }
 
@@ -1404,7 +1746,10 @@ void INI::parseSpecialPowerTemplate( INI* ini, void * /*instance*/, void *store,
 		throw ERROR_BUG;
 	}
 
-	*((ScienceType *)store) = INI::scanScience(token);
+	// a skipped reference leaves the field as the loaded data had it
+	ScienceType science = INI::scanScience(ini, token);
+	if (science != SCIENCE_INVALID)
+		*((ScienceType *)store) = science;
 
 }
 
@@ -1600,8 +1945,14 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 }
 
 //-------------------------------------------------------------------------------------------------
-/*static*/ ScienceType INI::scanScience(const char* token)
+/*static*/ ScienceType INI::scanScience(INI* ini, const char* token)
 {
+	// a patch INI loaded over a mod can name a science the mod renamed or removed
+	if (ini->getLoadType() == INI_LOAD_MULTIFILE && !TheScienceStore->isValidScience((ScienceType)NAMEKEY(token)))
+	{
+		DEBUG_LOG(("[LINE: %d in '%s'] science '%s' does not exist; the reference is skipped.\n", ini->getLineNum(), ini->getFilename().str(), token));
+		return SCIENCE_INVALID;
+	}
 	return TheScienceStore->friend_lookupScience( token );
 }
 

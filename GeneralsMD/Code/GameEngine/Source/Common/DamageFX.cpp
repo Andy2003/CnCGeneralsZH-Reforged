@@ -278,9 +278,10 @@ const DamageFX *DamageFXStore::findDamageFX(AsciiString name) const
 {
 	NameKeyType namekey = TheNameKeyGenerator->nameToKey(name);
   DamageFXMap::const_iterator it = m_dfxmap.find(namekey);
-  if (it == m_dfxmap.end()) 
+  if (it == m_dfxmap.end())
 	{
-		return NULL;
+		AsciiString retailName;
+		return TheModNamespace.findRetailName(name, MODNAME_DAMAGEFX, &retailName) ? findDamageFX(retailName) : NULL;
 	}
 	else
 	{

@@ -177,8 +177,8 @@ SignalKind Command_signalKindForMeta( GameMessage::Type meta )
 
 static Bool isFormationDragArmed( void )
 {
-	// Classic's left drag is the selection box it always was
-	if( TheGlobalData->isClassicUI() )
+	// the Classic mouse's left drag is the selection box it always was
+	if( TheGlobalData->isClassicMouse() )
 		return FALSE;
 
 	return Command_formationDragArmed( TheGlobalData->m_formationDrag,
@@ -981,14 +981,9 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 	{
 		Bool forceAttackHere = isForceAttackTargeting() && isForceAttackable;
 
-		// the guard key posts the selection where it is pointed.  Under shift it joins the list as its
-		// last order: clear this, then sit there.  Classic's waypoint key is the game's own: Alt held
-		// adds a point to the path instead of queueing an order
-		if( TheGlobalData->isClassicUI() && TheInGameUI->isInWaypointMode() )
-		{
-			msgType = GameMessage::MSG_ADD_WAYPOINT;
-		}
-		else if( TheInGameUI->isGuardArmed() )
+		// the guard key posts the selection where it is pointed.  Under the waypoint key it joins the
+		// list as its last order: clear this, then sit there
+		if( TheInGameUI->isGuardArmed() )
 		{
 			msgType = GameMessage::MSG_DO_GUARD_POSITION;
 		}
@@ -1017,14 +1012,9 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 				movemsg->appendLocationArgument( *pos );
 
 			// a posted unit holds its spot and shoots what walks into range, rather than chasing it
-			// off the post the player put it on
+			// off the post the player put it on.  EA's guard button armed it with its own mode
 			if (msgType == GameMessage::MSG_DO_GUARD_POSITION)
-			{
-				movemsg->appendIntegerArgument( GUARDMODE_GUARD_WITHOUT_PURSUIT );
-				// Classic sends the game's own two arguments and the logic guards its standard range
-				if( !TheGlobalData->isClassicUI() )
-					movemsg->appendRealArgument( TheInGameUI->getAreaPickRadius() );
-			}
+				movemsg->appendIntegerArgument( TheInGameUI->getGuardArmedMode() );
 
 		}  // end if
 	}
@@ -1681,24 +1671,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 	{
 		GameMessage *hintMessage;
 
-		// Classic keeps the game's waypoint mode: with Alt held every click is a point on the path
-		if( TheGlobalData->isClassicUI() && TheInGameUI->isInWaypointMode() )
-		{
-			if( type == DO_COMMAND || type == EVALUATE_ONLY )
-			{
-				if( TheTerrainLogic )
-					msgType = issueMoveToLocationCommand( pos, draw, type );
-			}
-			else
-			{
-				msgType = GameMessage::MSG_ADD_WAYPOINT_HINT;
-				hintMessage = TheMessageStream->appendMessage( msgType );
-				hintMessage->appendLocationArgument( *pos );
-			}
-			return msgType;
-		}
-
-		// shift used to turn every click into a point on the path.  Now whatever the click orders - an
+		// the waypoint key used to turn every click into a point on the path.  Now whatever the click orders - an
 		// attack, a capture, a ride in a transport - goes on the end of the units' list, and the logic
 		// keeps it there (OrderQueue.h).  A click that orders nothing is dropped by the logic with it
 		if( TheInGameUI->isInWaypointMode() && type == DO_COMMAND )
@@ -2415,8 +2388,8 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		// A right click on a selected building takes the rally point away from everything selected.
 		// Only the click is answered: the hover and SelectionXlat's EVALUATE_ONLY fall through as
 		// they always did, so the building keeps its selection cursor.  The game as shipped had no
-		// such order, and Classic sends none.
-		else if( type == DO_COMMAND && draw && draw->isSelected() && !TheGlobalData->isClassicUI()
+		// such order, and the Classic mouse sends none.
+		else if( type == DO_COMMAND && draw && draw->isSelected() && !TheGlobalData->isClassicMouse()
 						 && TheInGameUI->canSelectedObjectsDoAction( InGameUI::ACTIONTYPE_SET_RALLY_POINT, NULL, InGameUI::SELECTION_ALL, FALSE ) )
 		{
 			msgType = GameMessage::MSG_CLEAR_RALLY_POINT;
@@ -2608,11 +2581,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 {
 	GameMessage::Type t = msg->getType();
 	GameMessageDisposition disp = KEEP_MESSAGE;
-
-	// letting go of Tab puts the scoreboard away, input or no input; the press is the command map's
-	// DIPLOMACY
-	if (t == GameMessage::MSG_RAW_KEY_UP && msg->getArgument( 0 )->integer == KEY_TAB)
-		TheInGameUI->closeScoreboard();
 
 	// We want to always be able to get to the options menu even during no input times and a clear game data message should always go through
 	if (t != GameMessage::MSG_META_OPTIONS && t != GameMessage::MSG_CLEAR_GAME_DATA &&
@@ -2921,11 +2889,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_META_COMMAND_SLOT17:
 		case GameMessage::MSG_META_COMMAND_SLOT18:
 		{
-			// a watcher has no commands to press, and the top row picks the spectator's stat instead,
-			// the keys Dota's spectator uses for the same list
-			const Int slot = t - GameMessage::MSG_META_COMMAND_SLOT01;
-			if( !TheInGameUI->pickSpectatorStat( slot ) )
-				TheControlBar->pressCommandButton( slot );
+			TheControlBar->pressCommandButton( t - GameMessage::MSG_META_COMMAND_SLOT01 );
 			disp = DESTROY_MESSAGE;
 			break;
 		}		// end command bar grid slots
@@ -4165,9 +4129,9 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			m_mouseRightUp = (UnsignedInt) msg->getArgument( 2 )->integer;
 
 			// a structure waiting to be placed is dropped by the same release, over in
-			// SelectionXlat, unless the release ended a pan.  Classic drops it here on a click, as 1.04
-			// did, which is also what takes a shortcut bar's sneak attack off the cursor.
-			if( TheGlobalData->isClassicUI()
+			// SelectionXlat, unless the release ended a pan.  The Classic mouse drops it here on a click,
+			// as 1.04 did, which is also what takes a shortcut bar's sneak attack off the cursor.
+			if( TheGlobalData->isClassicMouse()
 					&& TheMouse->isClick( &m_mouseRightDragAnchor, &m_mouseRightDragLift, NULL, NULL, m_mouseRightDown, m_mouseRightUp ) )
 				TheInGameUI->placeBuildAvailable( NULL, NULL );
 
@@ -4201,7 +4165,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			// which LookAtXlat and SelectionXlat do, as the game shipped.
 			if( !TheGlobalData->rightButtonOrders() )
 				break;
-			const Bool classic = TheGlobalData->isClassicUI();
+			const Bool classic = TheGlobalData->isClassicMouse();
 
 			// A right click is an order.  A right drag pans the camera (LookAtXlat), so a release that
 			// travelled past the drag tolerance, or was held too long, gives no order at all.
@@ -4312,7 +4276,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			// them are aimed with the left button, because the right one cancels them.  In Classic the
 			// left button is the order button as well, as it was in the game as shipped, unless EA's
 			// Alternate Mouse Setup is on: then only a GUI command waiting for a target fires here.
-			const Bool classic = TheGlobalData->isClassicUI();
+			const Bool classic = TheGlobalData->isClassicMouse();
 			const Bool isOrderKey = TheInGameUI->isOrderKeyArmed();
 			if( classic ? !TheGlobalData->leftButtonOrders() && !isFiringGUICommand
 									: !isFiringGUICommand && !isOrderKey )

@@ -856,11 +856,22 @@ void Player::setDefaultTeam(void) {
 	tname.set("team");
 	tname.concat(m_playerName);
 	Team *dt = TheTeamFactory->findTeam(tname);
-	DEBUG_ASSERTCRASH(dt, ("no team"));
-	if (dt) {
-		m_defaultTeam = dt;
-		dt->setActive();
+	if (dt == NULL) {
+		/* A skirmish slot takes the name of the skirmish side its general's scripts are written for
+			 (initFromDict), drops its own teamplayer<n>, and gets its teams from those scripts instead.  A
+			 general the skirmish scripts have no player for - a mod's, under the fork's SkirmishScripts.scb -
+			 is left with no team at all, and the AI read the NULL on its first pass.  Every player is given
+			 its default team here, so the singleton validateSides would have added is made now. */
+		DEBUG_LOG(("Player::setDefaultTeam - %s had no %s, making it\n", m_playerName.str(), tname.str()));
+		Dict d;
+		d.setAsciiString(TheKey_teamName, tname);
+		d.setAsciiString(TheKey_teamOwner, m_playerName);
+		d.setBool(TheKey_teamIsSingleton, true);
+		TheTeamFactory->initTeam(tname, m_playerName, TRUE, &d);
+		dt = TheTeamFactory->findTeam(tname);
 	}
+	m_defaultTeam = dt;
+	dt->setActive();
 }
 
 //=============================================================================
@@ -1773,7 +1784,6 @@ void Player::preTeamDestroy( const Team *team )
 //-------------------------------------------------------------------------------------------------
 void Player::onStructureCreated( Object *builder, Object *structure )
 {
-	TheInGameUI->feedStructure( structure, FALSE );
 }  // end onStructureCreated
 
 //-------------------------------------------------------------------------------------------------
@@ -1805,7 +1815,6 @@ void Player::onStructureConstructionComplete( Object *builder, Object *structure
 	// the GUI needs to re-evaluate the information being displayed to the user now
 	if( TheControlBar )
 		TheControlBar->markUIDirty();
-	TheInGameUI->feedStructure( structure, TRUE );
 
 	// This object may require us to play some EVA sounds.
 	Player *localPlayer = ThePlayerList->getLocalPlayer();
@@ -2635,6 +2644,14 @@ Bool Player::hasPrereqsForScience(ScienceType t) const
 }
 
 //=============================================================================
+/** The rank table a player climbs: under -modfactions a mod faction's is its own mod's Rank.ini, so
+	* it gets that mod's ranks, points and rank sciences ("M<n>~SCIENCE_Rank3") and nothing of retail's. */
+static Int rankMod(const Player *player)
+{
+	return player->getPlayerTemplate() ? player->getPlayerTemplate()->getModIndex() : -1;
+}
+
+//=============================================================================
 /// returns TRUE if the player gained/lost levels as a result.
 Bool Player::addSkillPoints(Int delta)
 {
@@ -2643,8 +2660,8 @@ Bool Player::addSkillPoints(Int delta)
 	if( delta == 0 )
 		return false;
 
-	Int levelCap = min( TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount() );
-	Int pointCap = TheRankInfoStore->getRankInfo(levelCap)->m_skillPointsNeeded; // Cap at lowest point of cap level, not highest.
+	Int levelCap = min( TheGameLogic->getRankLevelLimit(), TheRankInfoStore->getRankLevelCount(rankMod(this)) );
+	Int pointCap = TheRankInfoStore->getRankInfo(levelCap, rankMod(this))->m_skillPointsNeeded; // Cap at lowest point of cap level, not highest.
 
 	Bool levelGained = FALSE;
 	m_skillPoints = min( pointCap, (m_skillPoints + delta) );
@@ -2686,7 +2703,7 @@ void Player::resetSciences()
 
 	for (Int i = 1; i <= m_rankLevel; ++i)
 	{
-		const RankInfo* rank = TheRankInfoStore->getRankInfo(i);
+		const RankInfo* rank = TheRankInfoStore->getRankInfo(i, rankMod(this));
 		if (rank)
 		{
 			for (ScienceVec::const_iterator it = rank->m_sciencesGranted.begin(); it != rank->m_sciencesGranted.end(); ++it)
@@ -2781,7 +2798,6 @@ Bool Player::attemptToPurchaseScience(ScienceType science)
 	addScience(science);
 
 	getAcademyStats()->recordGeneralsPointsSpent( cost );
-	TheInGameUI->feedScience( this, science );
 
 	if( ThePlayerList->getLocalPlayer() == this )
 	{
@@ -2851,12 +2867,12 @@ void Player::resetRank()
 {
 	m_rankLevel = 1;
 	m_skillPoints = 0;
-	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1);
+	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(m_rankLevel+1, rankMod(this));
 	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
 	m_levelDown = 0;
 	m_sciences.clear();
 	m_sciencePurchasePoints = getPlayerTemplate() ? getPlayerTemplate()->getIntrinsicSciencePurchasePoints() : 0;
-	const RankInfo* curRank = TheRankInfoStore->getRankInfo(m_rankLevel);
+	const RankInfo* curRank = TheRankInfoStore->getRankInfo(m_rankLevel, rankMod(this));
 	m_sciencePurchasePoints += curRank ? curRank->m_sciencePurchasePointsGranted : 0;
 	m_generalName = TheGameText? TheGameText->fetch("SCIENCE:GeneralName"):UnicodeString::TheEmptyString;
 	resetSciences();
@@ -2868,8 +2884,8 @@ Bool Player::setRankLevel(Int newLevel)
 {
 	if (newLevel < 1) 
 		newLevel = 1;
-	else if (newLevel > TheRankInfoStore->getRankLevelCount())
-		newLevel = TheRankInfoStore->getRankLevelCount();
+	else if (newLevel > TheRankInfoStore->getRankLevelCount(rankMod(this)))
+		newLevel = TheRankInfoStore->getRankLevelCount(rankMod(this));
 
 	if (newLevel > TheGameLogic->getRankLevelLimit())
 		newLevel = TheGameLogic->getRankLevelLimit();
@@ -2889,7 +2905,7 @@ Bool Player::setRankLevel(Int newLevel)
 
 	for (Int i = m_rankLevel + 1; i <= newLevel; ++i)
 	{
-		const RankInfo* rank = TheRankInfoStore->getRankInfo(i);
+		const RankInfo* rank = TheRankInfoStore->getRankInfo(i, rankMod(this));
 		DEBUG_ASSERTCRASH(rank, ("rank should never be null here"));
 		if (rank)
 		{
@@ -2911,7 +2927,7 @@ Bool Player::setRankLevel(Int newLevel)
 		}
 	}
 
-	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1);
+	const RankInfo* nextRank = TheRankInfoStore->getRankInfo(newLevel + 1, rankMod(this));
 	m_levelUp = nextRank ? nextRank->m_skillPointsNeeded : INT_MAX;
 	m_rankLevel = newLevel;
 
