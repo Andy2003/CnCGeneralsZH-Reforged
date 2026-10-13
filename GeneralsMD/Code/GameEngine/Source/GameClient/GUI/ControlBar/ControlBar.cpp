@@ -5730,7 +5730,10 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 	// owns a power his own faction's shortcut set has no button for, so the silo could be fired
 	// only by finding it on the map and selecting it.  Every other faction's shortcut set is asked
 	// for a button that fires a power this player now holds and nothing above has shown.  Powers
-	// behind a science are left out: a general's power is bought, never captured.
+	// behind a science are left out: a general's power is bought, never captured.  "Holds" means
+	// the very power the button names, not one of its kind: mods reuse the few power types for
+	// unrelated powers (Contra's small Scud Storm is a carpet bomb by type), and a type match put
+	// another faction's button in the tray that update then hid, an empty slot left behind.
 	//
 	for( Int t = 0; t < ThePlayerTemplateStore->getPlayerTemplateCount(); ++t )
 	{
@@ -5741,7 +5744,7 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 		if( otherSet == NULL )
 			continue;
 
-		for( Int b = 0; b < MAX_COMMANDS_PER_SET && currentButton < MAX_SPECIAL_POWER_SHORTCUTS; ++b )
+		for( Int b = 0; b < MAX_COMMANDS_PER_SET && currentButton < m_currentlyUsedSpecialPowersButtons; ++b )
 		{
 			const CommandButton *captured = otherSet->getCommandButton( b );
 			if( captured == NULL || !BitTest( captured->getOptions(), NEED_SPECIAL_POWER_SCIENCE ) )
@@ -5752,7 +5755,8 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 			const SpecialPowerType type = power->getSpecialPowerType();
 			if( std::find( shownPowerTypes.begin(), shownPowerTypes.end(), type ) != shownPowerTypes.end() )
 				continue;
-			if( player->findMostReadyShortcutSpecialPowerOfType( type ) == NULL )
+			const Object *holder = player->findMostReadyShortcutSpecialPowerOfType( type );
+			if( holder == NULL || holder->getSpecialPowerModule( power ) == NULL )
 				continue;
 
 			shownPowerTypes.push_back( type );
@@ -5910,7 +5914,9 @@ void ControlBar::updateSpecialPowerShortcut( void )
 		switch( availability )
 		{
 			case COMMAND_HIDDEN:
+				// the slot's frame goes with its button, or the tray shows an empty slot
 				win->winHide( TRUE );
+				m_specialPowerShortcutButtonParents[ i ]->winHide( TRUE );
 				break;
 			case COMMAND_RESTRICTED:
 				win->winEnable( FALSE );
