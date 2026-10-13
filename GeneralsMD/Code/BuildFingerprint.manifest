@@ -2980,7 +2980,6 @@ Tests/test_sdl_program_cache.cpp
 Tests/test_selection_priority.inc
 Tests/test_shader_sdl.cpp
 Tests/test_smooth_motion.cpp
-Tests/test_stage_overlay_hud.sh
 Tests/test_supply_center_save.inc
 Tests/test_support.cpp
 Tests/test_terrain_golden.cpp

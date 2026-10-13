@@ -170,8 +170,7 @@ instead.
 
 The top right info strip (the clock, the frame rates and the connection) is the player's own `ShowNetBox` option,
 on by default in every build. Upstream's `ShowHudOverlay` decides nothing here: the GameData.ini key is read and
-ignored so an old file still loads, and `-showHudOverlay` is gone. The staged overlay and the packages still refuse
-a `ShowHudOverlay = Yes`, a check left from when the key turned the readout on.
+ignored so an old file still loads, and `-showHudOverlay` is gone.
 
 **Menu Layout** (Options, Display) chooses how the 800x600 menu layouts meet a wider screen. **Fit**, the default
 on macOS and Linux, draws them at one scale, centred, so panels, logos and the map preview keep their shape;
