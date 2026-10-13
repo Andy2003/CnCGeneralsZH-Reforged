@@ -1313,8 +1313,8 @@ static void saveVolumeOptions( OptionPreferences &out )
 
 #if defined(_WIN32)
 //-------------------------------------------------------------------------------------------------
-// The volume view.  On Windows the launcher owns every setting but the four volumes, so the quit
-// menu's Options button opens the Audio page alone (OpenVolumeOptions), and its Accept writes those
+// The volume view.  On Windows the launcher owns every setting but the four volumes, so the main
+// menu's and the quit menu's Options buttons open the Audio page alone (OpenVolumeOptions), and its Accept writes those
 // four onto Options.ini as it is on disk right now.  Nothing the menu loaded for the other pages is
 // written back, so a resolution or a detail preset the launcher saved stays what the launcher said.
 // -optionsmenu and -resdrill still open the whole menu; they are how a script reaches it.
