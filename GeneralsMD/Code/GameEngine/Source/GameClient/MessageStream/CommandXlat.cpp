@@ -4165,7 +4165,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			// which LookAtXlat and SelectionXlat do, as the game shipped.
 			if( !TheGlobalData->rightButtonOrders() )
 				break;
-			const Bool classic = TheGlobalData->isClassicMouse();
 
 			// A right click is an order.  A right drag pans the camera (LookAtXlat), so a release that
 			// travelled past the drag tolerance, or was held too long, gives no order at all.
@@ -4173,11 +4172,11 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 					NULL, NULL,
 					m_mouseRightDown, m_mouseRightUp);
 
-			// The one exception is the move, attack, attack move or guard key.  Those orders are aimed
-			// with the left button, so a right click while one is armed puts the key down and gives no
-			// order.  A pan leaves the key armed.  Classic's alternate mouse aims its attack move with
-			// this click, as 1.04 did.
-			if( !classic && TheInGameUI->isOrderKeyArmed() )
+			// The exceptions are the move, attack, attack move and guard keys and Ctrl's force fire.
+			// Those are aimed with the left button in every mouse, so a right click while a key is armed
+			// puts the key down and gives no order, and a right click with Ctrl held gives none either.
+			// A pan leaves the key armed.
+			if( TheInGameUI->isOrderKeyArmed() || TheInGameUI->isInForceAttackMode() )
 			{
 				if( isRightClick )
 					TheInGameUI->clearAttackMoveToMode();
@@ -4206,18 +4205,14 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 														|| (command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
 				if (isPoint && controllable)
 				{
-					UnsignedInt pickType = getPickTypesForContext( isForceAttackTargeting() );
-					Drawable *draw = TheTacticalView->pickDrawable(&msg->getArgument(0)->pixelRegion.lo, 
-																													isForceAttackTargeting(), 
+					// force fire never reaches here: it is aimed with the left button, above
+					UnsignedInt pickType = getPickTypesForContext( FALSE );
+					Drawable *draw = TheTacticalView->pickDrawable(&msg->getArgument(0)->pixelRegion.lo,
+																													FALSE,
 																													(PickType) pickType);
-					if (isForceAttackTargeting()) {
-						evaluateForceAttack( draw, &pos, DO_COMMAND );
-					} else {
-						evaluateContextCommand( draw, &pos, DO_COMMAND );
-					}
+					evaluateContextCommand( draw, &pos, DO_COMMAND );
 
 					disp = DESTROY_MESSAGE;
-					TheInGameUI->clearAttackMoveToMode();
 				}
 			}
 
@@ -4271,15 +4266,14 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 												|| command->getCommandType() == GUICOMMANDMODE_HIJACK_VEHICLE
 												|| command->getCommandType() == GUICOMMANDMODE_CONVERT_TO_CARBOMB));
 
-			// The left button selects and nothing else.  The exceptions are a GUI command that is
-			// already armed and waiting for a target, and the attack, attack move and guard keys: all of
-			// them are aimed with the left button, because the right one cancels them.  In Classic the
-			// left button is the order button as well, as it was in the game as shipped, unless EA's
-			// Alternate Mouse Setup is on: then only a GUI command waiting for a target fires here.
+			// Where the right button gives the orders (Reforged, and Classic under EA's Alternate Mouse
+			// Setup) the left button selects and nothing else.  The exceptions are a GUI command that is
+			// already armed and waiting for a target, the move, attack, attack move and guard keys, and
+			// Ctrl's force fire: every mouse aims those with the left button, because the right one
+			// cancels them.  Classic's default mouse orders with the left button anyway, as it shipped.
 			const Bool classic = TheGlobalData->isClassicMouse();
-			const Bool isOrderKey = TheInGameUI->isOrderKeyArmed();
-			if( classic ? !TheGlobalData->leftButtonOrders() && !isFiringGUICommand
-									: !isFiringGUICommand && !isOrderKey )
+			if( !TheGlobalData->leftButtonOrders() && !isFiringGUICommand
+					&& !TheInGameUI->isOrderKeyArmed() && !TheInGameUI->isInForceAttackMode() )
 				break;
 
 			Bool controllable = TheInGameUI->areSelectedObjectsControllable()
