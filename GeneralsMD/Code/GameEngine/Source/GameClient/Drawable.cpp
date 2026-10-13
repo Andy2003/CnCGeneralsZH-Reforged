@@ -4649,29 +4649,7 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 			outlineColor = GameMakeColor( 0, healthRatio * 128.0f, 128, 255 );//dark blue to dark cyan
 
 		}
-		else if( obj->getControllingPlayer() != NULL &&
-						 obj->getControllingPlayer()->getPlayerColor() != 0 )
-		{
-			//
-			// The bar wears its owner's colour. Red-to-green said how hurt a thing was, which the
-			// length of the bar was already saying, and said nothing at all about whose it was -
-			// the one question a glance across a busy fight actually needs answered. Player colour
-			// is what the minimap, the selection rings and the unit tint all use, so a green bar
-			// means the same thing everywhere on screen.
-			//
-			// The outline stays a darkened version of the same colour, so a light player colour
-			// still reads against light terrain. A building going up fills its bar in the same
-			// colour as it builds - whose site it is answers a glance across the map, and the
-			// seconds written over it (drawConstructPercent) already say it is not finished. The
-			// disabled blue above keeps its own colour: that is a state nothing else signals.
-			//
-			UnsignedByte r, g, b, a;
-			GameGetColorComponents( clientPlayerColor( obj->getControllingPlayer() ), &r, &g, &b, &a );
-
-			color = GameMakeColor( r, g, b, 255 );				// the stored colour's alpha is not ours to trust
-			outlineColor = GameDarkenColor( color, 60 );
-		}
-		else //red to green: civilians, crates, anything with no owning player to borrow a colour from
+		else //retail's ramp for every owner: green at full health, through yellow, to red
 		{
 
 			RGBColor inColor, outColor;

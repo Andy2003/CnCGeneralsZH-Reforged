@@ -557,7 +557,7 @@ void GameConsole::runCommand( AsciiString commandLine )
 		printLine( AsciiString( "speed [n]     game speed in percent, 100 is normal, 'reset' goes back" ) );
 		printLine( AsciiString( "get [key]     a setting by its Options.ini key; no key lists them all" ) );
 		printLine( AsciiString( "set <key> <v> change a setting and save it, e.g. 'set ShowNetBox no' hides the" ) );
-		printLine( AsciiString( "              top right info box, 'set ShowSuperweaponStrip no' the superweapon timers" ) );
+		printLine( AsciiString( "              top right info strip" ) );
 		printLine( AsciiString( "freecam       photo mode: fly the camera anywhere, the whole map drawn, no interface." ) );
 		printLine( AsciiString( "              W/S forward and back, A/D left and right, R up, F down, mouse turns," ) );
 		printLine( AsciiString( "              Shift faster; Esc or 'freecam' again lands.  'freecam x y z heading tilt'" ) );

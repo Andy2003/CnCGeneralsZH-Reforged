@@ -1150,8 +1150,6 @@ InGameUI::InGameUI()
 	forgetPendingPlacements();
 	m_hudDisplayString = NULL;
 	m_peaceTimeDisplayString = NULL;
-	m_peaceTimeLabelDisplayString = NULL;
-	m_peaceCountdownDisplayString = NULL;
 	m_lastMoneyDisplayed = -1;
 	m_hudDrawCount = 0;
 	m_hudLastSampleFrame = 0;
@@ -7883,175 +7881,11 @@ void InGameUI::updateFloatingText( void )
 /** Itterates through and draws each floating text */
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-/** A one-line heads-up overlay: render rate and elapsed game time.
-	* GlobalData's m_showHudOverlay: on by default in the developer builds (Debug, _INTERNAL) and off in
-	* Release, a project rule.  A player turns it on with ShowHudOverlay = Yes in GameData.ini; the harnesses
-	* whose screenshots are evidence pass -showHudOverlay.  Nothing shipped forces it on: the staged overlay
-	* and the packages refuse a ShowHudOverlay = Yes.  Retail only ever showed the frame rate, and only behind
-	* -displayDebug together with a screenful of engine internals. */
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-/** How the last ten seconds of peace time animate, as fractions of one second. */
-//-------------------------------------------------------------------------------------------------
-static const Real PEACE_COUNTDOWN_POP_SCALE = 1.35f;	///< the size the digit lands at when the second turns
-static const Real PEACE_COUNTDOWN_POP_TIME = 0.35f;		///< how long it takes to settle back to its own size
-static const Real PEACE_COUNTDOWN_FADE_TIME = 0.30f;	///< how long it fades out for at the end of the second
-
-//-------------------------------------------------------------------------------------------------
 /** The one red the truce is written in, wherever it is written. */
 //-------------------------------------------------------------------------------------------------
 static Color peaceTimeColor( Int alpha )
 {
 	return GameMakeColor( 255, 48, 48, alpha );
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The lobby's peace time at the top of the screen, in the middle of it: the word PEACE in small
-	* letters over the time left, both red and bold on one plate.  The top centre is where a player
-	* already looks for the state of the match, and it keeps the corner free for the clock and the
-	* superweapon timers.  It is not behind ShowHudOverlay - that switch is for a readout, and this
-	* is a rule of the match.
-	*
-	* The plate goes away for the last ten seconds.  Those are counted out across the middle of the
-	* screen instead, and two copies of the same number in two places is one of them asking to be
-	* read and neither getting it.  Nothing draws once the truce runs out. */
-//-------------------------------------------------------------------------------------------------
-void InGameUI::drawPeaceTimer( void )
-{
-	if( TheGameLogic == NULL || !TheGameLogic->isInGame() || TheGameLogic->isInShellGame() )
-		return;
-
-	if( !TheGameLogic->isPeaceTime() )
-		return;
-
-	const UnsignedInt left = TheGameLogic->getPeaceTimeEndFrame() - TheGameLogic->getFrame();
-	if( left <= PEACE_COUNTDOWN_SECONDS * LOGICFRAMES_PER_SECOND )
-	{
-		drawPeaceCountdown( left );
-		return;
-	}
-
-	const UnsignedInt secs = ControlBar_secondsFromFrames( (Real)left );
-
-	UnicodeString text;
-	text.format( TheGameText->fetch( "GUI:PeaceTimeHud" ), secs / 60, secs % 60 );
-
-	if( m_peaceTimeDisplayString == NULL )
-	{
-		m_peaceTimeDisplayString = TheDisplayStringManager->newDisplayString();
-		m_peaceTimeDisplayString->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
-										TheGlobalLanguageData->adjustFontSize( PEACE_TIMER_POINT_SIZE ),
-										TRUE ) );
-	}
-	m_peaceTimeDisplayString->setText( text );
-
-	// the label is a second string rather than a line of the first: the text renderer has no
-	// concept of a newline and would draw one as a character
-	if( m_peaceTimeLabelDisplayString == NULL )
-	{
-		m_peaceTimeLabelDisplayString = TheDisplayStringManager->newDisplayString();
-		m_peaceTimeLabelDisplayString->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
-										TheGlobalLanguageData->adjustFontSize( PEACE_TIMER_LABEL_POINT_SIZE ),
-										TRUE ) );
-	}
-	m_peaceTimeLabelDisplayString->setText( TheGameText->fetch( "GUI:PeaceTimeHudLabel" ) );
-
-	Int textWidth = 0, textHeight = 0;
-	m_peaceTimeDisplayString->getSize( &textWidth, &textHeight );
-
-	Int labelWidth = 0, labelHeight = 0;
-	m_peaceTimeLabelDisplayString->getSize( &labelWidth, &labelHeight );
-
-	// clear of the top edge, the gap growing with the screen the same way the command bar does
-	const Int pad = 4;
-	const Int plateWidth = (labelWidth > textWidth ? labelWidth : textWidth) + pad*2;
-	const Int plateLeft = (TheDisplay->getWidth() - plateWidth) / 2;
-	const Int top = stripPixels( PEACE_TIMER_TOP_PAD );
-
-	TheDisplay->drawFillRect( plateLeft, top - 1, plateWidth, labelHeight + textHeight + 2,
-														GameMakeColor( 0, 0, 0, 160 ) );
-
-	m_peaceTimeLabelDisplayString->draw( (TheDisplay->getWidth() - labelWidth) / 2, top,
-														peaceTimeColor( 255 ), GameMakeColor( 0, 0, 0, 255 ) );
-
-	m_peaceTimeDisplayString->draw( (TheDisplay->getWidth() - textWidth) / 2, top + labelHeight,
-														peaceTimeColor( 255 ), GameMakeColor( 0, 0, 0, 255 ) );
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The last ten seconds of that peace time, one digit at a time, with the plate at the top of the
-	* screen taken down for them.  The word PEACE goes over the digit at a quarter of its size, on
-	* the same line the plate's own word was on, so what happens at ten seconds is the time being
-	* replaced by a number you cannot miss rather than the whole thing moving somewhere else.  The
-	* middle of the screen is where the fighting you are about to do is, and a countdown sitting on
-	* your own units is in the way of the thing it counts down to.
-	*
-	* Each second the digit lands at PEACE_COUNTDOWN_POP_SCALE of its size, settles to it over the
-	* first third of the second, then fades out through the last third, so the movement is what
-	* catches the eye rather than the number changing.  The word holds still and keeps its colour
-	* through all of it, and the digit grows downwards from under it, so nothing but the number
-	* moves.
-	*
-	* The animation is driven by the logic frame, not the wall clock, because the number it counts
-	* is a logic frame: a paused or slowed game shows a paused countdown instead of one that has
-	* run ahead of the truce it belongs to. */
-//-------------------------------------------------------------------------------------------------
-void InGameUI::drawPeaceCountdown( UnsignedInt framesLeft )
-{
-	const UnsignedInt secondsLeft = (framesLeft + LOGICFRAMES_PER_SECOND - 1) / LOGICFRAMES_PER_SECOND;
-	const UnsignedInt framesLeftOfSecond = framesLeft - (secondsLeft - 1) * LOGICFRAMES_PER_SECOND;
-	const Real secondElapsed = 1.0f - INT_TO_REAL( framesLeftOfSecond ) / INT_TO_REAL( LOGICFRAMES_PER_SECOND );
-
-	Real scale = 1.0f;
-	if( secondElapsed < PEACE_COUNTDOWN_POP_TIME )
-		scale = PEACE_COUNTDOWN_POP_SCALE
-					- (PEACE_COUNTDOWN_POP_SCALE - 1.0f) * (secondElapsed / PEACE_COUNTDOWN_POP_TIME);
-
-	Real opacity = 1.0f;
-	if( secondElapsed > 1.0f - PEACE_COUNTDOWN_FADE_TIME )
-		opacity = (1.0f - secondElapsed) / PEACE_COUNTDOWN_FADE_TIME;
-
-	// rounded to a step so a second's worth of scaling asks the font library for a few sizes, not thirty
-	const Int wantedPointSize = REAL_TO_INT_CEIL( PEACE_COUNTDOWN_POINT_SIZE * scale );
-	const Int pointSize = ((wantedPointSize + PEACE_COUNTDOWN_SIZE_STEP - 1) / PEACE_COUNTDOWN_SIZE_STEP)
-											* PEACE_COUNTDOWN_SIZE_STEP;
-
-	if( m_peaceCountdownDisplayString == NULL )
-		m_peaceCountdownDisplayString = TheDisplayStringManager->newDisplayString();
-
-	m_peaceCountdownDisplayString->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
-									TheGlobalLanguageData->adjustFontSize( pointSize ),
-									TRUE ) );
-
-	UnicodeString text;
-	text.format( u"%d", (Int)secondsLeft );
-	m_peaceCountdownDisplayString->setText( text );
-
-	// the same string the plate at the top uses, in its own size: the two are never up together
-	if( m_peaceTimeLabelDisplayString == NULL )
-		m_peaceTimeLabelDisplayString = TheDisplayStringManager->newDisplayString();
-
-	m_peaceTimeLabelDisplayString->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
-									TheGlobalLanguageData->adjustFontSize( PEACE_COUNTDOWN_POINT_SIZE
-																												/ PEACE_COUNTDOWN_LABEL_SHARE ),
-									TRUE ) );
-	m_peaceTimeLabelDisplayString->setText( TheGameText->fetch( "GUI:PeaceTimeHudLabel" ) );
-
-	Int textWidth = 0, textHeight = 0;
-	m_peaceCountdownDisplayString->getSize( &textWidth, &textHeight );
-
-	Int labelWidth = 0, labelHeight = 0;
-	m_peaceTimeLabelDisplayString->getSize( &labelWidth, &labelHeight );
-
-	const Int alpha = REAL_TO_INT_CEIL( opacity * 255.0f );
-
-	// the word and the digit stand on the line the plate's word was on
-	const Int top = stripPixels( PEACE_TIMER_TOP_PAD );
-	m_peaceTimeLabelDisplayString->draw( (TheDisplay->getWidth() - labelWidth) / 2, top,
-									peaceTimeColor( 255 ), GameMakeColor( 0, 0, 0, 255 ) );
-
-	m_peaceCountdownDisplayString->draw( (TheDisplay->getWidth() - textWidth) / 2, top + labelHeight,
-									peaceTimeColor( alpha ), GameMakeColor( 0, 0, 0, alpha ) );
 }
 
 // -directorrecord's broadcast is drawn in zerohour.gg's colours: the ground, its panel, ink, muted
@@ -9209,14 +9043,18 @@ void InGameUI::drawDirectorIntroPlate( void )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::drawHudOverlay( void )
 {
-	if( !TheGlobalData->m_showHudOverlay || !TheGlobalData->m_showNetBox )
-		return;
-
 	// only once a real game is under way - not in the shell, and not on the menu's background map
 	if( !TheGameLogic->isInGame() || TheGameLogic->isInShellGame() )
 		return;
 
 	if( TheGameLogic->getFrame() == 0 )
+		return;
+
+	// ShowNetBox is the player's switch for the readout.  Peace time is a rule of the match rather
+	// than a readout, so while it runs the strip stays up with only that segment in it.
+	const Bool showInfo = TheGlobalData->m_showNetBox;
+	const Bool peace = TheGameLogic->isPeaceTime();
+	if( !showInfo && !peace )
 		return;
 
 	//
@@ -9315,13 +9153,45 @@ void InGameUI::drawHudOverlay( void )
 										TheGlobalLanguageData->adjustFontSize( HUD_CLOCK_POINT_SIZE ),
 										TRUE ) );
 	}
-	m_hudDisplayString->setText( text );
-
 	Int textWidth = 0, textHeight = 0;
-	m_hudDisplayString->getSize( &textWidth, &textHeight );
+	if( showInfo )
+	{
+		m_hudDisplayString->setText( text );
+		m_hudDisplayString->getSize( &textWidth, &textHeight );
+	}
 
-	// top right, clear of the radar and the superweapon timers, and first in that corner: the peace
-	// time clock is drawn across the top middle of the screen and takes no room here.
+	// the truce goes last on the line, in red, so it sits in the same spot whether the readout to
+	// its left is there or not
+	Int peaceWidth = 0;
+	if( peace )
+	{
+		const UnsignedInt secs = ControlBar_secondsFromFrames(
+										(Real)(TheGameLogic->getPeaceTimeEndFrame() - logicFrame) );
+		UnicodeString clock;
+		clock.format( TheGameText->fetch( "GUI:PeaceTimeHud" ), secs / 60, secs % 60 );
+		UnicodeString peaceText = TheGameText->fetch( "GUI:PeaceTimeHudLabel" );
+		peaceText.concat( u' ' );
+		peaceText.concat( clock );
+
+		if( m_peaceTimeDisplayString == NULL )
+		{
+			m_peaceTimeDisplayString = TheDisplayStringManager->newDisplayString();
+			m_peaceTimeDisplayString->setFont( TheFontLibrary->getFont( m_superweaponNormalFont,
+											TheGlobalLanguageData->adjustFontSize( HUD_CLOCK_POINT_SIZE ),
+											TRUE ) );
+		}
+		m_peaceTimeDisplayString->setText( peaceText );
+
+		Int peaceHeight = 0;
+		m_peaceTimeDisplayString->getSize( &peaceWidth, &peaceHeight );
+		if( peaceHeight > textHeight )
+			textHeight = peaceHeight;
+	}
+
+	const Int gap = (showInfo && peace) ? stripPixels( 6 ) : 0;
+	const Int stripWidth = textWidth + gap + peaceWidth;
+
+	// top right, clear of the radar and the superweapon timers, and first in that corner.
 	//
 	// The three gaps are 800x600 numbers put through the command bar's own scale, like everything
 	// else on this overlay.  Held at a flat pixel count the plate crept into the corner as the
@@ -9329,14 +9199,18 @@ void InGameUI::drawHudOverlay( void )
 	// shot and a 1080-tall one did not overlay however the text was sized.
 	const Int pad = stripPixels( 2 );
 	const UIRect box = TheUIRect();
-	Int x = box.x + box.w - textWidth - pad - stripPixels( 4 );
+	Int x = box.x + box.w - stripWidth - pad - stripPixels( 4 );
 	Int y = box.y + stripPixels( 2 );
 
 	// a plate behind it, so it stays legible over bright terrain
-	TheDisplay->drawFillRect( x - pad, y - 1, textWidth + pad*2, textHeight + 2,
+	TheDisplay->drawFillRect( x - pad, y - 1, stripWidth + pad*2, textHeight + 2,
 														GameMakeColor( 0, 0, 0, 140 ) );
 
-	m_hudDisplayString->draw( x, y, GameMakeColor( 235, 235, 235, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+	if( showInfo )
+		m_hudDisplayString->draw( x, y, GameMakeColor( 235, 235, 235, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+
+	if( peace )
+		m_peaceTimeDisplayString->draw( x + textWidth + gap, y, peaceTimeColor( 255 ), GameMakeColor( 0, 0, 0, 255 ) );
 }
 
 //-------------------------------------------------------------------------------------------------

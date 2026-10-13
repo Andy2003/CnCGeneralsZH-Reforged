@@ -675,15 +675,12 @@ void W3DInGameUI::draw( void )
 #endif
 
 	//
-	// The peace time clock across the top middle and the clock plate in the corner go on last, after
-	// every window has painted: drawn before the window manager, a dialog, the menu or the control
-	// bar's own art covered them.
+	// The info strip in the corner, peace time included, goes on last, after every window has
+	// painted: drawn before the window manager, a dialog, the menu or the control bar's own art
+	// covered it.
 	//
 	if( matchOnScreen )
-	{
-		drawPeaceTimer();
 		drawHudOverlay();
-	}
 
 #ifdef EXTENDED_STATS
 	}

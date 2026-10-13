@@ -1384,17 +1384,8 @@ protected:
 	SuperweaponMap							m_superweapons[MAX_PLAYER_COUNT];
 	enum { HUD_OVERLAY_POINT_SIZE = 9 };	///< small: this sits over the battlefield, not in a panel
 	enum { HUD_CLOCK_POINT_SIZE = 7 };		///< smaller still, and bold: the clock/rate plate is a glance, not a read
-	enum { PEACE_TIMER_POINT_SIZE = 24 };	///< the peace time clock is the one number you watch, so it is read from across the room
-	enum { PEACE_TIMER_LABEL_POINT_SIZE = 12 };	///< the word over it, which is read once and then only glanced at
-	enum { PEACE_TIMER_TOP_PAD = 16 };	///< how far its plate hangs below the top edge, an 800x600 number like the strip's
-	enum { PEACE_COUNTDOWN_POINT_SIZE = 96 };	///< the last ten seconds, written across the middle of the battlefield
-	enum { PEACE_COUNTDOWN_SECONDS = 10 };	///< how much of the peace time is counted out in the middle of the screen
-	enum { PEACE_COUNTDOWN_SIZE_STEP = 12 };	///< the popping digit's point sizes are rounded to this, so the font library caches four of them rather than one per frame
-	enum { PEACE_COUNTDOWN_LABEL_SHARE = 4 };	///< the word over that digit is this fraction of it
 
-	void drawPeaceTimer( void );					///< the lobby's peace time, counting down at the top of the screen
-	void drawPeaceCountdown( UnsignedInt framesLeft );	///< the last seconds of it, one big digit in the middle of the screen
-	void drawHudOverlay( void );					///< the small elapsed-time / fps plate (ShowHudOverlay)
+	void drawHudOverlay( void );					///< the top right info strip (ShowNetBox), peace time at its end
 	void drawProductionList( void );			///< the production list, lines on the left above the control bar
 
 	SignalKind									m_armedSignal;						///< the signal the next click drops; SIGNAL_KIND_COUNT for none
@@ -1430,8 +1421,8 @@ protected:
 	UnsignedInt									m_dozerCheckFrame;				///< the logic frame watchDozers last looked on
 	Bool												m_hadDozer[ MAX_PLAYER_COUNT ];	///< that player had a dozer or worker then
 
-	DisplayString *							m_hudDisplayString;			///< the ShowHudOverlay line (fps / clock)
-	DisplayString *							m_peaceTimeDisplayString;	///< the peace time clock at the top of the screen
+	DisplayString *							m_hudDisplayString;			///< the info strip's readout (clock / rates)
+	DisplayString *							m_peaceTimeDisplayString;	///< the info strip's red peace time segment
 	/// the broadcast's string for what key names, in font at points, holding text: one string per
 	/// thing written, so a text is laid out again only when it changes
 	DisplayString *broadcastText( const std::string &key, const UnicodeString &text, const char *font, Int points, Bool bold );
@@ -1442,8 +1433,6 @@ protected:
 	/// the score bar laid out for players, under the clock's tab, team letters taken from named
 	void layOutBroadcast( const std::vector< SpectatorStats > &players, const std::vector< SpectatorStats > &named,
 		const std::string &tag, Int clockBox, Int clockBoxHeight, BroadcastLayout &layout );
-	DisplayString *							m_peaceTimeLabelDisplayString;	///< the word written over that clock
-	DisplayString *							m_peaceCountdownDisplayString;	///< the big digit of its last ten seconds
 	Int													m_lastMoneyDisplayed;		///< so the money gadget is only written when the amount changes
 	UnsignedInt									m_hudDrawCount;					///< rendered frames counted by drawHudOverlay itself
 	UnsignedInt									m_hudLastSampleFrame;		///< m_hudDrawCount the fps sample was last refreshed on
