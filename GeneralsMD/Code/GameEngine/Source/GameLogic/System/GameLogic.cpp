@@ -1592,7 +1592,10 @@ void GameLogic::startNewGame( Bool loadingSaveGame )
 	TheTeamFactory->reset();
 	ThePlayerList->newGame();
 
-	// update the loadscreen 
+	// the AI's unit-against-unit tables, here on the loading screen rather than at its first team choice
+	AIPlayer::prepareMatchupTables();
+
+	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PLAYER_LIST_RESET);
 
 	// Tell the script engine that a newe set of scripts is loaded.

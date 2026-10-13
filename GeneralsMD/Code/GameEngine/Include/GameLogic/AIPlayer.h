@@ -181,6 +181,11 @@ public:
 	static void resetFrameProfile( void );
 	static const char *getProfileReport( void );
 
+	/** Empty the unit-against-unit tables from the last match and, when a skirmish AI plays this one,
+		* fill them for every unit the sides in it can build, so the first team choice does not pay for
+		* them mid-match.  Called by GameLogic::startNewGame once the map's INI and the players are in. */
+	static void prepareMatchupTables( void );
+
 	/** Base building is the expensive job once the expansion convoy is out of the way, and it is a
 		* loop over the build list that calls several searches per entry. These name which one.
 		* AISkirmishPlayer overrides processBaseBuilding, so both copies are instrumented and the

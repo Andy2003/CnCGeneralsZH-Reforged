@@ -301,8 +301,9 @@ static Int64 theAIBaseSubStart;
 	 templateFramesToKill). selectTeamToBuild asks it for every unit of every candidate team against
 	 every kind of enemy in sight, both ways round, and each answer walks module names, weapon sets and
 	 armour: an eight-player match spent 84ms of one frame there. Nothing it reads changes during a
-	 match, so the answer is kept. The destructor empties it, because the next match can free a template
-	 and hand its address to another. */
+	 match, so the answer is kept. prepareMatchupTables empties it at the start of every match, because
+	 the next match can free a template and hand its address to another, and fills it on the loading
+	 screen when a skirmish AI is playing. */
 typedef std::pair<const ThingTemplate *, const ThingTemplate *> AITemplatePair;
 static std::map<AITemplatePair, Real> theFramesToKillCache;
 // the two questions under it that walk a template's module list by name, kept the same way: the first
@@ -485,9 +486,6 @@ m_role(AIROLE_AGGRESSIVE)
 AIPlayer::~AIPlayer()
 {
 	clearTeamsInQueue();
-	theFramesToKillCache.clear();
-	theMaxHealthCache.clear();
-	theDetectsStealthCache.clear();
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2655,6 +2653,51 @@ static Real templateFramesToKill( const ThingTemplate *attacker, const ThingTemp
 	const Real frames = computeTemplateFramesToKill( attacker, target );
 	theFramesToKillCache[ key ] = frames;
 	return frames;
+}
+
+/*static*/ void AIPlayer::prepareMatchupTables( void )
+{
+	theFramesToKillCache.clear();
+	theMaxHealthCache.clear();
+	theDetectsStealthCache.clear();
+
+	Bool skirmishAI = FALSE;
+	std::vector<AsciiString> sides;
+	for( Int i = 0; i < ThePlayerList->getPlayerCount(); ++i )
+	{
+		Player *player = ThePlayerList->getNthPlayer( i );
+		if( player->isSkirmishAIPlayer() )
+			skirmishAI = TRUE;
+		if( std::find( sides.begin(), sides.end(), player->getSide() ) == sides.end() )
+			sides.push_back( player->getSide() );
+	}
+	if( !skirmishAI )
+		return;
+
+#ifdef DEBUG_LOGGING
+	const Int64 start = Clock_Ticks();
+#endif
+	// ponytail: units only, the ones a side in the match can buy; a captured or scripted unit, a
+	// defence, an override from map.ini is still answered the first time it is asked
+	std::vector<const ThingTemplate *> units;
+	for( const ThingTemplate *tmpl = TheThingFactory->firstTemplate(); tmpl; tmpl = tmpl->friend_getNextTemplate() )
+	{
+		if( tmpl->friend_getBuildCost() <= 0 || tmpl->isKindOf( KINDOF_STRUCTURE ) || tmpl->getBuildable() == BSTATUS_NO )
+			continue;
+		if( std::find( sides.begin(), sides.end(), tmpl->getDefaultOwningSide() ) != sides.end() )
+			units.push_back( tmpl );
+	}
+	for( size_t a = 0; a < units.size(); ++a )
+	{
+		templateDetectsStealth( units[ a ] );
+		for( size_t t = 0; t < units.size(); ++t )
+			templateFramesToKill( units[ a ], units[ t ] );
+	}
+#ifdef DEBUG_LOGGING
+	const Int64 end = Clock_Ticks();
+	DEBUG_LOG(( "AI MATCHUP PREFILL %d units, %d pairs, %.1fms\n", (Int)units.size(),
+		(Int)theFramesToKillCache.size(), aiPlayerElapsedMS( start, end ) ));
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

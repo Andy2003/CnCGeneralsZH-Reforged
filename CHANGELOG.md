@@ -273,6 +273,7 @@ found and fixed â€” EA's own, not port damage.**
 - Now the priority is the start of a score, not the whole of it. What it can *see* you fielding weights the choice, and the weighing is the game's own arithmetic: for every unit it could build and every unit it sees you with, how many shots each needs to kill the other through its armour, how long it waits between them, and what each one costs. A Crusader shell does a tenth of its damage to a rifleman, so your Rebels get Gattlings and your Overlords get Tank Hunters, not whatever the script listed first. Stealth still pushes detectors up. It reads the same unit data the game fights with, so a mod's units are weighed correctly too.
 - How much that weighs depends on the level: nothing on Easy, which is what the game always did, about half on Normal, and the full weight on Hard.
 - Anti-air was the computer's oldest hole. It is closed.
+- The skirmish no longer catches a hitch the first time the computer picks a team. It works out every unit-against-unit matchup on the loading screen now, in about a millisecond.
 
 ## Three difficulty levels, and none of them cheat
 
