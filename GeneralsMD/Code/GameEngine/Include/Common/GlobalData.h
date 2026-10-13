@@ -93,6 +93,18 @@ enum TextLanguageType
 	TEXT_LANGUAGE_COUNT		= 3,
 };
 
+/** The LightingStyle option.  Classic draws a map's lights as the map gives them; Reforged takes
+	* the same lights and moves weight from the flat ambient and the fill lights to the sun, warms the
+	* sun and cools the ambient (reforgeLighting), deepens the sun's shadow to match, and grades the
+	* Direct3D 11 picture.  Client only: nothing in GameLogic reads a light. */
+enum LightingStyleType
+{
+	LIGHTING_STYLE_CLASSIC	= 0,
+	LIGHTING_STYLE_REFORGED	= 1,
+
+	LIGHTING_STYLE_COUNT		= 2,
+};
+
 /** The AI profile knobs -aiknobsoff can switch off for a measurement. */
 enum
 {
@@ -198,6 +210,7 @@ public:
 	Bool m_smokeFireLighting;		// "SmokeFireLighting": smoke takes light from the fire beside it
 	Int m_shadowQuality;				// "ShadowQuality": the sun's depth map at 1024, 2048 or 4096 texels a side (Direct3D 11)
 	Bool m_classicGraphics;				// "ClassicGraphics": the game's own art, tile, shadows and picture; read at startup
+	Int m_lightingStyle;					// "LightingStyle": LightingStyleType; the map's lights are rebalanced as each map loads
 	Bool m_shadowMap;							// "-shadowmap": draw the casters into the sun's depth buffer as well
 	Bool m_shadowMapReport;				// "-shadowmapreport": log what ended up in that buffer, once a second
 	Bool m_shadowMapOnly;					// "-shadowmaponly": the map's shadows with the stencil volumes' own darkening off
@@ -748,5 +761,11 @@ extern GlobalData* TheWritableGlobalData;
 	* line switch that picks a mode.  Keeping the derivation in one place is what stops -borderless and
 	* a borderless Options.ini from disagreeing about what borderless entails. */
 extern void applyWindowMode( void );
+
+/** The Reforged lighting style applied to one time of day's lights, in place: the first light is
+	* the sun, the other two the map's fills.  Derived from the values the map gave, so a dusk map
+	* stays a dusk map; WorldHeightMap calls it on the tables it has just read, which is why it can
+	* never be applied twice to the same numbers. */
+extern void reforgeLighting( GlobalData::TerrainLighting lights[MAX_GLOBAL_LIGHTS] );
 
 #endif

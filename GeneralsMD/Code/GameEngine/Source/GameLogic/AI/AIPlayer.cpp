@@ -2816,6 +2816,18 @@ void AIPlayer::logEngage( const char *cause, const std::vector<Object *> &units 
 void AIPlayer::onUnitLost( const Object *obj )
 {
 	const Team *team = obj->getTeam();
+	// AI DEFLOSS: killed by a building's gun or its garrison, for the count of units thrown at defences
+	const DamageInfo *last = obj->getBodyModule()->getLastDamageInfo();
+	const Object *killer = last ? TheGameLogic->findObjectByID( last->in.m_sourceID ) : NULL;
+	if( killer && killer->getContainedBy() )
+		killer = killer->getContainedBy();
+	if( isSkirmishAI() && !obj->isKindOf( KINDOF_STRUCTURE ) && killer && killer->isKindOf( KINDOF_STRUCTURE ) &&
+			m_player->getRelationship( killer->getTeam() ) == ENEMIES )
+		DEBUG_LOG(("AI DEFLOSS frame %d player %d '%s' worth %.0f to '%s'\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
+			obj->getTemplate()->getName().str(), aiCombatPower( obj ), killer->getTemplate()->getName().str()));
+	if( isSkirmishAI() && obj->isKindOf( KINDOF_STRUCTURE ) && aiCombatPower( obj ) > 0.0f )
+		DEBUG_LOG(("AI DEFDEAD frame %d player %d '%s' worth %.0f\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
+			obj->getTemplate()->getName().str(), aiCombatPower( obj )));
 	if( !isSkirmishAI() || obj->isKindOf( KINDOF_STRUCTURE ) || team == NULL || team == m_player->getDefaultTeam() )
 		return;
 	const Real NEAR_SQR = 300.0f * 300.0f;
@@ -10915,6 +10927,18 @@ Bool AIPlayer::isDutyAmbulance( const Object *obj ) const
 	return FALSE;
 }
 
+Bool AIPlayer::isWalkingToAmbulance( const Object *obj ) const
+{
+	AIUpdateInterface *ai = const_cast<Object *>( obj )->getAI();		// getGoalObject is not const
+	return ai && ai->getCurrentStateID() == AI_ENTER && ai->getGoalObject() && isDutyAmbulance( ai->getGoalObject() );
+}
+
+Bool AIPlayer::isOutToMend( const Object *obj ) const
+{
+	const AIUpdateInterface *ai = obj->getAI();
+	return ai && !ai->isRecruitable() && obj->getTeam() == m_player->getDefaultTeam();
+}
+
 /** For the log only: what became of each patient an Ambulance called in.  It climbs in, then is let out
 	* or dies inside; or it dies on the way; or something else gives it an order first and it walks off. */
 void AIPlayer::followPatients( void )
@@ -10958,6 +10982,15 @@ void AIPlayer::followPatients( void )
 		DEBUG_LOG(("AI PATIENT frame %d player %d %d %s after %d s at %.0f%% health, %.0f from the ambulance; called at %.0f%% health from %.0f\n", now,
 			m_player->getPlayerIndex(), patient.id, outcome, (now - patient.frame) / LOGICFRAMES_PER_SECOND, health * 100.0f, away,
 			patient.health * 100.0f, patient.distance));
+		if( obj && !obj->isEffectivelyDead() && !patient.inside )
+		{
+			const Object *goal = obj->getAI()->getGoalObject();
+			DEBUG_LOG(("AI PATIENT frame %d player %d %d walk-off state %d source %d goal %d team '%s' recruitable %d hit %d s ago; ambulance state %d moving %d\n", now,
+				m_player->getPlayerIndex(), patient.id, (Int)obj->getAI()->getCurrentStateID(), (Int)obj->getAI()->getLastCommandSource(),
+				goal ? (Int)goal->getID() : 0, obj->getTeam() ? obj->getTeam()->getName().str() : "", (Int)obj->getAI()->isRecruitable(),
+				(now - obj->getBodyModule()->getLastDamageTimestamp()) / LOGICFRAMES_PER_SECOND,
+				ambulanceUp ? (Int)ambulance->getAI()->getCurrentStateID() : -1, ambulanceUp ? (Int)ambulance->getAI()->isMoving() : -1));
+		}
 		m_calledPatients.erase( m_calledPatients.begin() + p );
 	}
 }
@@ -11303,6 +11336,9 @@ static Bool retreatCanOrderHome( const Object *obj )
 static const Real RANK_HEALTH_BASE = 0.25f;
 static const Real RANK_HEALTH_STEP = 0.1f;
 static const Real RANK_RATIO_STEP = 0.25f;
+/** A losing fight pulls only one that has been hurt in it.  Colonel Burton was walked out of one at full
+	* health, and a whole one has nothing to mend: canGetRepairedAt and canGetHealedAt refuse it. */
+static const Real RANK_UNHURT = 0.9f;
 /** How near a unit's own goal has to be to where pullOutRanked would send it to count as on its way. */
 static const Real RANK_GOAL_SLACK = 50.0f;
 
@@ -11312,7 +11348,7 @@ Bool AIRetreat_rankPullsOut( Int rank, Real healthFraction, Bool inFight, Real r
 		return FALSE;
 	if( healthFraction < RANK_HEALTH_BASE + RANK_HEALTH_STEP * rank )
 		return TRUE;
-	return inFight && ratio < min( retreatRatio * (1.0f + RANK_RATIO_STEP * rank), 1.0f );
+	return inFight && healthFraction < RANK_UNHURT && ratio < min( retreatRatio * (1.0f + RANK_RATIO_STEP * rank), 1.0f );
 }
 
 /** The nearest of our own buildings that mends this unit - a repair pad for a vehicle, a heal pad for
@@ -11359,6 +11395,11 @@ void AIPlayer::pullOutRanked( Team *team, Bool inFight, Real ratio )
 			continue;
 		const TacticalStep *row = findTacticalStep( obj->getID() );
 		if( row && (row->fallingBack || (row->fallbackFrame != 0 && now - row->fallbackFrame < RETREAT_HOME_WALK_FRAMES)) )
+			continue;
+		// one already out stays out until releaseMended frees it.  Out of its team it is in the default
+		// one, which doRetreats walks too, and every RETREAT_HOME_WALK_FRAMES it was sent again from
+		// wherever it stood: an Angry Mob member that its mob kept walking was pulled 8 times, every 30 s
+		if( isOutToMend( obj ) )
 			continue;
 		// one already on its way into a dock or a building is being mended, or will be.  So is one in a state
 		// of its own module's (1000 and up): a Helix sent to its airfield flies there in ChinookAIUpdate's
@@ -11419,6 +11460,8 @@ void AIPlayer::releaseMended( void )
 		if( state == AI_DOCK || state == AI_ENTER || state >= 1000 || ai->isMoving() )
 			continue;
 		ai->setIsRecruitable( TRUE );
+		DEBUG_LOG(("AI VETERAN frame %d player %d frees '%s' %d at %.0f%% health\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
+			obj->getTemplate()->getName().str(), obj->getID(), obj->getBodyModule()->getHealth() / obj->getBodyModule()->getMaxHealth() * 100.0f));
 	}
 }
 
@@ -11555,6 +11598,10 @@ void AIPlayer::doRetreats( void )
 				// one already on its way down a tunnel is on its way home; ordering it again would turn it
 				// round at the mouth
 				if( obj->getAI()->hasTunnelTrip() )
+					continue;
+				// nor one walking to an Ambulance that called it in: sent home instead, it left the Ambulance
+				// hurt (the other 2 of the 4 walk-offs in six Hard USA mirrors)
+				if( isWalkingToAmbulance( obj ) || isOutToMend( obj ) )
 					continue;
 				// one that is kiting the fight is winning its own share of it however the totals read: a
 				// Rocket Buggy turned for home in front of four tanks it outran and outranged died turning
@@ -11794,8 +11841,10 @@ Bool AIPlayer::doFallback( Team *team )
 		// its safe spot when the hold ran out kept that walk, unmarked, and the same pass pulled it out
 		// again for another full hold.  One with no gun has no fight to go back to: a Dozer pulled out of
 		// a fight was walked back into it.
+		// One walking to an Ambulance that called it in carries on too: walked home instead, it had left
+		// the Ambulance's enter order still hurt.
 		const Bool givesUp = what == AIFALLBACK_GO_HOME && !fightOver;
-		if( (!givesUp && obj->getAI()->isMoving()) || (what == AIFALLBACK_RESUME && aiCombatPower( obj ) <= 0.0f) )
+		if( isWalkingToAmbulance( obj ) || (!givesUp && obj->getAI()->isMoving()) || (what == AIFALLBACK_RESUME && aiCombatPower( obj ) <= 0.0f) )
 			restoreMood( obj, step );
 		else if( what == AIFALLBACK_RESUME )
 		{
@@ -12333,7 +12382,12 @@ void AIPlayer::tacticsFor( Object *obj )
 	const TeamTemplateInfo *info = team->getPrototype()->getTemplateInfo();
 	if( info && (info->m_isBaseDefense || info->m_isPerimeterDefense) )
 		return;
-	if( obj->getID() == m_capturerID || obj->getID() == m_hijackerID || isDutyHelix( obj ) || isDutyAmbulance( obj ) )
+	// nor a patient on its way into an Ambulance: past leaveTacticsAlone's ten seconds the pull-out and the
+	// rejoin walked 2 of 4 such patients off in six Hard USA mirrors on Twilight Flame (2026-10-11)
+	// nor one pulled out to be mended: waiting its turn at an Arms Dealer's dock it stood still, and the
+	// rejoin walked it back to the fight still hurt
+	if( obj->getID() == m_capturerID || obj->getID() == m_hijackerID || isDutyHelix( obj ) || isDutyAmbulance( obj ) ||
+			isWalkingToAmbulance( obj ) || isOutToMend( obj ) )
 		return;
 	for( Int i = 0; i < MAX_AI_SCOUTS; ++i )
 	{

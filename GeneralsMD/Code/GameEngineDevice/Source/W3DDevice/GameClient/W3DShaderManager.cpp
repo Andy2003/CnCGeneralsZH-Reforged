@@ -271,6 +271,7 @@ static Int fixedFunctionBloomIntensity(void)
 		//Pushed every frame, so a change on the options screen shows at once.
 		const GlowTuning tuning = glowTuning();
 		DX11Post_Set_Bloom(tuning.threshold, tuning.intensity, tuning.additiveGain, tuning.blurPasses);
+		DX11Post_Set_Grade(TheGlobalData->m_lightingStyle == LIGHTING_STYLE_REFORGED ? 1.0f : 0.0f);
 #endif
 		return 0;
 	}

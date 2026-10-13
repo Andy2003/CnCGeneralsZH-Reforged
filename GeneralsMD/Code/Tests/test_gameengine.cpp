@@ -835,7 +835,9 @@ TEST(patch_of_a_missing_object_is_skipped)
 	 pink death, which has none and is the one block the count leaves out.  The Paladin's and the
 	 Avenger's hard-kill charge added two of the fork's own, its launch and its blast, lit too.
 	 The explosion pass added 22 more of EA's, from the structure deaths to the nukes, each with
-	 the light it lacked, and the point defense lasers' missile burst one of the fork's own. */
+	 the light it lacked, and the point defense lasers' missile burst one of the fork's own.
+	 The gunfire pass added 13 of EA's gun FXLists, wider tracers and AtTarget impacts, all of
+	 which already had a muzzle light, and the faster tracers six more, each with EA's own light. */
 static const char *const s_unlitReforgedFXList = "FXList SupW_FX_ParticleUplinkDeathInitial";
 
 TEST(fxlist_reforged_ini_parses_and_keeps_its_light)
@@ -884,7 +886,7 @@ TEST(fxlist_reforged_ini_parses_and_keeps_its_light)
 	}
 	fclose( fp );
 
-	CHECK_EQ( blocks, 113 );
+	CHECK_EQ( blocks, 133 );
 	CHECK_EQ( lit, blocks );
 }
 
@@ -11008,8 +11010,11 @@ TEST(the_ai_pulls_ranked_units_out_sooner_the_higher_the_rank)
 	CHECK( !AIRetreat_rankPullsOut( 3, 0.60f, false, 1.0f, 0.5f ) );
 
 	// a fight read at 0.7, which a team quitting at 0.5 stays in: the veteran stays, the elite goes
-	CHECK( !AIRetreat_rankPullsOut( 1, 1.0f, true, 0.7f, 0.5f ) );
-	CHECK( AIRetreat_rankPullsOut( 2, 1.0f, true, 0.7f, 0.5f ) );
+	CHECK( !AIRetreat_rankPullsOut( 1, 0.8f, true, 0.7f, 0.5f ) );
+	CHECK( AIRetreat_rankPullsOut( 2, 0.8f, true, 0.7f, 0.5f ) );
+	// but only once the fight has hurt it: Colonel Burton was walked out of one at full health
+	CHECK( !AIRetreat_rankPullsOut( 3, 1.0f, true, 0.1f, 0.5f ) );
+	CHECK( !AIRetreat_rankPullsOut( 2, 0.95f, true, 0.7f, 0.5f ) );
 	// a fight read the same with no enemy in it is no reason to go
 	CHECK( !AIRetreat_rankPullsOut( 3, 1.0f, false, 0.7f, 0.5f ) );
 	// and nobody leaves a fight it is even in or winning, at any rank
@@ -16317,6 +16322,41 @@ TEST(particle_cap_in_force_is_the_switch_else_the_slider)
 	CHECK_EQ( scratch->getEffectiveParticleCap(), 20000 );
 	delete scratch;
 	TheWritableGlobalData = saved;
+}
+
+/** The Reforged lighting style keeps what a sunlit surface receives and takes it out of the shade:
+	 on an ordinary afternoon (ambient half the sun, a fill on each side) the lit side of flat ground
+	 lands within a few percent of where it was, the shadow side loses a quarter, the sun turns warmer
+	 than the ambient, and a dim moon keeps its blue. */
+TEST(reforged_lighting_keeps_the_lit_side_and_darkens_the_shade)
+{
+	GlobalData::TerrainLighting lights[MAX_GLOBAL_LIGHTS];
+	memset( lights, 0, sizeof(lights) );
+	lights[0].ambient.red = lights[0].ambient.green = lights[0].ambient.blue = 0.4f;
+	lights[0].diffuse.red = lights[0].diffuse.green = lights[0].diffuse.blue = 0.8f;
+	lights[0].lightPos.x = -0.5f; lights[0].lightPos.y = 0.0f; lights[0].lightPos.z = -0.866f;
+	lights[1].diffuse.red = lights[1].diffuse.green = lights[1].diffuse.blue = 0.3f;
+	const Real incidence = 0.866f;
+	const Real litBefore = 0.4f + 0.8f * incidence;
+
+	reforgeLighting( lights );
+
+	const Real ambient = 0.299f * lights[0].ambient.red + 0.587f * lights[0].ambient.green + 0.114f * lights[0].ambient.blue;
+	const Real sun = 0.299f * lights[0].diffuse.red + 0.587f * lights[0].diffuse.green + 0.114f * lights[0].diffuse.blue;
+	CHECK_NEAR( ambient, 0.4f * 0.72f, 0.01f );
+	CHECK( ambient + sun * incidence >= litBefore );
+	CHECK( ambient + sun * incidence <= litBefore * 1.06f );
+	CHECK( lights[0].diffuse.red > lights[0].diffuse.blue );
+	CHECK( lights[0].ambient.blue > lights[0].ambient.red );
+	CHECK_NEAR( lights[1].diffuse.green, 0.3f * 0.6f, 0.0001f );
+
+	GlobalData::TerrainLighting moon[MAX_GLOBAL_LIGHTS];
+	memset( moon, 0, sizeof(moon) );
+	moon[0].ambient.blue = 0.2f; moon[0].ambient.red = moon[0].ambient.green = 0.1f;
+	moon[0].diffuse.blue = 0.3f; moon[0].diffuse.red = moon[0].diffuse.green = 0.15f;
+	moon[0].lightPos.z = -1.0f;
+	reforgeLighting( moon );
+	CHECK( moon[0].diffuse.blue > 1.8f * moon[0].diffuse.red );
 }
 
 // A veterancy level's or death type's flag bit is bit (value - 1) with the count taken modulo 32, which is

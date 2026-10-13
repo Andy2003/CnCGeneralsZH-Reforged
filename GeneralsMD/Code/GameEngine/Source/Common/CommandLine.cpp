@@ -1014,6 +1014,23 @@ Int parseNoSmokeFireLight(char *args[], int)
 	return 1;
 }
 
+/* -lighting <classic|reforged>: the LightingStyle option for one run, the before and after of any
+	 picture of it. */
+Int parseLightingStyle(char *args[], int num)
+{
+	if (TheWritableGlobalData && num > 1)
+	{
+		if (strcasecmp(args[1], "classic") == 0)
+			TheWritableGlobalData->m_lightingStyle = LIGHTING_STYLE_CLASSIC;
+		else if (strcasecmp(args[1], "reforged") == 0)
+			TheWritableGlobalData->m_lightingStyle = LIGHTING_STYLE_REFORGED;
+		else
+			DEBUG_LOG(("-lighting: '%s' is neither classic nor reforged, keeping the saved style\n", args[1]));
+		return 2;
+	}
+	return 1;
+}
+
 Int parseNoShaders(char *args[], int)
 {
 	if (TheWritableGlobalData)
@@ -2736,6 +2753,7 @@ static CommandLineParam params[] =
 	{ "-noparticleshadows", parseNoParticleShadows },
 	{ "-novolumetricsmoke", parseNoVolumetricSmoke },
 	{ "-nosmokefirelight", parseNoSmokeFireLight },
+	{ "-lighting", parseLightingStyle },
 	{ "-quickstart", parseQuickStart },
 	/* In every build: EA kept them to Debug and Internal, so a Release run could not skip the logo or the
 		 movies. */

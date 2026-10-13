@@ -474,6 +474,8 @@ public:
 	Bool isDutyChinook( const Object *obj ) const;	///< either of those, which the gatherer counts leave out
 	Bool isDutyHelix( const Object *obj ) const;	///< a Helix this AI bought to heal or to raid, which nothing else gives orders
 	Bool isDutyAmbulance( const Object *obj ) const;	///< an Ambulance this AI bought to follow the army, which nothing else gives orders
+	Bool isWalkingToAmbulance( const Object *obj ) const;	///< a patient on its way into a duty Ambulance, which nothing else gives orders either
+	Bool isOutToMend( const Object *obj ) const;	///< a pulled-out veteran or a patient, out of its team until releaseMended frees it
 protected:
 
 	/**
