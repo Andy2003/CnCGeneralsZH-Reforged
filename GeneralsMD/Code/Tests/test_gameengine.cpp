@@ -3874,6 +3874,42 @@ TEST(controlbar_command_places_go_in_rows_by_what_they_are_for)
 		CHECK_EQ( places[ slot ], manyPlaces[ slot ] );
 }
 
+TEST(controlbar_mod_slots_past_the_bar_fit_its_windows)
+{
+	enum { SLOTS = MAX_COMMANDS_PER_SET, WINDOWS = 14 };
+	const Int N = GUI_COMMAND_NONE, U = GUI_COMMAND_OBJECT_UPGRADE, W = GUI_COMMAND_SWITCH_WEAPON;
+	Bool windowed[ SLOTS ];
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		windowed[ slot ] = slot < WINDOWS;
+	Int shown[ SLOTS ];
+
+	/* Contra's Cybr_AmericaInfantryRangerCommandSet: five drones, capture, two weapon switches, and
+	   attack move, guard and stop in 15, 17 and 18, which our fourteen windows lack.  The orders go to
+	   Zero Hour's 11, 13 and 14, the rest stay put */
+	const Int ranger[ SLOTS ] = { U, U, U, U, U, N, GUI_COMMAND_SPECIAL_POWER, W, N, W, N, N, N, N,
+		GUI_COMMAND_ATTACK_MOVE, N, GUI_COMMAND_GUARD, GUI_COMMAND_STOP };
+	ControlBar_fitCommandSlots( ranger, windowed, SLOTS, shown );
+	const Int rangerShown[ SLOTS ] = { 0, 1, 2, 3, 4, -1, 6, 7, -1, 9, 14, -1, 16, 17, -1, -1, -1, -1 };
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		CHECK_EQ( shown[ slot ], rangerShown[ slot ] );
+
+	/* 11 taken by the mod's own button: attack move takes the first empty window, and a stray button
+	   past the bar comes after the orders */
+	const Int busy[ SLOTS ] = { U, N, N, N, N, N, N, N, N, N, U, N, N, N, U, GUI_COMMAND_ATTACK_MOVE, N, N };
+	ControlBar_fitCommandSlots( busy, windowed, SLOTS, shown );
+	CHECK_EQ( shown[ 0 ], 0 );
+	CHECK_EQ( shown[ 10 ], 10 );
+	CHECK_EQ( shown[ 1 ], 15 );
+	CHECK_EQ( shown[ 2 ], 14 );
+
+	/* a retail set never goes past fourteen and comes back slot for slot */
+	const Int humvee[ SLOTS ] = { U, U, U, N, N, N, N, N, GUI_COMMAND_EVACUATE, N, GUI_COMMAND_ATTACK_MOVE, N,
+		GUI_COMMAND_GUARD, GUI_COMMAND_STOP, N, N, N, N };
+	ControlBar_fitCommandSlots( humvee, windowed, SLOTS, shown );
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		CHECK_EQ( shown[ slot ], humvee[ slot ] != N && slot < WINDOWS ? slot : -1 );
+}
+
 TEST(controlbar_stance_key_takes_what_the_buttons_leave)
 {
 	enum { SLOTS = 14 };

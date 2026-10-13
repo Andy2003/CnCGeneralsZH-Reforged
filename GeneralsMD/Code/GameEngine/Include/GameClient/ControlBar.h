@@ -499,6 +499,14 @@ Int ControlBar_commandGroup( const class CommandButton *command );
 	* what does not fit goes on in the next row down with room, then in the rows above. */
 Bool ControlBar_commandPlaces( const Int *types, const Int *groups, const Int *pinned, Int count, Int *places );
 
+/** Which command set slot each of `count` bar windows shows, -1 for none: `types` is what each slot
+	* holds, GUI_COMMAND_NONE for an empty one, and `windowed` whether ControlBar.wnd has that slot's
+	* window.  A slot with a window shows itself.  A mod drawn for a bigger bar (Contra's eighteen, whose
+	* units keep attack move, guard and stop in 15, 17 and 18) names slots our fourteen have no window
+	* for; such a button moves to an empty window, the three orders to Zero Hour's own 11, 13 and 14
+	* when free, anything else to the first empty one. */
+void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int count, Int *shown );
+
 /** The page's keys past attack, hold position and move, which no command set has a button for either. */
 enum OrderKeyExtra
 {

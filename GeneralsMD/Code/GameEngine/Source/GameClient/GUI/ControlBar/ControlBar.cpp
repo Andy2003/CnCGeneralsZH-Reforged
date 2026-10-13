@@ -379,6 +379,43 @@ Bool ControlBar_commandPlaces( const Int *types, const Int *groups, const Int *p
 }
 
 //-------------------------------------------------------------------------------------------------
+void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int count, Int *shown )
+{
+	for( Int slot = 0; slot < count; slot++ )
+		shown[ slot ] = ( windowed[ slot ] && types[ slot ] != GUI_COMMAND_NONE ) ? slot : -1;
+
+	// the shared orders first, so a mod's own button past the bar cannot take their Zero Hour slot
+	for( Int pass = 0; pass < 2; pass++ )
+	{
+		for( Int slot = 0; slot < count; slot++ )
+		{
+			if( windowed[ slot ] || types[ slot ] == GUI_COMMAND_NONE )
+				continue;
+			Int to = -1;
+			switch( types[ slot ] )
+			{
+				case GUI_COMMAND_ATTACK_MOVE:							to = 10; break;
+				case GUI_COMMAND_GUARD:
+				case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
+				case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:	to = 12; break;
+				case GUI_COMMAND_STOP:										to = 13; break;
+			}
+			if( ( to >= 0 ) != ( pass == 0 ) )
+				continue;
+			if( to < 0 || to >= count || !windowed[ to ] || shown[ to ] >= 0 )
+			{
+				to = -1;
+				for( Int each = 0; each < count && to < 0; each++ )
+					if( windowed[ each ] && shown[ each ] < 0 )
+						to = each;
+			}
+			if( to >= 0 )
+				shown[ to ] = slot;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 void ControlBar_orderKeyPlaces( const Int *places, Int count, Bool fights, Int *keys )
 {
 	for( Int key = 0; key < ORDER_KEY_EXTRAS; key++ )

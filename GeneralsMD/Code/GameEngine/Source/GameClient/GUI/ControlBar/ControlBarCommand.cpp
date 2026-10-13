@@ -382,10 +382,24 @@ void ControlBar::populateCommand( Object *obj )
 	if( obj->getContain()  &&  obj->getContain()->isDisplayedOnControlBar() )
 		doTransportInventoryUI( obj, commandSet );
 
-	// what goes in each slot: the command set, slot for slot
+	// what goes in each slot: the command set, slot for slot, and a button in a slot past our bar's
+	// windows into an empty one (ControlBar_fitCommandSlots)
 	const CommandButton *slot[ MAX_COMMANDS_PER_SET ];
-	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
-		slot[ i ] = commandSet->getCommandButton( i );
+	{
+		const CommandButton *set[ MAX_COMMANDS_PER_SET ];
+		Int types[ MAX_COMMANDS_PER_SET ];
+		Bool windowed[ MAX_COMMANDS_PER_SET ];
+		Int shown[ MAX_COMMANDS_PER_SET ];
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+		{
+			set[ i ] = commandSet->getCommandButton( i );
+			types[ i ] = ( set[ i ] && !BitTest( set[ i ]->getOptions(), SCRIPT_ONLY ) ) ? set[ i ]->getCommandType() : GUI_COMMAND_NONE;
+			windowed[ i ] = m_commandWindows[ i ] != NULL;
+		}
+		ControlBar_fitCommandSlots( types, windowed, MAX_COMMANDS_PER_SET, shown );
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+			slot[ i ] = shown[ i ] >= 0 ? set[ shown[ i ] ] : set[ i ];
+	}
 
 	// populate the button with commands defined
 	const CommandButton *commandButton;
