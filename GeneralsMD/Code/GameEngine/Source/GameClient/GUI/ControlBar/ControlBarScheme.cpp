@@ -1060,10 +1060,10 @@ ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString&
 }
 
 //-----------------------------------------------------------------------------
-/** The owner's call: a mod's faction plays on our bar, ControlBar Pro's American one, whatever its
-	* side and whatever bar the mod ships.  Its buttons, cameos and portrait are still the mod's.  Under
-	* -modfactions that is a faction with a mod index; under a single -mod every faction is the mod's.
-	* The observer keeps its own bar. */
+/** The owner's call: a mod's faction gets our American power tray and our science layout, whatever
+	* .wnd the mod names.  Its buttons, cameos and portrait are still the mod's.  Under -modfactions that
+	* is a faction with a mod index; under a single -mod every faction is the mod's.  The observer is
+	* none. */
 //-----------------------------------------------------------------------------
 Bool ControlBarIsModFaction( const PlayerTemplate *pt )
 {
@@ -1072,15 +1072,23 @@ Bool ControlBarIsModFaction( const PlayerTemplate *pt )
 	return pt->getModIndex() >= 0 || ( !TheGlobalData->m_mods.empty() && !TheGlobalData->m_modFactions );
 }
 
-ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( AsciiString side, const PlayerTemplate *pt, Bool useSmall ) const
+//-----------------------------------------------------------------------------
+/** The bar follows the country.  A side with a scheme of its own (Boss and Observer among them) wears
+	* it; any other wears its country's by name, the way ControlBarPlateForSide reads a side, so a mod's
+	* ChinaCyberGeneral gets China's and its AmericaCyberneticGeneral America's.  A side of no country we
+	* know (Russia, ECA, the civilians) wears America's.  The squished bar does not come here. */
+//-----------------------------------------------------------------------------
+ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( const AsciiString& side ) const
 {
-	if( ControlBarIsModFaction( pt ) )
-	{
-		side.set( "America" );
-		if( useSmall )
-			side.concat( "Small" );
-	}
-	return findSchemeForSide( side );
+	ControlBarScheme *scheme = findSchemeForSide( side );
+	if( scheme != NULL )
+		return scheme;
+
+	if( side.startsWithNoCase( "China" ) )
+		return findSchemeForSide( AsciiString( "China" ) );
+	if( side.startsWithNoCase( "GLA" ) )
+		return findSchemeForSide( AsciiString( "GLA" ) );
+	return findSchemeForSide( AsciiString( "America" ) );
 }
 
 Bool ControlBarSchemeManager::isCurrentSchemePainted( void ) const
@@ -1147,33 +1155,26 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayerTemplate( const PlayerT
 	if(!pt)
 		return;
 	AsciiString side = pt->getSide();
-	if(useSmall)
-		side.concat("Small");
 
 	// if we don't have a side, set it to Observer shell
 	if(side.isEmpty())
 		side.set("Observer");
 	// picked again every time, even for the side on screen: a new resolution can want a different
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
-	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt, useSmall );
-	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
-
+	// the squished bar keeps EA's pick: the side's Small scheme, and none ships, so "Default"
+	AsciiString smallSide = side;
+	smallSide.concat("Small");
+	ControlBarScheme *tempScheme = useSmall ? findSchemeForSide( smallSide ) : findSchemeForFaction( side );
 	if(tempScheme)
 	{
-		// setup the multiplyer value
- 		m_multiplyer.x = TheDisplay->getWidth() / (Real)tempScheme->m_ScreenCreationRes.x;
+		DEBUG_LOG(("setControlBarSchemeByPlayer gave side %s the scheme of %s\n", side.str(), tempScheme->m_side.str()));
+		m_multiplyer.x = TheDisplay->getWidth() / (Real)tempScheme->m_ScreenCreationRes.x;
 		m_multiplyer.y = TheDisplay->getHeight() / (Real)tempScheme->m_ScreenCreationRes.y;
 		m_currentScheme = tempScheme;
 	}
 	else
-	{
-		// well, we couldn't find
 		m_currentScheme = findControlBarScheme("Default");
-		DEBUG_LOG(("There's no ControlBarScheme with a side of %s", side.str()));
-//		m_currentScheme = NULL;
-	}
-	if(m_currentScheme)
-		m_currentScheme->init();
+	m_currentScheme->init();
 }
 //-----------------------------------------------------------------------------
 void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
@@ -1196,28 +1197,13 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
 		side.set("Observer");
 	// picked again every time, even for the side on screen: a new resolution can want a different
 	// scheme for it (findSchemeForSide), and the multiplier below is the screen's
-	// the neutral and civilian players have no template, and wear ours
-	const PlayerTemplate *pt = p->getPlayerTemplate();
-	ControlBarScheme *tempScheme = findSchemeForFaction( side, pt, FALSE );
-	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side\n", side.str()));
-
-	if(tempScheme)
-	{
-		// setup the multiplyer value
- 		m_multiplyer.x = TheDisplay->getWidth() / (Real)tempScheme->m_ScreenCreationRes.x;
-		m_multiplyer.y = TheDisplay->getHeight() / (Real)tempScheme->m_ScreenCreationRes.y;
-		m_currentScheme = tempScheme;
-	}
-	else
-	{
-		// well, we couldn't find
-		m_currentScheme = findControlBarScheme("Default");
-		DEBUG_LOG(("There's no ControlBarScheme with a side of %s", side.str()));
-//		m_currentScheme = NULL;
-	}
-	if(m_currentScheme)
-		m_currentScheme->init();
-}	
+	// the neutral and civilian players are of no country, and wear America's
+	m_currentScheme = findSchemeForFaction( side );
+	DEBUG_LOG(("setControlBarSchemeByPlayer gave side %s the scheme of %s\n", side.str(), m_currentScheme->m_side.str()));
+	m_multiplyer.x = TheDisplay->getWidth() / (Real)m_currentScheme->m_ScreenCreationRes.x;
+	m_multiplyer.y = TheDisplay->getHeight() / (Real)m_currentScheme->m_ScreenCreationRes.y;
+	m_currentScheme->init();
+}
 
 
 //-----------------------------------------------------------------------------

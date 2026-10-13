@@ -292,7 +292,7 @@ public:
 
 private:
 	ControlBarScheme *findSchemeForSide( const AsciiString& side ) const;	///< the widest of that side's schemes the screen can wear
-	ControlBarScheme *findSchemeForFaction( AsciiString side, const PlayerTemplate *pt, Bool useSmall ) const;	///< a mod faction wears America's (ControlBarIsModFaction)
+	ControlBarScheme *findSchemeForFaction( const AsciiString& side ) const;	///< the side's own, else its country's, else America's
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
 	Coord2D m_multiplyer;																	
@@ -309,7 +309,7 @@ private:
 //-----------------------------------------------------------------------------
 // EXTERNALS //////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
-/// a mod's faction, which wears our American bar and tray whatever bar the mod ships (owner's call)
+/// a mod's faction, which gets our American power tray and our science layout (owner's call)
 Bool ControlBarIsModFaction( const PlayerTemplate *pt );
 
 #endif // __CONTROL_BAR_SCHEME_H_
