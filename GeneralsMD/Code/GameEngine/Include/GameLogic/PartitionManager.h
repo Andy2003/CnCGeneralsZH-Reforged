@@ -295,6 +295,13 @@ protected:
 extern void PartitionManager_findSightMargins( const Real *heights, Int cellRadius, Real cellSize, Real eyeZ,
 																							 Real *sightMargin );
 
+/** What a hill-blocked sighting records for one cell: SIGHT_CELL_GROUND when the ground there is in
+	sight, SIGHT_CELL_AIR when the air over it is. The air is in sight anywhere within the looker's flat
+	range, whatever hill or roof stands between: an aircraft behind a ridge sees down over it, so the
+	units it shoots at must see it back. */
+enum { SIGHT_CELL_GROUND = 0x01, SIGHT_CELL_AIR = 0x02 };
+extern UnsignedByte PartitionManager_sightCellFlags( Bool groundRevealed, Int offsetX, Int offsetY, Int flatCellRadius );
+
 //=====================================
 /**
 	We sometimes need to save whether or not an area was fogged or permanently revealed through a 
@@ -324,7 +331,8 @@ class PartitionCell : public Snapshot	// not MPO: allocated in an array
 {
 private:
 	CellAndObjectIntersection*		m_firstCoiInCell;	///< list of COIs in this cell (may be null).
-	ShroudLevel										m_shroudLevel[MAX_PLAYER_COUNT];	
+	ShroudLevel										m_shroudLevel[MAX_PLAYER_COUNT];
+	Short													m_airLookers[MAX_PLAYER_COUNT];	///< lookers whose circle takes in the air over this cell, hills and roofs or not
 #ifdef PM_CACHE_TERRAIN_HEIGHT
 	Real													m_loTerrainZ;			///< lowest terrain-pt in this cell
 	Real													m_hiTerrainZ;			///< highest terrain-pt in this cell
@@ -360,6 +368,9 @@ public:
 	void addShrouder( Int playerIndex );
 	void removeShrouder( Int playerIndex );
 	CellShroudStatus getShroudStatusForPlayer( Int playerIndex ) const;
+	void addAirLooker( Int playerIndex );
+	void removeAirLooker( Int playerIndex );
+	Bool isAirSeenByPlayer( Int playerIndex ) const { return m_airLookers[playerIndex] > 0; }
 
 	// @todo: All of these are inline candidates
 	UnsignedInt getThreatValue( Int playerIndex );

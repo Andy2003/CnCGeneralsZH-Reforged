@@ -2301,11 +2301,13 @@ set_tests_properties(test_gameengine PROPERTIES TIMEOUT 2700)
 # simulation_uses_no_runtime_trig reads the engine's own sources back off disk to prove nothing in
 # GameLogic or Common has gone back to calling sinf().
 # fxlist_reforged_ini_parses_and_keeps_its_light runs the fork's own FXList file through the real
-# INI parser, so it needs the tracked master rather than whatever sits in Run/.
+# INI parser, so it needs the tracked master rather than whatever sits in Run/; the WeaponReforged
+# test the same.
 # the_options_menu_buttons_all_wear_one_font reads the tracked layout master, not Run/'s copy.
 target_compile_definitions(test_gameengine PRIVATE
   GAMEENGINE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/GameEngine"
   FXLIST_REFORGED_INI="${CMAKE_CURRENT_SOURCE_DIR}/Data/INI/FXListReforged.ini"
+  WEAPON_REFORGED_INI="${CMAKE_CURRENT_SOURCE_DIR}/Data/INI/WeaponReforged.ini"
   OPTIONS_MENU_WND="${CMAKE_CURRENT_SOURCE_DIR}/Data/Window/Menus/OptionsMenuClassic.wnd"
   PLATE_TEXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Data/Art/Textures")
 

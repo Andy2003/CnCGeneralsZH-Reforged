@@ -900,16 +900,8 @@ void Player::initFromDict(const Dict* d)
 		// poorly-formed user maps might not, which would be bad, and could crash us later. so if it doesn't
 		// actually have a skirmish player defined for this side, declare it nonskirmish... the player won't
 		// really work, but it's better than crashing.
-		for (Int spIdx = 0; spIdx < TheSidesList->getNumSkirmishSides(); ++spIdx)
-		{
-			AsciiString spTemplateName = TheSidesList->getSkirmishSideInfo(spIdx)->getDict()->getAsciiString(TheKey_playerFaction);
-			const PlayerTemplate* spt = ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(spTemplateName));
-			if (spt && spt->getSide() == getSide()) 
-			{
-				skirmish = true;
-				break;
-			}
-		}
+		// -modfactions: a mod faction may have a skirmish player of its own mod's scripts, or retail's of its side
+		skirmish = pt != NULL && TheSidesList->findSkirmishSideFor(pt, NULL) != NULL;
 
 		DEBUG_ASSERTCRASH(skirmish, ("Could not find skirmish player for side %s... quietly making into nonskirmish.", getSide().str()));
 		if (!skirmish)
@@ -965,17 +957,14 @@ void Player::initFromDict(const Dict* d)
 		// Copy and qualify scripts, and teams.
 
 		AsciiString mySide = getSide();
-		Int i, skirmishNdx;
-		Bool found = false;
+		Int i;
 		AsciiString  qualTemplatePlayerName;
-		for (skirmishNdx=0; skirmishNdx<TheSidesList->getNumSkirmishSides(); skirmishNdx++) {
-			AsciiString templateName = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getDict()->getAsciiString(TheKey_playerFaction);
-			pt = ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(templateName));
-			if (pt && pt->getSide() == mySide) {
-				qualTemplatePlayerName.format("%s%d", TheSidesList->getSkirmishSideInfo(skirmishNdx)->getDict()->getAsciiString(TheKey_playerName).str(), m_mpStartIndex);
-				found = true;
-				break;
-			}
+		// -modfactions: a mod faction runs its own mod's skirmish scripts and teams when the mod ships them
+		TeamsInfoRec *skirmishTeams = NULL;
+		SidesInfo *skirmishSide = TheSidesList->findSkirmishSideFor(getPlayerTemplate(), &skirmishTeams);
+		const Bool found = skirmishSide != NULL;
+		if (found) {
+			qualTemplatePlayerName.format("%s%d", skirmishSide->getDict()->getAsciiString(TheKey_playerName).str(), m_mpStartIndex);
 		}
 		Int diffInt  = d->getInt(TheKey_skirmishDifficulty, &exists);
 		GameDifficulty difficulty = TheScriptEngine->getGlobalDifficulty();
@@ -1006,7 +995,7 @@ void Player::initFromDict(const Dict* d)
 			m_playerName = qualTemplatePlayerName;
 			AsciiString qualifier;
 			qualifier.format("%d", m_mpStartIndex);
-			ScriptList *scripts = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getScriptList()->duplicateAndQualify(
+			ScriptList *scripts = skirmishSide->getScriptList()->duplicateAndQualify(
 						qualifier, qualTemplatePlayerName, pname);
 			ScriptList* slist = TheSidesList->getSideInfo(getPlayerIndex())->getScriptList();
 			if (slist) 
@@ -1024,11 +1013,11 @@ void Player::initFromDict(const Dict* d)
 			}
 			// Now add teams.
 
-			AsciiString originalPlayerName = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getDict()->getAsciiString(TheKey_playerName);
-			for (i=0; i<TheSidesList->getNumSkirmishTeams(); i++) {
-				if (TheSidesList->getSkirmishTeamInfo(i)->getDict()->getAsciiString(TheKey_teamOwner) == originalPlayerName)
+			AsciiString originalPlayerName = skirmishSide->getDict()->getAsciiString(TheKey_playerName);
+			for (i=0; i<skirmishTeams->getNumTeams(); i++) {
+				if (skirmishTeams->getTeamInfo(i)->getDict()->getAsciiString(TheKey_teamOwner) == originalPlayerName)
 				{
-					Dict teamDict(*TheSidesList->getSkirmishTeamInfo(i)->getDict());
+					Dict teamDict(*skirmishTeams->getTeamInfo(i)->getDict());
 					AsciiString teamName = teamDict.getAsciiString(TheKey_teamName); 
 					AsciiString newName;
 					newName.format("%s%d", teamDict.getAsciiString(TheKey_teamName).str(), m_mpStartIndex);

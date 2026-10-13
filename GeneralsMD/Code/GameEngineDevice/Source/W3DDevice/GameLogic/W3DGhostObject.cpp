@@ -376,7 +376,7 @@ void W3DGhostObject::snapShot(int playerIndex)
 						m_parentSnapshots[playerIndex]=snap;
 				}
 				else
-					m_parentSnapshots[playerIndex]->update(robj, &m_drawableInfo);
+					snap->update(robj, &m_drawableInfo);
 
 				// the model name keeps the mod prefix the robj's name drops, so a save reloads the mod's art
 				copyModPrefix(snap->m_modPrefix, w3dDraw->getCurrentModelName().str());

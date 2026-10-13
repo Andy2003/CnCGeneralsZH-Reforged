@@ -108,6 +108,22 @@ constexpr Real ConvertRetailPerFrameSquared( Real perFrameSqr ) { return perFram
 inline Real ConvertRetailPerFrameFactor( Real factor ) { return sqrtf( factor > 0.0f ? factor : 0.0f ); }
 
 // ----------------------------------------------------------------------------------------------
+// The speeds a skirmish or single-player match may run at: half speed to normal, never faster.  The
+// menu, the console, a saved game and a map script all pass through this; -fps, -turbo and a network
+// game do not.
+enum
+{
+	PLAYER_GAME_SPEED_MIN_FPS = LOGICFRAMES_PER_SECOND / 2,
+	PLAYER_GAME_SPEED_MAX_FPS = LOGICFRAMES_PER_SECOND
+};
+constexpr Int ClampPlayerGameSpeed( Int fps )
+{
+	if( fps < PLAYER_GAME_SPEED_MIN_FPS ) return PLAYER_GAME_SPEED_MIN_FPS;
+	if( fps > PLAYER_GAME_SPEED_MAX_FPS ) return PLAYER_GAME_SPEED_MAX_FPS;
+	return fps;
+}
+
+// ----------------------------------------------------------------------------------------------
 // note that this returns a REAL value, not an int... most callers will want to
 // call ceil() on the result, so that partial frames get converted to full frames!
 inline Real ConvertDurationFromMsecsToFrames(Real msec) 

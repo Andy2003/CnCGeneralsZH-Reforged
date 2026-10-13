@@ -1933,7 +1933,14 @@ void WeaponStore::postProcessLoad()
 		}
 		else
 		{
-			DEBUG_CRASH(("Weapon '%s' already exists, but OVERRIDE not specified", c));
+			/* The first definition stands and the block is read and dropped.  WeaponReforged.ini keeps
+				 copies of EA weapons FixesReforged.ini hands out, for a mod whose Weapon.ini leaves them out
+				 (Contra has no Demo_DestroyedWeapon); where the loaded data has the weapon, its own wins.
+				 This used to return mid-block, and the next field line stopped the load as an unknown block. */
+			DEBUG_LOG(("[LINE: %d in '%s'] Weapon '%s' is already defined; the block is skipped.\n", ini->getLineNum(), ini->getFilename().str(), c));
+			WeaponTemplate *scratch = newInstance(WeaponTemplate);
+			ini->initFromINI(scratch, scratch->getFieldParse());
+			scratch->deleteInstance();
 			return;
 		}
 

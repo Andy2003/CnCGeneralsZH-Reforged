@@ -29,6 +29,7 @@ Data/Art/Textures/ReforgedMineLedRed.tga
 Data/Art/Textures/ReforgedSignalAttack.tga
 Data/Art/Textures/ReforgedSignalDefend.tga
 Data/Art/Textures/ReforgedSignalLook.tga
+Data/Cinema/aurorablast.txt
 Data/Cinema/aurorafog.txt
 Data/Cinema/blastcheck.txt
 Data/Cinema/demo.txt
@@ -109,6 +110,9 @@ Data/Cinema/s240_snow.txt
 Data/Cinema/s240_tank.txt
 Data/Cinema/s240_town.txt
 Data/Cinema/scudlaunch_film.txt
+Data/Cinema/shadowfar.txt
+Data/Cinema/shadowpan.txt
+Data/Cinema/spectre_reshoot.txt
 Data/Cinema/swpair_nuke.txt
 Data/Cinema/swpair_scud.txt
 Data/Cinema/thumb_chaos_a.txt
@@ -152,6 +156,7 @@ Data/INI/ParticleSystemReforged.ini
 Data/INI/ScienceReforged.ini
 Data/INI/SpecialPowerReforged.ini
 Data/INI/UpgradeReforged.ini
+Data/INI/WeaponReforged.ini
 Data/Install_Final.bmp
 Data/Patch.str
 Data/Scenarios/airbelow.txt
@@ -159,6 +164,7 @@ Data/Scenarios/airbelowfar.txt
 Data/Scenarios/alphaaurora.txt
 Data/Scenarios/ambulanceclean.txt
 Data/Scenarios/ambulanceguard.txt
+Data/Scenarios/aurorablast.txt
 Data/Scenarios/aurorafog.txt
 Data/Scenarios/avengerlasers.txt
 Data/Scenarios/beambase.txt
@@ -168,6 +174,7 @@ Data/Scenarios/bridgecross.txt
 Data/Scenarios/bridgelong.txt
 Data/Scenarios/broadcastend.txt
 Data/Scenarios/chokeprobe.txt
+Data/Scenarios/comanchehill.txt
 Data/Scenarios/comanchepods.txt
 Data/Scenarios/comturret.txt
 Data/Scenarios/crowdbattle.txt
@@ -279,6 +286,7 @@ Data/Scenarios/shellpaths.txt
 Data/Scenarios/shiftorders.txt
 Data/Scenarios/shiftqueue.txt
 Data/Scenarios/spectre_reaim.txt
+Data/Scenarios/spectre_reshoot.txt
 Data/Scenarios/squad30.txt
 Data/Scenarios/stance.txt
 Data/Scenarios/standinbuild.txt
@@ -312,6 +320,7 @@ Data/Scenarios/vehicleaccel.txt
 Data/Scenarios/vehiclelean.txt
 Data/Scenarios/vehicleturn.txt
 Data/Scenarios/vision.txt
+Data/Scenarios/wallgarrison.txt
 Data/Scenarios/wreckcheck.txt
 Data/Scripts/SkirmishScripts.scb
 Data/Turkish/Generals.str

@@ -434,10 +434,12 @@ class GameData:
         self.things = {}
         self.skipped = []                  # patch blocks naming what this data does not have
 
-        for keyword, args, children in ini_blocks(files.text("Data/INI/Weapon.ini")):
-            if keyword.lower() == "weapon" and args[0].lower() not in self.weapons:
-                self.weapons[args[0].lower()] = new_weapon(args[0])
-                apply_weapon(self.weapons[args[0].lower()], children)
+        # WeaponReforged.ini right after Weapon.ini, as GameEngine::init loads it: the fork's own names
+        for path in ("Data/INI/Weapon.ini", "Data/INI/WeaponReforged.ini"):
+            for keyword, args, children in ini_blocks(files.text(path)):
+                if keyword.lower() == "weapon" and args[0].lower() not in self.weapons:
+                    self.weapons[args[0].lower()] = new_weapon(args[0])
+                    apply_weapon(self.weapons[args[0].lower()], children)
         for keyword, args, children in ini_blocks(files.text("Data/INI/Locomotor.ini")):
             if keyword.lower() == "locomotor":
                 speeds = [real(value[0]) for key, value in (field(line) for line, _ in children) if key == "speed"]

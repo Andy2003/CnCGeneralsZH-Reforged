@@ -383,6 +383,8 @@ m_role(AIROLE_AGGRESSIVE)
 		m_ambulance[ slot ].seen.zero();
 		m_ambulance[ slot ].seenHealth = 1.0f;
 		m_ambulance[ slot ].seenReach = 0.0f;
+		m_ambulance[ slot ].pullbacks = 0;
+		m_ambulance[ slot ].holds = 0;
 	}
 	m_ambulanceLost = 0;
 	m_ambulancesBought = 0;
@@ -579,21 +581,18 @@ void AIPlayer::checkForSupplyCenter( BuildListInfo *info, Object *bldg )
 	{
 		info->setSupplyBuilding(true);
 		Int desiredGatherers = 0;
-		const AISideInfo *resInfo = TheAI->getAiData()->m_sideInfo;
-		while (resInfo) {
-			if (resInfo->m_side == m_player->getSide()) {
-				GameDifficulty difficulty = m_difficulty;
-				if (difficulty == DIFFICULTY_EASY) {
-					desiredGatherers = resInfo->m_easy;
-				}
-				if (difficulty == DIFFICULTY_NORMAL) {
-					desiredGatherers = resInfo->m_normal;
-				}
-				if (difficulty == DIFFICULTY_HARD) {
-					desiredGatherers = resInfo->m_hard;	 
-				}
+		const AISideInfo *resInfo = TheAI->getAiData()->findSideInfo( m_player );
+		if (resInfo) {
+			GameDifficulty difficulty = m_difficulty;
+			if (difficulty == DIFFICULTY_EASY) {
+				desiredGatherers = resInfo->m_easy;
 			}
-			resInfo = resInfo->m_next;
+			if (difficulty == DIFFICULTY_NORMAL) {
+				desiredGatherers = resInfo->m_normal;
+			}
+			if (difficulty == DIFFICULTY_HARD) {
+				desiredGatherers = resInfo->m_hard;
+			}
 		}
 		//
 		// Adaptive harvesters (B6): the three INI numbers do not know how much supply is actually
@@ -1817,6 +1816,8 @@ void AIPlayer::onUnitProduced( Object *factory, Object *unit )
 							m_ambulance[slot].seen = *unit->getPosition();
 							m_ambulance[slot].seenHealth = 1.0f;
 							m_ambulance[slot].seenReach = 0.0f;
+							m_ambulance[slot].pullbacks = 0;
+							m_ambulance[slot].holds = 0;
 							++m_ambulancesBought;
 							DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d comes out, %d bought this match\n", TheGameLogic->getFrame(),
 								m_player->getPlayerIndex(), unit->getTemplate()->getName().str(), unit->getID(), m_ambulancesBought));
@@ -2867,8 +2868,11 @@ void AIPlayer::onUnitLost( const Object *obj )
 		killer = killer->getContainedBy();
 	if( isSkirmishAI() && !obj->isKindOf( KINDOF_STRUCTURE ) && killer && killer->isKindOf( KINDOF_STRUCTURE ) &&
 			m_player->getRelationship( killer->getTeam() ) == ENEMIES )
-		DEBUG_LOG(("AI DEFLOSS frame %d player %d '%s' worth %.0f to '%s'\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
-			obj->getTemplate()->getName().str(), aiCombatPower( obj ), killer->getTemplate()->getName().str()));
+		DEBUG_LOG(("AI DEFLOSS frame %d player %d '%s' worth %.0f to '%s'; team '%s' state %d source %d, %.0f from home\n", TheGameLogic->getFrame(),
+			m_player->getPlayerIndex(), obj->getTemplate()->getName().str(), aiCombatPower( obj ), killer->getTemplate()->getName().str(),
+			team ? team->getName().str() : "", obj->getAI() ? (Int)obj->getAI()->getCurrentStateID() : -1,
+			obj->getAI() ? (Int)obj->getAI()->getLastCommandSource() : -1,
+			(Real)sqrt( sqr( obj->getPosition()->x - m_baseCenter.x ) + sqr( obj->getPosition()->y - m_baseCenter.y ) )));
 	if( isSkirmishAI() && obj->isKindOf( KINDOF_STRUCTURE ) && aiCombatPower( obj ) > 0.0f )
 		DEBUG_LOG(("AI DEFDEAD frame %d player %d '%s' worth %.0f\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
 			obj->getTemplate()->getName().str(), aiCombatPower( obj )));
@@ -4689,13 +4693,7 @@ void AIPlayer::doUpgradesAndSkills( void )
 	if (!checkScience) {
 		return;
 	}
-	const AISideInfo *sideInfo = TheAI->getAiData()->m_sideInfo;
-	while (sideInfo) {
-		if (sideInfo->m_side == m_player->getSide()) {
-			break;
-		}
-		sideInfo = sideInfo->m_next;
-	}
+	const AISideInfo *sideInfo = TheAI->getAiData()->findSideInfo( m_player );
 	if (sideInfo == NULL) return;
 
 	if (m_skillsetSelector == INVALID_SKILLSET_SELECTION) {
@@ -5153,10 +5151,9 @@ void AIPlayer::doExpansion( void )
 	* on the build list and this player can build it. */
 Bool AIPlayer::buildExpansionDefense( void )
 {
-	for( const AISideInfo *resInfo = TheAI->getAiData()->m_sideInfo; resInfo; resInfo = resInfo->m_next )
+	const AISideInfo *resInfo = TheAI->getAiData()->findSideInfo( m_player );
+	if( resInfo != NULL )
 	{
-		if( resInfo->m_side != m_player->getSide() )
-			continue;
 		const ThingTemplate *defense = TheThingFactory->findTemplate( resInfo->m_baseDefenseStructure1, FALSE );
 		if( defense == NULL )
 			return FALSE;
@@ -10402,7 +10399,7 @@ void AIPlayer::upgradeHelix( Object *helix, Int role, AIEnemyComposition *enemy,
 			enemy->m_infantry * 100.0f, (enemy->m_armour - enemy->m_air) * 100.0f));
 }
 
-Coord3D AIPlayer::rearOf( const Coord3D *from, const std::vector<AIKnownGun> &guns ) const
+Coord3D AIPlayer::rearOf( const Coord3D *from, const std::vector<AIKnownGun> &guns, Real margin ) const
 {
 	const Real dx = m_baseCenter.x - from->x;
 	const Real dy = m_baseCenter.y - from->y;
@@ -10413,7 +10410,7 @@ Coord3D AIPlayer::rearOf( const Coord3D *from, const std::vector<AIKnownGun> &gu
 	{
 		const Real x = from->x + dx * along / length;
 		const Real y = from->y + dy * along / length;
-		if( deepestReach( guns, x, y, FALSE ) < -HELIX_GUN_MARGIN )
+		if( deepestReach( guns, x, y, FALSE ) < -margin )
 		{
 			spot.set( x, y, TheTerrainLogic->getGroundHeight( x, y ) );
 			return spot;
@@ -10430,7 +10427,7 @@ Coord3D AIPlayer::rearOf( const Coord3D *from, const std::vector<AIKnownGun> &gu
 			const Real x = from->x + RAID_SIDE[ side ][ 0 ] * reach;
 			const Real y = from->y + RAID_SIDE[ side ][ 1 ] * reach;
 			if( x >= extent.lo.x && x <= extent.hi.x && y >= extent.lo.y && y <= extent.hi.y &&
-					deepestReach( guns, x, y, FALSE ) < -HELIX_GUN_MARGIN )
+					deepestReach( guns, x, y, FALSE ) < -margin )
 			{
 				spot.set( x, y, TheTerrainLogic->getGroundHeight( x, y ) );
 				return spot;
@@ -10496,7 +10493,7 @@ void AIPlayer::steerHealer( Int slot, const std::vector<AIKnownGun> &guns )
 	if( hit || antiAirNear || inReach )
 	{
 		phase = HEAL_PULLBACK;
-		spot = rearOf( pos, guns );
+		spot = rearOf( pos, guns, HELIX_GUN_MARGIN );
 	}
 	else if( helix->hasUpgrade( tower ) )
 	{
@@ -10557,7 +10554,7 @@ void AIPlayer::steerHealer( Int slot, const std::vector<AIKnownGun> &guns )
 			phase = HEAL_REAR;
 			middle.x /= out;
 			middle.y /= out;
-			spot = rearOf( &middle, guns );
+			spot = rearOf( &middle, guns, HELIX_GUN_MARGIN );
 			// sideways, alternately right and left, by a tower's reach plus the slack a lower slot's spot
 			// keeps before it is re-ordered, so a step always clears the spot it stepped away from
 			const Real dx = m_baseCenter.x - middle.x;
@@ -10678,7 +10675,7 @@ void AIPlayer::flyRaid( Int slot, const std::vector<AIKnownGun> &guns )
 			const UnsignedInt lastHit = body->getLastDamageTimestamp();
 			if( (lastHit != 0 && now - lastHit < HEALER_HIT_FRAMES) || deepestReach( guns, pos->x, pos->y, TRUE ) > -HELIX_GUN_MARGIN )
 			{
-				const Coord3D clear = rearOf( pos, guns );
+				const Coord3D clear = rearOf( pos, guns, HELIX_GUN_MARGIN );
 				ai->aiMoveToPosition( &clear, CMD_FROM_AI );
 				break;
 			}
@@ -10879,9 +10876,11 @@ void AIPlayer::doHelixes( void )
 	* on our side of the map that no known gun covers; one beside it it notices by itself
 	* (CleanupHazardUpdate::startAutoCleanup).
 	*
-	* It is a 240-health truck with no gun.  Hit in the last AMBULANCE_HIT_FRAMES or inside a known gun's
-	* reach, it drops whatever it was doing, the cleanup included, and drives AMBULANCE_PULLBACK toward
-	* home to the first ground no known gun reaches; under AMBULANCE_REPAIR_HEALTH it goes to be repaired.
+	* It is a 240-health truck with no gun.  Hit in the last AMBULANCE_HIT_FRAMES or within the margin of a
+	* known gun's reach (AIAmbulance_gunMargin, scaled to the map), it drops whatever it was doing, the
+	* cleanup included, and drives AMBULANCE_PULLBACK toward home to the first ground the margin clears,
+	* but only when that ground is clearer than where it stands; otherwise it holds.  Under
+	* AMBULANCE_REPAIR_HEALTH it goes to be repaired.
 	* Before that it parked 150 from the middle of the army and kept cleaning the toxins of the fight it
 	* stood in: 90 of 112 bought in eight 2v2 matches died, each bought again once the bank allowed.
 	* A lost one is now replaced after AMBULANCE_REBUY_FRAMES.
@@ -10903,7 +10902,19 @@ static const Real AMBULANCE_HAZARD_REACH = 1500.0f;
 /** The cleanup ability's MaxMoveDistanceFromLocation in retail AmericaVehicle.ini. */
 static const Real AMBULANCE_CLEANUP_RANGE = 300.0f;
 static const Real AMBULANCE_REORDER_DISTANCE = 100.0f;
-static const UnsignedInt AMBULANCE_HIT_FRAMES = 4 * LOGICFRAMES_PER_SECOND;
+/** By rung (Easy, Medium, Hard; Easy fields none, its values keep the table whole).  How long after a
+	* hit it stays back.  How far clear of every known gun it keeps: a share of the distance between the
+	* two bases, held between a floor and a cap.  A fixed 160 or 200 broke on the small generated maps,
+	* where its own base stood that close to known enemy guns: no ground was clear, and on 32 such matches
+	* the Hard USA pulled back 312 times against 116, at full health and unhit for minutes, cycling between
+	* its wait spot and its base.  On Twilight Flame the share reaches the cap. */
+static const UnsignedInt AMBULANCE_HIT_FRAMES[ AISKILL_COUNT ] = { 4 * LOGICFRAMES_PER_SECOND, 6 * LOGICFRAMES_PER_SECOND, 8 * LOGICFRAMES_PER_SECOND };
+static const Real AMBULANCE_MARGIN_SHARE[ AISKILL_COUNT ] = { 0.04f, 0.06f, 0.08f };
+static const Real AMBULANCE_MARGIN_MIN[ AISKILL_COUNT ] = { 40.0f, 60.0f, 80.0f };
+static const Real AMBULANCE_MARGIN_MAX[ AISKILL_COUNT ] = { 120.0f, 160.0f, 200.0f };
+/** A spot it waits at stands this share of the margin farther clear again, so a gun a step closer does
+	* not send it back the moment it gets there. */
+static const Real AMBULANCE_WAIT_SLACK = 0.5f;
 static const Real AMBULANCE_PULLBACK = 400.0f;
 static const Real AMBULANCE_REPAIR_HEALTH = 0.5f;
 static const UnsignedInt AMBULANCE_REBUY_FRAMES = 90 * LOGICFRAMES_PER_SECOND;
@@ -10932,9 +10943,33 @@ Bool AIAmbulance_mayBuyMore( Int bought, Int skill )
 	return bought < AMBULANCE_MATCH_CAP[ skill ];
 }
 
-Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReach )
+/** How far clear of every known gun it keeps, for bases baseDistance apart. */
+Real AIAmbulance_gunMargin( Real baseDistance, Int skill )
 {
-	return inGunReach || (lastHit != 0 && now - lastHit < AMBULANCE_HIT_FRAMES);
+	return clamp( AMBULANCE_MARGIN_MIN[ skill ], AMBULANCE_MARGIN_SHARE[ skill ] * baseDistance, AMBULANCE_MARGIN_MAX[ skill ] );
+}
+
+/** Hit lately, or a known gun within the margin.  clear is how far outside the reach of the gun that
+	* reaches deepest it stands, below zero when inside it. */
+Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Real clear, Real margin, Int skill )
+{
+	return clear < margin || (lastHit != 0 && now - lastHit < AMBULANCE_HIT_FRAMES[ skill ]);
+}
+
+/** Whether a pull-back moves it to ground clear by spotClear from where it stands clear by hereClear.
+	* Only to ground clearer by a reorder step: on ground no clearer, it holds where it is, which is what
+	* stops the cycle.  Hit since its last look by something it does not know of, it goes back regardless,
+	* since the known guns cannot say where the fire came from. */
+Bool AIAmbulance_movesBack( Real hereClear, Real spotClear, Bool hitSinceLook )
+{
+	return hitSinceLook || spotClear >= hereClear + AMBULANCE_REORDER_DISTANCE;
+}
+
+/** Whether it goes forward to a wait spot clear by spotClear: clear by the margin and the slack, or at
+	* least clearer than where it stands; otherwise it stays put. */
+Bool AIAmbulance_waitsAt( Real hereClear, Real spotClear, Real margin )
+{
+	return spotClear >= margin * (1.0f + AMBULANCE_WAIT_SLACK) || spotClear >= hereClear + AMBULANCE_REORDER_DISTANCE;
 }
 
 /** What becomes of each one called is in the AI PATIENT lines.  In one Hard and one Medium match (ambC,
@@ -11057,10 +11092,10 @@ void AIPlayer::doAmbulances( void )
 			++owned;
 			continue;
 		}
-		DEBUG_LOG(("AI AMBULANCE frame %d player %d loses %d at (%.0f,%.0f), %.0f from home, last seen at %.0f%% health %s a known gun's reach by %.0f, last sent to (%.0f,%.0f)\n",
+		DEBUG_LOG(("AI AMBULANCE frame %d player %d loses %d at (%.0f,%.0f), %.0f from home, last seen at %.0f%% health %s a known gun's reach by %.0f, last sent to (%.0f,%.0f), %d pull-backs %d holds\n",
 			TheGameLogic->getFrame(), m_player->getPlayerIndex(), duty.id, duty.seen.x, duty.seen.y,
 			(Real)sqrt( sqr( duty.seen.x - m_baseCenter.x ) + sqr( duty.seen.y - m_baseCenter.y ) ), duty.seenHealth * 100.0f,
-			duty.seenReach > 0.0f ? "inside" : "clear of", fabs( duty.seenReach ), duty.spot.x, duty.spot.y));
+			duty.seenReach > 0.0f ? "inside" : "clear of", fabs( duty.seenReach ), duty.spot.x, duty.spot.y, duty.pullbacks, duty.holds));
 		duty.id = INVALID_ID;
 		m_ambulanceLost = TheGameLogic->getFrame();
 	}
@@ -11150,8 +11185,26 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	// doing, a trip to be repaired included.  Sent to be repaired first, it drove the pathfinder's way to
 	// the War Factory, through whatever reached that way: 20 of 31 lost in eight matches (ambA4) died on
 	// that trip, most within a few seconds of the order and inside a known gun's reach
-	if( AIAmbulance_pullsBack( now, body->getLastDamageTimestamp(), reach > 0.0f ) )
+	//
+	// How clear it keeps scales with the map (AIAmbulance_gunMargin), and it only ever moves to clearer
+	// ground: with no clearer ground to go to it holds where it is, and it goes forward again only to a
+	// spot clear by the margin and a slack, or clearer than where it stands (AIAmbulance_waitsAt)
+	Player *enemy = getAiEnemy();
+	Coord3D enemyPos;
+	const Bool enemyPlaced = enemy && enemyStartGuess( enemy->getPlayerIndex(), &enemyPos );
+	const Real margin = enemyPlaced ?
+		AIAmbulance_gunMargin( (Real)sqrt( sqr( enemyPos.x - m_baseCenter.x ) + sqr( enemyPos.y - m_baseCenter.y ) ), m_skillLevel ) :
+		AMBULANCE_MARGIN_MAX[ m_skillLevel ];
+	const Real spotMargin = margin * (1.0f + AMBULANCE_WAIT_SLACK);
+	const Real hereClear = -reach;
+	const UnsignedInt lastHit = body->getLastDamageTimestamp();
+	if( AIAmbulance_pullsBack( now, lastHit, hereClear, margin, m_skillLevel ) )
 	{
+		const Bool hitSinceLook = lastHit != 0 && now - lastHit < (UnsignedInt)AMBULANCE_CHECK_RATE;
+		const Real sentClear = -deepestReach( guns, duty.spot.x, duty.spot.y, FALSE );
+		// on its way to clearer ground already, a repair trip included, and not hit since: it keeps going
+		if( !hitSinceLook && !cleaner->isCleaningArea() && ai->isMoving() && AIAmbulance_movesBack( hereClear, sentClear, FALSE ) )
+			return;
 		Coord3D back = *pos;
 		const Real dx = m_baseCenter.x - pos->x;
 		const Real dy = m_baseCenter.y - pos->y;
@@ -11163,16 +11216,35 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 		}
 		else
 			back = m_baseCenter;
-		Coord3D spot = rearOf( &back, guns );
-		const Bool goingThere = ai->isMoving() && sqr( spot.x - duty.spot.x ) + sqr( spot.y - duty.spot.y ) <= sqr( AMBULANCE_REORDER_DISTANCE );
-		if( !goingThere )
+		Coord3D spot = rearOf( &back, guns, spotMargin );
+		const Real spotClear = -deepestReach( guns, spot.x, spot.y, FALSE );
+		if( !AIAmbulance_movesBack( hereClear, spotClear, hitSinceLook ) )
 		{
-			DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d pulls back to (%.0f,%.0f) at %.0f%% health%s\n", now, m_player->getPlayerIndex(),
-				ambulance->getTemplate()->getName().str(), duty.id, spot.x, spot.y, body->getHealth() * 100.0f / body->getMaxHealth(),
-				cleaner->isCleaningArea() ? ", off its cleanup" : ""));
-			ai->aiMoveToPosition( &spot, CMD_FROM_SCRIPT );		// not CMD_FROM_AI, which a cleanup under way would keep
-			duty.spot = spot;
+			// no clearer ground than this: it holds here.  Driving on into worse, or cleaning, it stops
+			++duty.holds;
+			if( cleaner->isCleaningArea() || (ai->isMoving() && !AIAmbulance_movesBack( hereClear, sentClear, FALSE )) )
+			{
+				DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d holds at (%.0f,%.0f), %.0f clear against a margin of %.0f, no clearer ground; %d holds\n",
+					now, m_player->getPlayerIndex(), ambulance->getTemplate()->getName().str(), duty.id, pos->x, pos->y, hereClear, margin, duty.holds));
+				if( cleaner->isCleaningArea() )
+					cleaner->giveUpArea();
+				const Coord3D stop = *pos;
+				ai->aiMoveToPosition( &stop, CMD_FROM_SCRIPT );
+				duty.spot = stop;
+			}
+			return;
 		}
+		++duty.pullbacks;
+		DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d pulls back to (%.0f,%.0f) at %.0f%% health, %.0f clear against a margin of %.0f, to %.0f clear, hit %d s ago%s; %d pull-backs\n",
+			now, m_player->getPlayerIndex(), ambulance->getTemplate()->getName().str(), duty.id, spot.x, spot.y,
+			body->getHealth() * 100.0f / body->getMaxHealth(), hereClear, margin, spotClear,
+			lastHit != 0 ? (Int)((now - lastHit) / LOGICFRAMES_PER_SECOND) : -1, cleaner->isCleaningArea() ? ", off its cleanup" : "", duty.pullbacks));
+		// pulled off a cleanup, it leaves that ground alone from now on: the spill it was sent to was
+		// picked again the next look, and the cleanup drove it back after the same hazard under the guns
+		if( cleaner->isCleaningArea() )
+			cleaner->giveUpArea();
+		ai->aiMoveToPosition( &spot, CMD_FROM_SCRIPT );		// not CMD_FROM_AI, which a cleanup under way would keep
+		duty.spot = spot;
 		return;
 	}
 
@@ -11255,11 +11327,9 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	if( called > 0 || boarding.found )
 		return;		// no new spot while they walk over
 
-	// the nearest hazard, if it is on our side and clear of every known gun's reach by the healer's margin
-	PartitionFilterAcceptByKindOf kindFilter( MAKE_KINDOF_MASK( KINDOF_CLEANUP_HAZARD ), KINDOFMASK_NONE );
-	PartitionFilterSameMapStatus filterMapStatus( ambulance );
-	PartitionFilter *filters[] = { &kindFilter, &filterMapStatus, NULL };
-	Object *hazard = ThePartitionManager->getClosestObject( pos, AMBULANCE_HAZARD_REACH, FROM_CENTER_2D, filters );
+	// the nearest hazard, if it is on our side and clear of every known gun's reach by the healer's margin,
+	// and not on ground it gave up on
+	Object *hazard = cleaner->closestHazard( pos, AMBULANCE_HAZARD_REACH );
 	// and no farther from home than where it waits behind the army, or at home with nobody out.  Three of
 	// four lost in one Hard match (ambD) died on or after a cleanup 1,400 out, 2,100 to 2,800 from home
 	Real hazardLimit = 0.0f;
@@ -11268,13 +11338,13 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	if( hazard && isOurSideOfMap( hazard->getPosition() ) &&
 			(isAtHome( hazard->getPosition() ) ||
 				sqr( hazard->getPosition()->x - m_baseCenter.x ) + sqr( hazard->getPosition()->y - m_baseCenter.y ) <= sqr( max( hazardLimit, 0.0f ) )) &&
-			deepestReach( guns, hazard->getPosition()->x, hazard->getPosition()->y, FALSE ) < -HELIX_GUN_MARGIN )
+			deepestReach( guns, hazard->getPosition()->x, hazard->getPosition()->y, FALSE ) < -spotMargin )
 	{
 		DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d goes to clean '%s' %d at (%.0f,%.0f), %.0f away\n", now, m_player->getPlayerIndex(),
 			ambulance->getTemplate()->getName().str(), duty.id, hazard->getTemplate()->getName().str(), hazard->getID(),
 			hazard->getPosition()->x, hazard->getPosition()->y,
 			(Real)sqrt( sqr( hazard->getPosition()->x - pos->x ) + sqr( hazard->getPosition()->y - pos->y ) )));
-		cleaner->setCleanupAreaParameters( hazard->getPosition(), AMBULANCE_CLEANUP_RANGE );
+		cleaner->setCleanupAreaParameters( hazard->getPosition(), AMBULANCE_CLEANUP_RANGE, FALSE );
 		duty.spot = *hazard->getPosition();
 		return;
 	}
@@ -11292,7 +11362,7 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 		{
 			middle.x += dx * AMBULANCE_BEHIND / length;
 			middle.y += dy * AMBULANCE_BEHIND / length;
-			spot = rearOf( &middle, guns );
+			spot = rearOf( &middle, guns, spotMargin );
 		}
 	}
 	else if( isAtHome( pos ) )
@@ -11301,6 +11371,10 @@ void AIPlayer::steerAmbulance( Int slot, const std::vector<AIKnownGun> &guns )
 	const Bool moved = sqr( spot.x - duty.spot.x ) + sqr( spot.y - duty.spot.y ) > sqr( AMBULANCE_REORDER_DISTANCE );
 	const Bool away = sqr( spot.x - pos->x ) + sqr( spot.y - pos->y ) > sqr( AMBULANCE_REORDER_DISTANCE );
 	if( !moved && !(ai->isIdle() && away) )
+		return;
+	// not forward onto ground the margin does not clear: rearOf falls back to the base center when nothing
+	// is clear, and on a small map that sent it back and forth between there and its pull-back spot
+	if( !AIAmbulance_waitsAt( hereClear, -deepestReach( guns, spot.x, spot.y, FALSE ), margin ) )
 		return;
 	if( moved )
 		DEBUG_LOG(("AI AMBULANCE frame %d player %d '%s' %d waits at (%.0f,%.0f), %d units out\n", now, m_player->getPlayerIndex(),

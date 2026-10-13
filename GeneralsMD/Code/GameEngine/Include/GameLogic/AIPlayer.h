@@ -412,7 +412,7 @@ protected:
 	void steerHealer(Int slot, const std::vector<AIKnownGun> &guns);	///< a healer over our hurt behind the line, clear of every known gun
 	void flyRaid(Int slot, const std::vector<AIKnownGun> &guns);	///< a raider's bomb run on an enemy building, in and out the quiet side
 	Bool pickRaidTarget(const Object *raider, const std::vector<AIKnownGun> &guns, Object **target, Coord3D *entry, Int *gunsOnRun) const;
-	Coord3D rearOf(const Coord3D *from, const std::vector<AIKnownGun> &guns) const;	///< the nearest point toward home no known gun reaches
+	Coord3D rearOf(const Coord3D *from, const std::vector<AIKnownGun> &guns, Real margin) const;	///< the nearest point toward home no known gun reaches by margin
 	Bool isGunshipRider(const Object *obj) const;	///< infantry loadGunships may put in a transport
 	void sendIdleAttackTeams(void);	///< attack teams standing at home join the next wave instead of waiting for the script's signal
 	Real addHomeStrays(AIGroup *wave) const;	///< the default team's fighters idle at home go with the wave
@@ -573,6 +573,8 @@ protected:
 		Coord3D			seen;				///< for the log only, not saved: where it stood on the last pass
 		Real				seenHealth;	///< for the log only, not saved: its health share on the last pass
 		Real				seenReach;	///< for the log only, not saved: how deep inside a known gun's reach it stood, negative when clear
+		Int					pullbacks;	///< for the log only, not saved: pull-back orders this one was given
+		Int					holds;			///< for the log only, not saved: looks it wanted to pull back and found no clearer ground
 	};
 	enum { MAX_DUTY_AMBULANCES = 2 };
 	DutyAmbulance	m_ambulance[ MAX_DUTY_AMBULANCES ];

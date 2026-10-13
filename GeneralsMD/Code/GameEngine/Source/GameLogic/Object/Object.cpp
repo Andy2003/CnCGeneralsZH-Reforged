@@ -1078,6 +1078,11 @@ void Object::setStatus( ObjectStatusMaskType objectStatus, Bool set )
 		}
 
 
+		// a hill hides the ground under an aircraft, not the aircraft, so taking off or landing in place
+		// changes who sees it without touching a cell
+		if( m_partitionData && m_status.test( OBJECT_STATUS_AIRBORNE_TARGET ) != oldStatus.test( OBJECT_STATUS_AIRBORNE_TARGET ) )
+			m_partitionData->invalidateShroudedStatusForAllPlayers();
+
 		// when an object's construction status changes, it needs to have its partition data updated,
 		// in order to maintain the shroud correctly.
 		if( m_status.test( OBJECT_STATUS_UNDER_CONSTRUCTION ) != oldStatus.test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )

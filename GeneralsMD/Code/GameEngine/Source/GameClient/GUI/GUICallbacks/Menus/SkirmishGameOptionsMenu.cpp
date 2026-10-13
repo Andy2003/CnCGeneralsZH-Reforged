@@ -169,11 +169,12 @@ static Bool stillNeedsToSetOptions = FALSE;
 void skirmishUpdateSlotList( void );
 static void populateSkirmishBattleHonors( void );
 // The game speed dropdown, as logic frames a second against the normal LOGICFRAMES_PER_SECOND.  Half
-// speed to double.  The preference keeps the frame rate in retail 30 Hz frames, as it always did, so
-// one saved by an older build or by the old 15 to 60 slider lands on the nearest entry.
-static const Int SKIRMISH_GAME_SPEEDS[] = { LOGICFRAMES_PER_SECOND / 2, LOGICFRAMES_PER_SECOND * 3 / 4,
-	LOGICFRAMES_PER_SECOND, LOGICFRAMES_PER_SECOND * 3 / 2, LOGICFRAMES_PER_SECOND * 2 };
-static const WideChar *SKIRMISH_GAME_SPEED_CAPTIONS[] = { u"x0.5", u"x0.75", u"x1", u"x1.5", u"x2" };
+// speed to normal (ClampPlayerGameSpeed), nothing faster.  The preference keeps the frame rate in
+// retail 30 Hz frames, as it always did, so one saved by an older build, the old 15 to 60 slider or
+// the x1.5 and x2 entries this list used to have, lands on the nearest entry.
+static const Int SKIRMISH_GAME_SPEEDS[] = { PLAYER_GAME_SPEED_MIN_FPS, LOGICFRAMES_PER_SECOND * 3 / 4,
+	PLAYER_GAME_SPEED_MAX_FPS };
+static const WideChar *SKIRMISH_GAME_SPEED_CAPTIONS[] = { u"x0.5", u"x0.75", u"x1" };
 static const Int SKIRMISH_GAME_SPEED_COUNT = sizeof( SKIRMISH_GAME_SPEEDS ) / sizeof( SKIRMISH_GAME_SPEEDS[ 0 ] );
 
 static Int nearestGameSpeedIndex( Int framesPerSecond )

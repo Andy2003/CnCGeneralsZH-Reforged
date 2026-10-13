@@ -55,16 +55,46 @@
 //#pragma MESSAGE("************************************** WARNING, optimization disabled for debugging purposes")
 #endif
 
-/** Scans in a row an area cleaner stands out of reach of its hazard before it gives the area up. */
-static const Int MAX_CLEANUP_APPROACHES = 5;
+/** Scans in a row an area cleaner stays out of reach of its hazard, standing about and getting no nearer
+	to it, before it gives the area up. */
+static const Int MAX_CLEANUP_APPROACHES = 8;
 
-/** Every hazard but the one given up on. */
+/** How much nearer to its hazard a scan has to find it to count as getting there, and how far it has to
+	have driven since the last scan to count as on its way. */
+static const Real CLEANUP_PROGRESS = 10.0f;
+static const Real CLEANUP_DRIVEN = 20.0f;
+
+/** How far round the hazard it gave up on it leaves the ground alone: a toxin field is many hazards, and
+	remembering the one it gave up on, the next in the same field was gone for at once. The same reach
+	makes the hazards of one field one target for the give-up count. */
+static const Real GIVEN_UP_RADIUS = 150.0f;
+
+/** One scan of an area cleaner out of reach of its hazard: whether it counts toward giving up. It does
+	when the cleaner stands no CLEANUP_PROGRESS nearer than the nearest it had come and has driven under
+	CLEANUP_DRIVEN since the last scan. One driving round a river or a cliff gets no nearer for a while
+	but keeps moving; one at the pathfinder's nearest point to a hazard it cannot reach stands there.
+	A nearer reading becomes the new nearest. Split out for the tests. */
+Bool CleanupHazard_stalls( Real distance, Real driven, Real *closest )
+{
+	if( distance <= *closest - CLEANUP_PROGRESS )
+	{
+		*closest = distance;
+		return FALSE;
+	}
+	return driven < CLEANUP_DRIVEN;
+}
+
+/** Every hazard but those on the ground given up on. */
 class PartitionFilterRejectGivenUp : public PartitionFilter
 {
-	ObjectID m_id;
+	Bool m_any;
+	Coord3D m_pos;
 public:
-	PartitionFilterRejectGivenUp( ObjectID id ) : m_id( id ) {}
-	virtual Bool allow( Object *objOther ) { return objOther->getID() != m_id; }
+	PartitionFilterRejectGivenUp( Bool any, const Coord3D &pos ) : m_any( any ), m_pos( pos ) {}
+	virtual Bool allow( Object *objOther )
+	{
+		return !m_any || sqr( objOther->getPosition()->x - m_pos.x ) + sqr( objOther->getPosition()->y - m_pos.y ) > sqr( GIVEN_UP_RADIUS );
+	}
 #if defined(_DEBUG) || defined(_INTERNAL)
 	virtual const char* debugGetName() { return "PartitionFilterRejectGivenUp"; }
 #endif
@@ -108,8 +138,13 @@ CleanupHazardUpdate::CleanupHazardUpdate( Thing *thing, const ModuleData* module
 	m_resumeGuardMode						= GUARDMODE_NORMAL;
 	m_returning									= FALSE;
 	m_approaches								= 0;
+	m_approaching								= FALSE;
+	m_approachPos.zero();
+	m_lastScanPos.zero();
+	m_closestApproach						= 0.0f;
 	m_resumeGuardObject					= INVALID_ID;
-	m_givenUpID									= INVALID_ID;
+	m_hasGivenUp								= FALSE;
+	m_givenUpPos.zero();
 
 }
 
@@ -177,6 +212,7 @@ UpdateSleepTime CleanupHazardUpdate::update()
 				m_resumeGuard = FALSE;
 				m_returning = FALSE;
 				m_approaches = 0;
+				m_approaching = FALSE;
 				return UPDATE_SLEEP_NONE;
 			}
 		}
@@ -199,25 +235,43 @@ UpdateSleepTime CleanupHazardUpdate::update()
 	if( found )
 	{
 		m_returning = FALSE;
-		// Cleaning an area: standing still out of the weapon's reach on a scan, scan after scan, is a hazard
-		// it cannot drive up to. It gives the area up rather than order the same drive for good, and does
-		// not go for that hazard again: noticed from home, it drove the same way for the hazard's lifetime.
-		// ponytail: one hazard remembered; two out of reach side by side would take turns
-		AIUpdateInterface *ai = obj->getAI();
+		// Cleaning an area: out of the weapon's reach scan after scan, and no nearer, is a hazard it cannot
+		// drive up to. It gives the area up rather than order the same drive for good, and does not go for
+		// the ground round that hazard again: noticed from home, it drove the same way for the hazard's
+		// lifetime. Counted by distance and by how far it drove since the last scan, not by the AI state:
+		// fireWhenReady orders the drive again whenever it stops, so a scan nearly always found it moving
+		// and the count never got anywhere. Counted for the ground, not the one hazard: the nearest of a
+		// toxin field changes as it drives, and each change started the count over
 		WeaponBonus bonus;
 		bonus.clear();
-		if( m_moveRange > 0.0f && ai && (ai->isIdle() || ai->isBusy()) &&
-				ThePartitionManager->getDistanceSquared( obj, found, FROM_CENTER_2D ) > sqr( m_weaponTemplate->getAttackRange( bonus ) ) )
+		const Real distance = (Real)sqrt( ThePartitionManager->getDistanceSquared( obj, found, FROM_CENTER_2D ) );
+		if( m_moveRange > 0.0f && distance > m_weaponTemplate->getAttackRange( bonus ) )
 		{
-			if( ++m_approaches > MAX_CLEANUP_APPROACHES )
+			const Coord3D *at = found->getPosition();
+			const Coord3D *here = obj->getPosition();
+			if( !m_approaching || sqr( at->x - m_approachPos.x ) + sqr( at->y - m_approachPos.y ) > sqr( GIVEN_UP_RADIUS ) )
 			{
-				m_givenUpID = found->getID();
+				m_approaching = TRUE;
+				m_approachPos = *at;
+				m_closestApproach = distance;
+				m_approaches = 0;
+			}
+			else if( !CleanupHazard_stalls( distance, (Real)sqrt( sqr( here->x - m_lastScanPos.x ) + sqr( here->y - m_lastScanPos.y ) ), &m_closestApproach ) )
+				m_approaches = 0;
+			else if( ++m_approaches > MAX_CLEANUP_APPROACHES )
+			{
+				m_hasGivenUp = TRUE;
+				m_givenUpPos = *at;
 				finishArea( "gave up on a hazard it cannot reach", TRUE );
 				return UPDATE_SLEEP_NONE;
 			}
+			m_lastScanPos = *here;
 		}
 		else
+		{
 			m_approaches = 0;
+			m_approaching = FALSE;
+		}
 		//1 frame can make a big difference so fire ASAP!
 		fireWhenReady();
 	}
@@ -336,21 +390,16 @@ Object* CleanupHazardUpdate::scanClosestTarget()
 	Object *bestTargetInRange = NULL;
 	m_bestTargetID = INVALID_ID;
 
-	PartitionFilterAcceptByKindOf kindFilter(MAKE_KINDOF_MASK(KINDOF_CLEANUP_HAZARD), KINDOFMASK_NONE);
-	PartitionFilterSameMapStatus filterMapStatus(getObject());
-	PartitionFilterRejectGivenUp givenUpFilter( m_givenUpID );
-	PartitionFilter* filters[] = { &kindFilter, &filterMapStatus, &givenUpFilter, NULL };
-
 	if( m_moveRange > 0.0f )
 	{
 		//Look for targets around the target position only (but add scan range and move range).
 		//This case only happens when we are performing a cleanup area command.
-		bestTargetInRange = ThePartitionManager->getClosestObject( &m_pos, data->m_scanRange + m_moveRange, FROM_CENTER_2D, filters );
+		bestTargetInRange = closestHazard( &m_pos, data->m_scanRange + m_moveRange );
 	}
 	else
 	{
 		//Look for targets near me -- passive default.
-		bestTargetInRange = ThePartitionManager->getClosestObject( me->getPosition(), data->m_scanRange, FROM_CENTER_2D, filters );
+		bestTargetInRange = closestHazard( me->getPosition(), data->m_scanRange );
 	}
 
 	if( bestTargetInRange ) 
@@ -358,6 +407,25 @@ Object* CleanupHazardUpdate::scanClosestTarget()
 		m_bestTargetID = bestTargetInRange->getID();
 	}
 	return bestTargetInRange;
+}
+
+//-------------------------------------------------------------------------------------------------
+Object* CleanupHazardUpdate::closestHazard( const Coord3D *from, Real range ) const
+{
+	PartitionFilterAcceptByKindOf kindFilter(MAKE_KINDOF_MASK(KINDOF_CLEANUP_HAZARD), KINDOFMASK_NONE);
+	PartitionFilterSameMapStatus filterMapStatus(getObject());
+	PartitionFilterRejectGivenUp givenUpFilter( m_hasGivenUp, m_givenUpPos );
+	PartitionFilter* filters[] = { &kindFilter, &filterMapStatus, &givenUpFilter, NULL };
+	return ThePartitionManager->getClosestObject( from, range, FROM_CENTER_2D, filters );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The hazard it is shooting or driving at, or the middle of the area when it has none yet. */
+void CleanupHazardUpdate::giveUpArea()
+{
+	const Object *target = TheGameLogic->findObjectByID( m_bestTargetID );
+	m_givenUpPos = target ? *target->getPosition() : m_pos;
+	m_hasGivenUp = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -374,6 +442,7 @@ void CleanupHazardUpdate::finishArea( const char *why, Bool goHome )
 	m_moveRange = 0.0f;
 	m_returning = FALSE;
 	m_approaches = 0;
+	m_approaching = FALSE;
 	if( m_resumeGuard )
 	{
 		m_resumeGuard = FALSE;
@@ -418,11 +487,7 @@ void CleanupHazardUpdate::startAutoCleanup()
 	if( obj->getControllingPlayer() && obj->getControllingPlayer()->isAIDutyAmbulance( obj ) )
 		return;
 
-	PartitionFilterAcceptByKindOf kindFilter(MAKE_KINDOF_MASK(KINDOF_CLEANUP_HAZARD), KINDOFMASK_NONE);
-	PartitionFilterSameMapStatus filterMapStatus(obj);
-	PartitionFilterRejectGivenUp givenUpFilter( m_givenUpID );
-	PartitionFilter* filters[] = { &kindFilter, &filterMapStatus, &givenUpFilter, NULL };
-	if( !ThePartitionManager->getClosestObject( obj->getPosition(), data->m_scanRange + AUTO_CLEANUP_MOVE_RANGE, FROM_CENTER_2D, filters ) )
+	if( !closestHazard( obj->getPosition(), data->m_scanRange + AUTO_CLEANUP_MOVE_RANGE ) )
 		return;
 
 	m_pos = *obj->getPosition();
@@ -440,7 +505,7 @@ void CleanupHazardUpdate::startAutoCleanup()
 //-------------------------------------------------------------------------------------------------
 //This allows the unit to cleanup an area until clean, then the AI goes idle.
 //-------------------------------------------------------------------------------------------------
-void CleanupHazardUpdate::setCleanupAreaParameters( const Coord3D *pos, Real range )
+void CleanupHazardUpdate::setCleanupAreaParameters( const Coord3D *pos, Real range, Bool forgetGivenUp )
 {
 	Object *obj = getObject();
 	AIUpdateInterface *ai = obj->getAI();
@@ -452,7 +517,11 @@ void CleanupHazardUpdate::setCleanupAreaParameters( const Coord3D *pos, Real ran
 	m_resumeGuard = FALSE;
 	m_returning = FALSE;
 	m_approaches = 0;
-	m_givenUpID = INVALID_ID;		// sent on purpose, it tries every hazard there again
+	m_approaching = FALSE;
+	// a player sending it on purpose has it try every hazard there again; the computer's own orders pick
+	// round the ground given up on (closestHazard), and forgetting it here walked the next one back to it
+	if( forgetGivenUp )
+		m_hasGivenUp = FALSE;
 
 	if( ai )
 	{
@@ -479,13 +548,14 @@ void CleanupHazardUpdate::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version
 	* 2: the guard a cleanup it started by itself gives back, the walk back, the drives toward a hazard
-	* 3: the object that guard was on, the hazard given up on */
+	* 3: the object that guard was on, the hazard given up on
+	* 4: the ground given up on instead of the one hazard, and the ground it is after with how near it has come */
 // ------------------------------------------------------------------------------------------------
 void CleanupHazardUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 3;
+	XferVersion currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -521,9 +591,20 @@ void CleanupHazardUpdate::xfer( Xfer *xfer )
 		xfer->xferInt( &m_approaches );
 	}
 	if( version >= 3 )
-	{
 		xfer->xferObjectID( &m_resumeGuardObject );
-		xfer->xferObjectID( &m_givenUpID );
+	if( version == 3 )
+	{
+		ObjectID givenUpID = INVALID_ID;		// the one hazard version 3 remembered; its ground is not known
+		xfer->xferObjectID( &givenUpID );
+	}
+	if( version >= 4 )
+	{
+		xfer->xferBool( &m_hasGivenUp );
+		xfer->xferCoord3D( &m_givenUpPos );
+		xfer->xferBool( &m_approaching );
+		xfer->xferCoord3D( &m_approachPos );
+		xfer->xferCoord3D( &m_lastScanPos );
+		xfer->xferReal( &m_closestApproach );
 	}
 
 }  // end xfer

@@ -1425,7 +1425,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 		case GUI_COMMAND_PLAYER_UPGRADE:
 		{
-			if( queueMaxed )
+			if( queueMaxed || !canResearchWithStatus( obj->getStatusBits() ) )
 			{
 				return COMMAND_RESTRICTED;
 			}
@@ -1451,7 +1451,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 
 		case GUI_COMMAND_OBJECT_UPGRADE:
 		{
-			if( queueMaxed )
+			if( queueMaxed || !canResearchWithStatus( obj->getStatusBits() ) )
 			{
 				return COMMAND_RESTRICTED;
 			}

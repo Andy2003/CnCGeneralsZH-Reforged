@@ -35,6 +35,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/PlayerTemplate.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -86,6 +87,35 @@ void TAiData::addFactionBuildList(AISideBuildList *buildList)
 	}
 	buildList->m_next = m_sideBuildLists;
 	m_sideBuildLists = buildList;
+}
+
+const AISideInfo *TAiData::findSideInfo( const AsciiString &side, Int modIndex ) const
+{
+	const AsciiString own = AI::modSideKey( side, modIndex );
+	for (const AISideInfo *info = m_sideInfo; info != NULL; info = info->m_next)
+	{
+		if (info->m_side == own)
+			return info;
+	}
+	return modIndex >= 0 ? findSideInfo( side, -1 ) : NULL;
+}
+
+const AISideBuildList *TAiData::findBuildList( const AsciiString &side, Int modIndex ) const
+{
+	const AsciiString own = AI::modSideKey( side, modIndex );
+	for (const AISideBuildList *build = m_sideBuildLists; build != NULL; build = build->m_next)
+	{
+		if (build->m_side == own)
+			return build;
+	}
+	return modIndex >= 0 ? findBuildList( side, -1 ) : NULL;
+}
+
+const AISideInfo *TAiData::findSideInfo( const Player *player ) const
+{
+	// a map player whose faction is gone (an obsolete map) has no template, and plays retail's side
+	const PlayerTemplate *pt = player->getPlayerTemplate();
+	return findSideInfo( player->getSide(), pt != NULL ? pt->getModIndex() : -1 );
 }
 
 TAiData::~TAiData()
@@ -479,9 +509,65 @@ void AI::parseAiDataDefinition( INI* ini )
 
 	}  // end if
 
+	/* -modfactions: a mod's pass (INI::loadModPasses) takes only its sides' entries, filed under
+		 "M<n>~<side>" with its names already prefixed, so its factions build and train its own things.
+		 The tuning in the rest of the block stays the fork's, mods fit the fork. */
+	const Int mod = TheModNamespace.getActive();
+	if (mod >= 0)
+	{
+		TAiData *modData = NEW TAiData;
+		// the mod's AIData.ini goes over its Default\AIData.ini: what the first filed seeds this parse, so a
+		// SideInfo field the second leaves out keeps the first's value, as retail's two files merge
+		const AsciiString prefix = modSideKey( AsciiString::TheEmptyString, mod );
+		for (AISideInfo **link = &TheAI->m_aiData->m_sideInfo; *link != NULL; )
+		{
+			AISideInfo *info = *link;
+			if (!info->m_side.startsWith( prefix ))
+			{
+				link = &info->m_next;
+				continue;
+			}
+			*link = info->m_next;
+			const AsciiString side( info->m_side.str() + prefix.getLength() );
+			info->m_side = side;
+			modData->addSideInfo( info );
+		}
+		ini->initFromINI( modData, TheAIFieldParseTable );
+		Int sides = 0;
+		while (modData->m_sideInfo != NULL)
+		{
+			AISideInfo *info = modData->m_sideInfo;
+			modData->m_sideInfo = info->m_next;
+			info->m_side = modSideKey( info->m_side, mod );
+			TheAI->m_aiData->addSideInfo( info );
+			++sides;
+		}
+		Int buildLists = 0;
+		while (modData->m_sideBuildLists != NULL)
+		{
+			AISideBuildList *build = modData->m_sideBuildLists;
+			modData->m_sideBuildLists = build->m_next;
+			build->m_side = modSideKey( build->m_side, mod );
+			TheAI->m_aiData->addFactionBuildList( build );
+			++buildLists;
+		}
+		delete modData;
+		DEBUG_LOG(( "MODNS M%d~ AIData from %s: %d sides, %d skirmish build lists\n", mod + 1, ini->getFilename().str(), sides, buildLists ));
+		return;
+	}
+
 	// parse the ini weapon definition
 	ini->initFromINI( TheAI->m_aiData, TheAIFieldParseTable );
 
+}
+
+AsciiString AI::modSideKey( const AsciiString &side, Int modIndex )
+{
+	if (modIndex < 0)
+		return side;
+	AsciiString key;
+	key.format( "M%d~%s", modIndex + 1, side.str() );
+	return key;
 }
 
 

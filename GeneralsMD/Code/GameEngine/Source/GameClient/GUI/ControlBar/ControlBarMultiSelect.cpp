@@ -123,6 +123,12 @@ void ControlBar::populateMultiSelectUnitList( void )
 			m_multiSelectGroupFirst[ g ] = draw->getID();
 			m_multiSelectGroupCount++;
 		}
+		else if( !obj->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) &&
+						 TheGameClient->findDrawableByID( m_multiSelectGroupFirst[ g ] )->getObject()->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
+		{
+			// a finished building speaks for its type, so the bar shows the upgrades it can take
+			m_multiSelectGroupFirst[ g ] = draw->getID();
+		}
 		m_multiSelectGroupSize[ g ]++;
 
 	}  // end for, selected drawables

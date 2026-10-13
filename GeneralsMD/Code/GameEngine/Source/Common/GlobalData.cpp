@@ -1419,10 +1419,26 @@ void GlobalData::computeExeCRC( void )
 		exeCRC.computeCRC( &version, sizeof(UnsignedInt) );
 	}
 	// Add in MP scripts to the EXE CRC, since the game will go out of sync if they change
-	const char *scripts[] = { "Data\\Scripts\\SkirmishScripts.scb", "Data\\Scripts\\MultiplayerScripts.scb" };
-	for (Int s = 0; s < 2; ++s)
+	// -modfactions: then each mod's own SkirmishScripts.scb, which its factions' computer players run
+	// (SidesList::loadModSkirmishScripts)
+	std::vector<Int> focus( 2, FILE_FOCUS_ALL );
+	for (Int mod = 0; m_modFactions && mod < (Int)m_mods.size(); ++mod)
+		focus.push_back( mod );
+	for (size_t s = 0; s < focus.size(); ++s)
 	{
-		File *fp = TheFileSystem->openFile(scripts[s], File::READ | File::BINARY);
+		const char *script = s == 1 ? "Data\\Scripts\\MultiplayerScripts.scb" : "Data\\Scripts\\SkirmishScripts.scb";
+		File *fp = NULL;
+		if (focus[s] == FILE_FOCUS_ALL)
+		{
+			fp = TheFileSystem->openFile( script, File::READ | File::BINARY );
+		}
+		else
+		{
+			TheFileSystem->setFocus( focus[s] );
+			if (TheFileSystem->doesFileExist( script ))
+				fp = TheFileSystem->openFile( script, File::READ | File::BINARY );
+			TheFileSystem->setFocus( FILE_FOCUS_ALL );
+		}
 		if (fp == NULL)
 			continue;
 		unsigned char crcBlock[blockSize];

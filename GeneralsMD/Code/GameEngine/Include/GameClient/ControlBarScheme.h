@@ -141,7 +141,8 @@ public:
 
 	AsciiString m_name;												///< it's name
 	ICoord2D m_ScreenCreationRes;							///< Used to determine what screen res this will look the best on
-	AsciiString m_side;												///< contain what faction type this command bar was made for (used when selecting command bar by template	
+	AsciiString m_side;												///< contain what faction type this command bar was made for (used when selecting command bar by template
+	Bool m_controlBarPro;											///< read from ControlBarProReforged.ini, the bar every side wears
 	Image *m_buttonQueueImage;								///< We'll probably want each one to have it's own image.
 	Image *m_rightHUDImage;										///< We'll probably want each one to have it's own right HUD image.
 	Color m_buildUpClockColor;								///< we can setup the color for the buildup clock if we want
@@ -291,10 +292,11 @@ public:
 	void preloadAssets( TimeOfDay timeOfDay );									///< preload the assets
 
 private:
-	ControlBarScheme *findSchemeForSide( const AsciiString& side ) const;	///< the widest of that side's schemes the screen can wear
-	ControlBarScheme *findSchemeForFaction( const AsciiString& side ) const;	///< the side's own, else its country's, else America's
+	ControlBarScheme *findSchemeForSide( const AsciiString& side, Bool controlBarProOnly = FALSE ) const;	///< the widest of that side's schemes the screen can wear
+	ControlBarScheme *findSchemeForFaction( const AsciiString& side ) const;	///< the side's own ControlBar Pro scheme, else its country's, else America's
 
 	ControlBarScheme *m_currentScheme;													///< the current scheme that everythign uses
+	Bool m_loadingControlBarPro;														///< newControlBarScheme marks what it makes as ControlBar Pro's
 	Coord2D m_multiplyer;																	
 	
 	typedef std::list< ControlBarScheme* > ControlBarSchemeList;			///< list of control bar schemes

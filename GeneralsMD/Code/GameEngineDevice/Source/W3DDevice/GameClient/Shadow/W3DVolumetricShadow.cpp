@@ -4263,6 +4263,19 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 		transform.Look_At( focus + toSun * sunDistance, focus, 0.0f );
 		halfWidth = shadowMapHalfWidth( sceneCamera, transform, lowestReceiver,
 			TheTerrainRenderObject->getMaxHeight() );
+		/* The box's depth has to hold the ground its width holds.  Level ground a distance across the
+			 box toward or away from the sun sits that distance times the sun's cotangent nearer or further
+			 along the ray, so a box opened for the zoom with a low sun put the top of the screen past the
+			 far plane, lit, and clipped the casters at the near one.  The usual depth stays wherever it
+			 already covers that.  Aircraft above the highest ground count, as in wholeMapSunBox, and the
+		 sun is held where the frame's caster cull stops sweeping, so a very low sun deepens the box
+		 rather than cutting it short. */
+		const Real horizontal = WWMath::Sqrt( toSun.X * toSun.X + toSun.Y * toSun.Y );
+		const Real along = (halfWidth * horizontal + TheTerrainRenderObject->getMaxHeight()
+			+ SHADOW_MAP_WHOLE_MAP_HEADROOM - lowestReceiver) / WWMath::Max( toSun.Z, 0.01f )
+			+ SHADOW_MAP_WHOLE_MAP_DEPTH_MARGIN;
+		sunDistance = WWMath::Max( SHADOW_MAP_SUN_DISTANCE, along + SHADOW_MAP_NEAR_CLIP );
+		farClip = sunDistance + WWMath::Max( SHADOW_MAP_FAR_CLIP - SHADOW_MAP_SUN_DISTANCE, along );
 	}
 
 	CameraClass sun;
@@ -4273,14 +4286,20 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 	/* The box has to sit on whole texels of its own map, or every scroll of the camera slides the
 		 grid under the world by a fraction of a texel and every shadow edge crawls and sparkles.  The
 		 look point is taken into the sun's own frame, rounded to the texel it lands in, and taken back
-		 out: the box then moves in texel steps and a shadow that did not move does not shimmer. */
+		 out: the box then moves in texel steps and a shadow that did not move does not shimmer.  The
+		 frame it is rounded in has to stay put in the world.  Rounded in the box's own frame, which is
+		 centred on the look point, the look point is always at zero and rounds to itself: the grid
+		 slid on every scroll all the same.  The sun's frame on the world's origin turns the same way,
+		 since only the sun's direction decides that, and holds still. */
 	const Real texelWidth = (2.0f * halfWidth) / (Real)texels;
+	Matrix3D sunAtOrigin;
+	sunAtOrigin.Look_At( toSun, Vector3( 0.0f, 0.0f, 0.0f ), 0.0f );
 	Vector3 focusInSun;
-	Matrix3D::Inverse_Transform_Vector( transform, focus, &focusInSun );
+	Matrix3D::Inverse_Transform_Vector( sunAtOrigin, focus, &focusInSun );
 	focusInSun.X = WWMath::Floor( focusInSun.X / texelWidth + 0.5f ) * texelWidth;
 	focusInSun.Y = WWMath::Floor( focusInSun.Y / texelWidth + 0.5f ) * texelWidth;
 	Vector3 snapped;
-	Matrix3D::Transform_Vector( transform, focusInSun, &snapped );
+	Matrix3D::Transform_Vector( sunAtOrigin, focusInSun, &snapped );
 	transform.Look_At( snapped + toSun * sunDistance, snapped, 0.0f );
 
 	sun.Set_Transform( transform );
@@ -4439,12 +4458,10 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 		 an orthographic projection puts depth on a straight line. */
 	const Real worldPerTexel = texelWidth;
 	const Real unitsPerUnitOfDepth = farClip - SHADOW_MAP_NEAR_CLIP;
-	/* The bias is a share of that range, picked for the usual 3990 units.  The freecam's deeper box
-		 would stretch it to tens of units and lift every shadow off its caster, so it is held at the
-		 same distance in the world: six units. */
-	const Real depthBias = wholeMap
-		? SHADOW_MAP_DEPTH_BIAS * (SHADOW_MAP_FAR_CLIP - SHADOW_MAP_NEAR_CLIP) / unitsPerUnitOfDepth
-		: SHADOW_MAP_DEPTH_BIAS;
+	/* The bias is a share of that range, picked for the usual 3990 units.  The freecam's deeper box,
+		 or the usual one deepened for a low sun, would stretch it to tens of units and lift every
+		 shadow off its caster, so it is held at the same distance in the world: six units. */
+	const Real depthBias = SHADOW_MAP_DEPTH_BIAS * (SHADOW_MAP_FAR_CLIP - SHADOW_MAP_NEAR_CLIP) / unitsPerUnitOfDepth;
 
 	// -shadowtune overrules any of the four that it was given; a zero leaves the build's own.
 	const Real penumbra = (TheGlobalData->m_shadowMapPenumbra > 0.0f)

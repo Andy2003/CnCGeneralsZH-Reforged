@@ -1168,6 +1168,10 @@ void GameEngine::init( int argc, char *argv[] )
 			 it silently refuses every multiplayer join from a machine that does not have the same one. */
 		ini.load( AsciiString( "Data\\INI\\FXListReforged.ini" ), INI_LOAD_OVERWRITE, &xferCRC );
 		initFactionSubsystem(TheWeaponStore,"TheWeaponStore", MSGNEW("GameEngineSubsystem") WeaponStore(), &xferCRC, NULL, "Data\\INI\\Weapon.ini");
+		/* Weapons of the fork's own that BalanceReforged.ini hands out.  It cannot add one, and borrowing
+			 one of EA's that nothing fires broke under a mod whose Weapon.ini leaves it out (Contra's Paladin
+			 found no infantry laser and crashed); a new name here exists whatever Weapon.ini loaded. */
+		ini.load( AsciiString( "Data\\INI\\WeaponReforged.ini" ), INI_LOAD_OVERWRITE, &xferCRC );
 		initFactionSubsystem(TheObjectCreationListStore,"TheObjectCreationListStore", MSGNEW("GameEngineSubsystem") ObjectCreationListStore(), &xferCRC, "Data\\INI\\Default\\ObjectCreationList.ini", "Data\\INI\\ObjectCreationList.ini");
 		/* Lists EA left out or got wrong, before any object names one: a list parsed again is cleared
 			 and replaced whole, and a new name is simply added. */
@@ -1224,6 +1228,11 @@ void GameEngine::init( int argc, char *argv[] )
 
 	
 		initSubsystem(TheAI,"TheAI", MSGNEW("GameEngineSubsystem") AI(), &xferCRC,  "Data\\INI\\Default\\AIData.ini", "Data\\INI\\AIData.ini");
+		/* -modfactions: each mod's sides' build lists and skill sets, under "M<n>~<side>".  Unlike the
+			 other faction files this one reads the mod's Default\ copy too: ShockWave and The End of Days
+			 keep their whole AIData there, as retail does, and End of Days' AIData.ini is an empty block. */
+		INI::loadModPasses( "Data\\INI\\Default\\AIData.ini", &xferCRC );
+		INI::loadModPasses( "Data\\INI\\AIData.ini", &xferCRC );
 		initSubsystem(TheGameLogic,"TheGameLogic", createGameLogic(), NULL);
 		initSubsystem(TheTeamFactory,"TheTeamFactory", MSGNEW("GameEngineSubsystem") TeamFactory(), NULL);
 		initSubsystem(TheCrateSystem,"TheCrateSystem", MSGNEW("GameEngineSubsystem") CrateSystem(), &xferCRC, "Data\\INI\\Default\\Crate.ini", "Data\\INI\\Crate.ini");

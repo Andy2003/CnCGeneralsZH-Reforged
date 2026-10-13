@@ -952,13 +952,28 @@ Bool ThingTemplate::removeModuleInfo(const AsciiString& moduleToRemove, AsciiStr
 }
 
 //-------------------------------------------------------------------------------------------------
+void ArmorTemplateSet::parseArmor( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ )
+{
+	ArmorTemplateSet* self = (ArmorTemplateSet*)instance;
+	const char *name = ini->getNextToken();
+	if (strcasecmp(name, "None") == 0)
+	{
+		self->m_template = NULL;
+		return;
+	}
+	self->m_template = TheArmorStore->findArmorTemplate(name);
+	// ThingTemplate::parseArmorTemplateSet passes over a patch file's set that names an armor a mod dropped
+	self->m_namesMissingArmor = (self->m_template == NULL);
+}
+
+//-------------------------------------------------------------------------------------------------
 /// @todo srj -- move this to another file
 void ArmorTemplateSet::parseArmorTemplateSet( INI* ini )
 {
-	static const FieldParse myFieldParse[] = 
+	static const FieldParse myFieldParse[] =
 	{
 		{ "Conditions", ArmorSetFlags::parseFromINI, NULL, offsetof( ArmorTemplateSet, m_types ) },
-		{ "Armor", INI::parseArmorTemplate,	NULL, offsetof( ArmorTemplateSet, m_template ) },
+		{ "Armor", ArmorTemplateSet::parseArmor,	NULL, 0 },
 		{ "DamageFX",	INI::parseDamageFX,	NULL, offsetof( ArmorTemplateSet, m_fx ) },
 		{ 0, 0, 0, 0 }
 	};
@@ -970,14 +985,26 @@ void ArmorTemplateSet::parseArmorTemplateSet( INI* ini )
 void ThingTemplate::parseArmorTemplateSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ )
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
+	ArmorTemplateSet ws;
+	ws.parseArmorTemplateSet(ini);
+
+	/* A patch file's set naming an armor the loaded data lacks would leave the object with no armor
+		 at all under those conditions, every hit at full damage: Contra has no ChemSuitHumanArmor, so
+		 FixesReforged.ini stripped its Rangers' Chemical Suits.  The object keeps the set it had. */
+	if (ini->getLoadType() == INI_LOAD_MULTIFILE && ws.namesMissingArmor())
+	{
+		// a nameless template is ThingFactory's scratch for a patch of a missing object, logged there
+		if (self->getName().isNotEmpty())
+			DEBUG_LOG(("[LINE: %d - FILE: '%s'] ArmorSet on %s names an armor that is not defined; the set is skipped.\n",
+				ini->getLineNum(), ini->getFilename().str(), self->getName().str()));
+		return;
+	}
+
 	if (self->m_armorCopiedFromDefault == TRUE)
 	{
 		self->m_armorCopiedFromDefault = FALSE;
 		self->m_armorTemplateSets.clear();
 	}
-
-	ArmorTemplateSet ws;
-	ws.parseArmorTemplateSet(ini);
 	self->m_armorTemplateSetFinder.clear();
 	if (ini->getLoadType() == INI_LOAD_MULTIFILE)
 	{
@@ -1010,14 +1037,28 @@ void ThingTemplate::parseArmorTemplateSet( INI* ini, void *instance, void * /*st
 void ThingTemplate::parseWeaponTemplateSet( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ )
 {
 	ThingTemplate* self = (ThingTemplate*)instance;
+	WeaponTemplateSet ws;
+	ws.parseWeaponTemplateSet(ini, self);
+
+	/* A patch file's set naming a weapon the loaded data lacks would arm the object with nothing in
+		 that slot: FixesReforged.ini's Toxin Tunnel Defender and Stinger sets name EA's Chem_ rockets,
+		 which Contra's Weapon.ini leaves out, so Contra's own two went unarmed.  The object keeps the
+		 set it had, as a patch naming a missing object or module is passed over. */
+	if (ini->getLoadType() == INI_LOAD_MULTIFILE && ws.namesMissingWeapon())
+	{
+		// a nameless template is ThingFactory's scratch for a patch of a missing object, already logged
+		// there and thrown away with everything in it (GC_Chem_GLAScudStorm under Contra)
+		if (self->getName().isNotEmpty())
+			DEBUG_LOG(("[LINE: %d - FILE: '%s'] WeaponSet on %s names a weapon that is not defined; the set is skipped.\n",
+				ini->getLineNum(), ini->getFilename().str(), self->getName().str()));
+		return;
+	}
+
 	if (self->m_weaponsCopiedFromDefault == TRUE)
 	{
 		self->m_weaponsCopiedFromDefault = FALSE;
 		self->m_weaponTemplateSets.clear();
 	}
-
-	WeaponTemplateSet ws;
-	ws.parseWeaponTemplateSet(ini, self);
 	self->m_weaponTemplateSetFinder.clear();
 	if (ini->getLoadType() == INI_LOAD_MULTIFILE)
 	{

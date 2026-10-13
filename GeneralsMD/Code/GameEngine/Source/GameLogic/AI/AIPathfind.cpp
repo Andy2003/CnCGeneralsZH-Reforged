@@ -11416,6 +11416,12 @@ Bool Pathfinder::isAttackViewBlockedByObstacle(const Object* attacker, const Coo
 		return false;
 	}
 
+	// An aircraft needs no line of sight and shoots down over the hill or the roof it hides behind, so
+	// whatever it shoots at may shoot back the same way. isViewBlockedByObstacle let flyers through
+	// already; the attack states call this directly and stood behind the hill instead of firing.
+	if (victim && victim->isSignificantlyAboveTerrain())
+		return false;
+
 // srj sez: this is a good start at taking terrain into account for attacks, but findAttackPath needs to be smartened also
 #define LOS_TERRAIN
 #ifdef LOS_TERRAIN

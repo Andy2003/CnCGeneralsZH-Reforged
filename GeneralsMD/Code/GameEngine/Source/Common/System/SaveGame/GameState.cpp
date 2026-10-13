@@ -844,9 +844,10 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 	}  // end if
 
 	// A loaded match played at the default 30 whatever speed it was saved at: the reset during the
-	// load puts the default back, and nothing kept the speed. A mission save starts its map afresh.
+	// load puts the default back, and nothing kept the speed. A mission save starts its map afresh. A
+	// save from when the speed went past normal comes back at normal.
 	if( getSaveGameInfo()->saveFileType != SAVE_FILE_TYPE_MISSION && getSaveGameInfo()->framesPerSecond > 0 )
-		TheGameEngine->setFramesPerSecondLimit( getSaveGameInfo()->framesPerSecond );
+		TheGameEngine->setFramesPerSecondLimit( ClampPlayerGameSpeed( getSaveGameInfo()->framesPerSecond ) );
 
 	//
 	// when loading a mission save, we want to do as much normal loading stuff as we

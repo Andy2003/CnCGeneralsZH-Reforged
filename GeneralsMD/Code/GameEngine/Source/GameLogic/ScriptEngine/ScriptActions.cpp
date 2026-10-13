@@ -7049,8 +7049,12 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			else
 			{
-				// the map asks for a 30 Hz logic rate; 30 is normal speed
-				TheGameEngine->setFramesPerSecondLimit(ConvertRetailFrames(pAction->getParameter(0)->getInt()));
+				// the map asks for a 30 Hz logic rate; 30 is normal speed.  A mission or skirmish map gets
+				// half speed to normal like the player does, never faster
+				Int fps = ConvertRetailFrames(pAction->getParameter(0)->getInt());
+				if (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
+					fps = ClampPlayerGameSpeed(fps);
+				TheGameEngine->setFramesPerSecondLimit(fps);
 			}
 			// Setting the fps limit doesn't do much good if we don't use it.  jba.
 			TheWritableGlobalData->m_useFpsLimit = true; 

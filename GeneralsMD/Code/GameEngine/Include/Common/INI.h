@@ -207,6 +207,12 @@ public:
 	/// set.  Finders ask this on a miss, so a definition of the mod's own X never falls through to retail's.
 	Bool findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const;
 	Bool findRetailKey( NameKeyType key, ModNameType type, NameKeyType *retailKey ) const;
+	/// "M<n>~name" when mod n defines a `type` called name, else name: how a mod's own data that is not INI
+	/// (its SkirmishScripts.scb) names its things
+	AsciiString modName( Int mod, ModNameType type, const AsciiString &name ) const;
+	/// where the file name in a path-shaped word starts, past its last '\\' or '/': "Sub\\x.mp3" gives 4.
+	/// The prefix goes there, since FileSystem::splitModName reads it on the last part only
+	static size_t lastPathPart( const std::string &word );
 
 	static const char *const FactionFiles[];		///< what scanMods reads and the mod passes load, NULL-ended; no ".ini" is a directory
 

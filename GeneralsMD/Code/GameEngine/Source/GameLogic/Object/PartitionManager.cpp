@@ -1262,6 +1262,7 @@ PartitionCell::PartitionCell()
 		// Default is "passive shroud".  1,0.
 		m_shroudLevel[i].m_currentShroud = 1;
 		m_shroudLevel[i].m_activeShroudLevel = 0;
+		m_airLookers[i] = 0;
 
 		// default cash value is 0
 		m_cashValue[i] = 0;
@@ -1419,6 +1420,23 @@ void PartitionCell::removeShrouder( Int playerIndex )
 }
 
 //-----------------------------------------------------------------------------
+/** Only an aircraft reads the air count, and only where the ground is not in sight; the objects here
+	think again whenever the air over a cell comes into sight or goes out of it. */
+void PartitionCell::addAirLooker( Int playerIndex )
+{
+	if( m_airLookers[playerIndex]++ == 0 )
+		invalidateShroudedStatusForAllCois( playerIndex );
+}
+
+//-----------------------------------------------------------------------------
+void PartitionCell::removeAirLooker( Int playerIndex )
+{
+	DEBUG_ASSERTCRASH( m_airLookers[playerIndex] > 0, ("removeAirLooker on a cell nobody looks over") );
+	if( --m_airLookers[playerIndex] == 0 )
+		invalidateShroudedStatusForAllCois( playerIndex );
+}
+
+//-----------------------------------------------------------------------------
 //Bool PartitionCell::isShroudedForPlayer( Int playerIndex ) const
 //{
 	// There isn't an absolute answer.  This cell is only shrouded in regards to a person
@@ -1565,12 +1583,16 @@ void PartitionCell::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	// 2: m_airLookers
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
 	// xfer shroud data
 	xfer->xferUser( &m_shroudLevel, sizeof( ShroudLevel ) * MAX_PLAYER_COUNT );
+
+	if( version >= 2 )
+		xfer->xferUser( &m_airLookers, sizeof( m_airLookers ) );
 
 }  // end xfer
 
@@ -1713,9 +1735,14 @@ ObjectShroudStatus PartitionData::getShroudedStatus(Int playerIndex)
 #endif
 		Int shroudedCells = 0;
 		Int foggedCells = 0;
+		// a hill or a roof hides the ground behind it, not the aircraft flying over it: whoever it can
+		// see and shoot at sees it back
+		const Bool inTheAir = m_object && m_object->isAirborneTarget();
 		CellAndObjectIntersection* coi = m_coiArray;
 		for (Int i = m_coiInUseCount; i; --i, ++coi)
 		{
+			if( inTheAir && coi->getCell()->isAirSeenByPlayer(playerIndex) )
+				continue;
 			if( coi->getCell()->getShroudStatusForPlayer(playerIndex) == CELLSHROUD_SHROUDED )
 				++shroudedCells;
 			else if( coi->getCell()->getShroudStatusForPlayer(playerIndex) == CELLSHROUD_FOGGED )
@@ -4327,11 +4354,31 @@ static void hLineRecordedLooker( Int x1, Int x2, Int y, void *lookersVoid )
 			continue;
 
 		PartitionCell *cell = ThePartitionManager->getCellAt( x, y );
-		if( lookers->m_reveal )
-			cell->addLooker( lookers->m_playerIndex );
-		else
-			cell->removeLooker( lookers->m_playerIndex );
+		if( revealed[ x ] & SIGHT_CELL_GROUND )
+		{
+			if( lookers->m_reveal )
+				cell->addLooker( lookers->m_playerIndex );
+			else
+				cell->removeLooker( lookers->m_playerIndex );
+		}
+		if( revealed[ x ] & SIGHT_CELL_AIR )
+		{
+			if( lookers->m_reveal )
+				cell->addAirLooker( lookers->m_playerIndex );
+			else
+				cell->removeAirLooker( lookers->m_playerIndex );
+		}
 	}
+}
+
+//-----------------------------------------------------------------------------
+UnsignedByte PartitionManager_sightCellFlags( Bool groundRevealed, Int offsetX, Int offsetY, Int flatCellRadius )
+{
+	// r * ( r + 1 ) rather than r squared, as for the ground: the Bresenham circle keeps every cell of it
+	UnsignedByte flags = groundRevealed ? SIGHT_CELL_GROUND : 0;
+	if( offsetX * offsetX + offsetY * offsetY <= flatCellRadius * ( flatCellRadius + 1 ) )
+		flags |= SIGHT_CELL_AIR;
+	return flags;
 }
 
 //-----------------------------------------------------------------------------
@@ -4454,18 +4501,19 @@ void PartitionManager::doBlockedShroudReveal( SightingInfo *sighting, const Obje
 	// r * ( r + 1 ) rather than r squared: the circle the reveal is drawn with is a Bresenham one,
 	// and on flat ground this has to keep every cell of it
 	const Bool stretched = sighting->m_howFar > flatRange;
+	const Int flatCellRadius = sightCellRadius( flatRange );
 	sighting->m_revealedCells.resize( side * side );
 	for( Int cell = 0; cell < side * side; ++cell )
 	{
+		const Int offsetX = cell % side - cellRadius;
+		const Int offsetY = cell / side - cellRadius;
 		Bool revealed = sightMargin[ cell ] >= 0.0f;
 		if( revealed && stretched )
 		{
-			const Int offsetX = cell % side - cellRadius;
-			const Int offsetY = cell / side - cellRadius;
 			const Int reachCells = sightCellRadius( Weapon_elevatedRange( looker, flatRange, heights[ cell ] ) );
 			revealed = offsetX * offsetX + offsetY * offsetY <= reachCells * ( reachCells + 1 );
 		}
-		sighting->m_revealedCells[ cell ] = revealed;
+		sighting->m_revealedCells[ cell ] = PartitionManager_sightCellFlags( revealed, offsetX, offsetY, flatCellRadius );
 	}
 
 	applyRecordedReveal( sighting, TRUE );
@@ -5805,6 +5853,10 @@ PartitionFilterLineOfSight::PartitionFilterLineOfSight(const Object *obj)
 Bool PartitionFilterLineOfSight::allow(Object *objOther)
 {
 	// objOther is guaranteed to be non-null, so we don't need to check (srj)
+
+	// a hill or a roof does not hide what flies over it (see Pathfinder::isAttackViewBlockedByObstacle)
+	if (objOther->isSignificantlyAboveTerrain())
+		return true;
 
 	if (!ThePartitionManager->isClearLineOfSightTerrain(m_obj, *m_obj->getPosition(), objOther, *objOther->getPosition()))
 		return false;

@@ -146,7 +146,7 @@ static AsciiString runCheat( const ConsoleCheat &cheat, AsciiString arguments )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The game speed as a share of normal, the same thing numpad plus and minus move.  It changes how
+/** The game speed as a share of normal, 50 to 100 in a skirmish or mission, 17 to 666 in a replay.  It changes how
 	* often a logic frame runs and nothing inside one, so a network game, which runs at the pace the
 	* whole room agrees on, is the one place it is refused. */
 //-------------------------------------------------------------------------------------------------
@@ -168,7 +168,12 @@ static AsciiString runSpeed( AsciiString arguments )
 		Int percent = arguments.compareNoCase( "reset" ) == 0 ? SPEED_NORMAL_PERCENT : atoi( arguments.str() );
 		if( percent < SPEED_MIN_PERCENT ) percent = SPEED_MIN_PERCENT;
 		if( percent > SPEED_MAX_PERCENT ) percent = SPEED_MAX_PERCENT;
-		TheGameEngine->setFramesPerSecondLimit( percent * LOGICFRAMES_PER_SECOND / SPEED_NORMAL_PERCENT );
+		Int fps = percent * LOGICFRAMES_PER_SECOND / SPEED_NORMAL_PERCENT;
+		// a match someone plays goes no faster than normal and no slower than half; a replay keeps the
+		// whole range
+		if( TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame() )
+			fps = ClampPlayerGameSpeed( fps );
+		TheGameEngine->setFramesPerSecondLimit( fps );
 	}
 
 	result.format( "speed %d%%", TheGameEngine->getFramesPerSecondLimit() * SPEED_NORMAL_PERCENT / LOGICFRAMES_PER_SECOND );

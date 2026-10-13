@@ -678,6 +678,206 @@ TEST(balance_patch_edits_a_weapon_in_place)
 	remove( TEST_INI );
 }
 
+#include "../Stubs/NullAudioManager.h"
+
+/* The Paladin's infantry laser, the second point defense module BalanceReforged.ini gives it, once
+	 borrowed EA's WatchTowerMachineGun.  Contra's Weapon.ini leaves that weapon out, the MULTIFILE
+	 block for it was dropped as the test above wants, the module got a null template and
+	 PointDefenseLaserUpdate::scanClosestTarget crashed on it.  The weapon is the fork's own now, in
+	 WeaponReforged.ini, loaded the way GameEngine::init loads it: it has to come out whole from a
+	 store that holds none of EA's weapons, which is what a mod's Weapon.ini can leave. */
+TEST(weapon_reforged_ini_makes_the_paladin_infantry_laser_without_eas_weapons)
+{
+	CHECK( bootOnce() );
+
+	if( TheWeaponStore == NULL )
+		TheWeaponStore = NEW WeaponStore;
+	if( TheFXListStore == NULL )
+		TheFXListStore = NEW FXListStore;
+
+	/* the fire FX the weapon names; retail has it, Contra does not, and a missing one reads as none */
+	writeFile( TEST_INI,
+		"FXList WeaponFX_PaladinPointDefenseLaser\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+	remove( TEST_INI );
+
+	CHECK( TheWeaponStore->findWeaponTemplate( "WatchTowerMachineGun" ) == NULL );
+
+	/* EA's death weapons in the file carry a FireSound, which the parser looks up in TheAudio: the
+		 silent device answers with an empty event table, as the game's would for a sound it lacks */
+	AudioManager *savedAudio = TheAudio;
+	if( savedAudio == NULL )
+		TheAudio = NEW NullAudioManager;
+
+	Bool threw = FALSE;
+	try
+	{
+		INI ini;
+		ini.load( AsciiString( WEAPON_REFORGED_INI ), INI_LOAD_OVERWRITE, NULL );
+	}
+	catch( ... )
+	{
+		threw = TRUE;
+	}
+	CHECK( threw == FALSE );
+
+	if( savedAudio == NULL )
+	{
+		delete TheAudio;
+		TheAudio = NULL;
+	}
+
+	const WeaponTemplate *laser = TheWeaponStore->findWeaponTemplate( "Reforged_PaladinInfantryLaser" );
+	CHECK( laser != NULL );
+	if( laser == NULL )
+		return;
+	WeaponBonus noBonus;
+	CHECK_NEAR( laser->getPrimaryDamage( noBonus ), 100.0f, 0.01f );
+	CHECK_NEAR( laser->getUnmodifiedAttackRange(), 65.0f, 0.01f );
+	CHECK_EQ( laser->getClipSize(), 2 );
+	CHECK_STR( laser->getLaserName().str(), "PointDefenseLaserBeam" );
+}
+
+/* WeaponReforged.ini also keeps copies of EA weapons FixesReforged.ini hands out, under EA's names,
+	 for a mod whose Weapon.ini dropped them.  Where the weapon is already defined the copy is read and
+	 dropped and the first definition stands; this used to return mid-block, and the next field line
+	 threw as an unknown block. */
+TEST(weapon_defined_twice_keeps_the_first_and_reads_on)
+{
+	CHECK( bootOnce() );
+
+	if( TheWeaponStore == NULL )
+		TheWeaponStore = NEW WeaponStore;
+
+	writeFile( TEST_INI,
+		"Weapon TwiceDefinedProbeGun\r\n"
+		"  PrimaryDamage = 60.0\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+
+	writeFile( TEST_INI,
+		"Weapon TwiceDefinedProbeGun\r\n"
+		"  PrimaryDamage = 5.0\r\n"
+		"  AttackRange = 999.0\r\n"
+		"End\r\n"
+		"Weapon TwiceDefinedProbeGunAfter\r\n"
+		"  PrimaryDamage = 7.0\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+
+	WeaponBonus noBonus;
+	const WeaponTemplate *first = TheWeaponStore->findWeaponTemplate( "TwiceDefinedProbeGun" );
+	CHECK( first != NULL );
+	if( first != NULL )
+		CHECK_NEAR( first->getPrimaryDamage( noBonus ), 60.0f, 0.01f );
+	const WeaponTemplate *after = TheWeaponStore->findWeaponTemplate( "TwiceDefinedProbeGunAfter" );
+	CHECK( after != NULL );
+	if( after != NULL )
+		CHECK_NEAR( after->getPrimaryDamage( noBonus ), 7.0f, 0.01f );
+
+	remove( TEST_INI );
+}
+
+#include "GameLogic/ArmorSet.h"
+
+/* FixesReforged.ini's Toxin Tunnel Defender and Stinger sets name EA's Chem_ rockets and its Ranger
+	 armor set names ChemSuitHumanArmor; Contra keeps those objects and drops the weapons and the armor.
+	 Applied anyway, the set left a null in each slot: Contra's two went unarmed and its Rangers took
+	 every hit at full damage after Chemical Suits.  A patch set naming a missing weapon or armor is
+	 skipped now and the object keeps its own; a set that names what exists still applies. */
+TEST(patch_set_naming_a_missing_weapon_or_armor_is_skipped)
+{
+	CHECK( bootOnce() );
+
+	GlobalData *savedGlobals = TheWritableGlobalData;
+	if( savedGlobals == NULL )
+		TheWritableGlobalData = NEW GlobalData;
+	if( TheModuleFactory == NULL )
+	{
+		TheModuleFactory = NEW ModuleFactory;
+		TheModuleFactory->init();
+	}
+	if( TheThingFactory == NULL )
+		TheThingFactory = NEW ThingFactory;
+	if( TheWeaponStore == NULL )
+		TheWeaponStore = NEW WeaponStore;
+	if( TheArmorStore == NULL )
+		TheArmorStore = NEW ArmorStore;
+
+	writeFile( TEST_INI,
+		"Weapon MissingSetProbeGunA\r\n"
+		"  PrimaryDamage = 10.0\r\n"
+		"End\r\n"
+		"Weapon MissingSetProbeGunB\r\n"
+		"  PrimaryDamage = 20.0\r\n"
+		"End\r\n"
+		"Armor MissingSetProbeArmor\r\n"
+		"  Armor = SMALL_ARMS 50%\r\n"
+		"End\r\n"
+		"Object MissingSetProbe\r\n"
+		"  WeaponSet\r\n"
+		"    Conditions = None\r\n"
+		"    Weapon = PRIMARY MissingSetProbeGunA\r\n"
+		"  End\r\n"
+		"  ArmorSet\r\n"
+		"    Conditions = None\r\n"
+		"    Armor = MissingSetProbeArmor\r\n"
+		"  End\r\n"
+		"End\r\n" );
+	CHECK( loadIni( TEST_INI ) );
+
+	writeFile( TEST_INI,
+		"Object MissingSetProbe\r\n"
+		"  WeaponSet\r\n"
+		"    Conditions = None\r\n"
+		"    Weapon = PRIMARY MissingSetProbeGunNotDefined\r\n"
+		"  End\r\n"
+		"  WeaponSet\r\n"
+		"    Conditions = PLAYER_UPGRADE\r\n"
+		"    Weapon = PRIMARY MissingSetProbeGunB\r\n"
+		"  End\r\n"
+		"  ArmorSet\r\n"
+		"    Conditions = None\r\n"
+		"    Armor = MissingSetProbeArmorNotDefined\r\n"
+		"  End\r\n"
+		"End\r\n" );
+	Bool threw = FALSE;
+	try
+	{
+		INI patch;
+		patch.load( AsciiString( TEST_INI ), INI_LOAD_MULTIFILE, NULL );
+	}
+	catch( ... )
+	{
+		threw = TRUE;
+	}
+	CHECK( threw == FALSE );
+
+	const ThingTemplate *probe = TheThingFactory->findTemplate( "MissingSetProbe" );
+	CHECK( probe != NULL );
+	if( probe != NULL )
+	{
+		const WeaponTemplateSetVector &sets = probe->getWeaponTemplateSets();
+		CHECK_EQ( (Int)sets.size(), 2 );
+		CHECK( sets[ 0 ].getNth( PRIMARY_WEAPON ) == TheWeaponStore->findWeaponTemplate( "MissingSetProbeGunA" ) );
+		CHECK( sets[ 1 ].getNth( PRIMARY_WEAPON ) == TheWeaponStore->findWeaponTemplate( "MissingSetProbeGunB" ) );
+
+		ArmorSetFlags none;
+		const ArmorTemplateSet *armor = probe->findArmorTemplateSet( none );
+		CHECK( armor != NULL );
+		if( armor != NULL )
+			CHECK( armor->getArmorTemplate() == TheArmorStore->findArmorTemplate( "MissingSetProbeArmor" ) );
+	}
+
+	remove( TEST_INI );
+	if( savedGlobals == NULL )
+	{
+		delete TheWritableGlobalData;
+		TheWritableGlobalData = NULL;
+	}
+}
+
 /* BalanceReforged.ini replaces Tank_ChinaBunker's ModuleTag_05 with a StructureBody.  Under the
 	 Shockwave mod that tag holds another module, and the type check in ThingTemplate::parseModuleName
 	 threw and stopped the game at start.  The block is skipped now: the template keeps the module it
@@ -2219,6 +2419,23 @@ TEST(bitflags_types_keep_their_own_name_tables)
 	CHECK_STR( KindOfMaskType::getBitNames()[0], "OBSTACLE" );
 	CHECK_EQ( KindOfMaskType::getSingleBitFromName("STRUCTURE"), (Int)KINDOF_STRUCTURE );
 	CHECK_EQ( ModelConditionFlags::getSingleBitFromName("RUBBLE"), (Int)MODELCONDITION_RUBBLE );
+}
+
+/* Selecting a finished Cold Fusion Reactor with ones still going up let the control rods be
+   bought on the unfinished ones too.  ProductionUpdate now refuses research on a building that
+   is under construction or being sold, and the command bar greys the button the same way. */
+TEST(no_upgrade_research_on_unfinished_or_sold_buildings)
+{
+	ObjectStatusMaskType status;
+	CHECK( canResearchWithStatus( status ) );
+	status.set( OBJECT_STATUS_UNDER_CONSTRUCTION );
+	CHECK( !canResearchWithStatus( status ) );
+	status.set( OBJECT_STATUS_UNDER_CONSTRUCTION, 0 );
+	status.set( OBJECT_STATUS_SOLD );
+	CHECK( !canResearchWithStatus( status ) );
+	status.set( OBJECT_STATUS_SOLD, 0 );
+	status.set( OBJECT_STATUS_RECONSTRUCTING );
+	CHECK( canResearchWithStatus( status ) );
 }
 
 /* GameWindowManager.cpp: destroying a modal window that is not the top of the modal stack
@@ -4035,6 +4252,18 @@ TEST(controlbar_seconds_round_up_and_never_reach_zero_early)
 	/* the one that matters - a single frame of work left still says 1s, because a button with
 	   work left on it reading 0s looks finished when it is not */
 	CHECK_EQ( ControlBar_secondsFromFrames( 1.0f ), 1 );
+}
+
+TEST(player_game_speed_is_half_to_normal)
+{
+	/* A skirmish or mission runs from half speed to normal and never faster: the menu, the console,
+	   a saved game and a map script all clamp to this. An old x2 preference or save comes back at x1. */
+	CHECK_EQ( ClampPlayerGameSpeed( LOGICFRAMES_PER_SECOND * 2 ), LOGICFRAMES_PER_SECOND );
+	CHECK_EQ( ClampPlayerGameSpeed( LOGICFRAMES_PER_SECOND * 3 / 2 ), LOGICFRAMES_PER_SECOND );
+	CHECK_EQ( ClampPlayerGameSpeed( LOGICFRAMES_PER_SECOND ), LOGICFRAMES_PER_SECOND );
+	CHECK_EQ( ClampPlayerGameSpeed( LOGICFRAMES_PER_SECOND * 3 / 4 ), LOGICFRAMES_PER_SECOND * 3 / 4 );
+	CHECK_EQ( ClampPlayerGameSpeed( LOGICFRAMES_PER_SECOND / 2 ), LOGICFRAMES_PER_SECOND / 2 );
+	CHECK_EQ( ClampPlayerGameSpeed( ConvertRetailFrames( 5 ) ), LOGICFRAMES_PER_SECOND / 2 );
 }
 
 TEST(controlbar_seconds_are_real_seconds_at_the_current_game_speed)
@@ -7769,6 +7998,20 @@ TEST(a_unit_does_not_see_over_a_hill)
 	CHECK( sightMargin[ middleRow + side - 1 ] >= 0.0f );
 }
 
+/** A Comanche hovering behind a hill shot at tanks that could not see it. The hill hides the ground
+	 behind it, never the air over it: inside the looker's flat range the air is in sight wherever the
+	 ground is not, and past that range neither is. */
+TEST(a_hill_hides_the_ground_behind_it_not_the_aircraft_over_it)
+{
+	CHECK( PartitionManager_sightCellFlags( FALSE, 3, 0, 4 ) == SIGHT_CELL_AIR );
+	CHECK( PartitionManager_sightCellFlags( TRUE, 3, 0, 4 ) == ( SIGHT_CELL_GROUND | SIGHT_CELL_AIR ) );
+	CHECK( PartitionManager_sightCellFlags( FALSE, 4, 2, 4 ) == SIGHT_CELL_AIR );
+	CHECK( PartitionManager_sightCellFlags( FALSE, 5, 0, 4 ) == 0 );
+
+	// high ground stretches the ground sight past the flat range; the air stays at the flat range
+	CHECK( PartitionManager_sightCellFlags( TRUE, 6, 0, 4 ) == SIGHT_CELL_GROUND );
+}
+
 /** Since the plan reveals nothing, the fog it was placed in would swallow it - and there would be
 	 nothing left on screen to click on and cancel.  Your own plan is drawn through the fog; anything
 	 else fogged, including an enemy's, is still hidden. */
@@ -11197,26 +11440,74 @@ TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 	CHECK( !AIAmbulance_callsPatient( 0.3f, 100.0f, quiet - 1 ) );
 }
 
-/** AIPlayer.cpp: an Ambulance pulls back when shot at or inside a known gun's reach, and a lost one is
-	 replaced only after a wait. */
-extern Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Bool inGunReach );
+/** AIPlayer.cpp: an Ambulance keeps clear of known guns by a margin scaled to the map, pulls back when
+	 shot at or within it, only ever to clearer ground, and a lost one is replaced only after a wait. */
+extern Real AIAmbulance_gunMargin( Real baseDistance, Int skill );
+extern Bool AIAmbulance_pullsBack( UnsignedInt now, UnsignedInt lastHit, Real clear, Real margin, Int skill );
+extern Bool AIAmbulance_movesBack( Real hereClear, Real spotClear, Bool hitSinceLook );
+extern Bool AIAmbulance_waitsAt( Real hereClear, Real spotClear, Real margin );
 extern Bool AIAmbulance_rebuyWaits( UnsignedInt now, UnsignedInt lost, Int skill );
 
 TEST(the_ai_ambulance_pulls_back_when_hit_and_is_not_rebought_at_once)
 {
-	CHECK( AIAmbulance_pullsBack( 1000, 0, TRUE ) );
-	CHECK( AIAmbulance_pullsBack( 1000, 990, FALSE ) );
-	// never hit, or hit long ago, and clear of every gun: it stays on the job
-	CHECK( !AIAmbulance_pullsBack( 1000, 0, FALSE ) );
-	CHECK( !AIAmbulance_pullsBack( 1000, 500, FALSE ) );
+	const UnsignedInt second = LOGICFRAMES_PER_SECOND;
+	// the margin: Hard 8% of the base distance between 80 and 200, Medium 6% between 60 and 160
+	CHECK_NEAR( 80.0f, AIAmbulance_gunMargin( 700.0f, AISKILL_BRUTAL ), 0.01f );
+	CHECK_NEAR( 120.0f, AIAmbulance_gunMargin( 1500.0f, AISKILL_BRUTAL ), 0.01f );
+	CHECK_NEAR( 200.0f, AIAmbulance_gunMargin( 4000.0f, AISKILL_BRUTAL ), 0.01f );
+	CHECK_NEAR( 60.0f, AIAmbulance_gunMargin( 700.0f, AISKILL_MEDIUM ), 0.01f );
+	CHECK_NEAR( 160.0f, AIAmbulance_gunMargin( 4000.0f, AISKILL_MEDIUM ), 0.01f );
+	CHECK( AIAmbulance_gunMargin( 4000.0f, AISKILL_MEDIUM ) < AIAmbulance_gunMargin( 4000.0f, AISKILL_BRUTAL ) );
+
+	// within the margin, or inside the reach
+	CHECK( AIAmbulance_pullsBack( 1000, 0, 50.0f, 80.0f, AISKILL_BRUTAL ) );
+	CHECK( AIAmbulance_pullsBack( 1000, 0, -10.0f, 80.0f, AISKILL_BRUTAL ) );
+	CHECK( !AIAmbulance_pullsBack( 1000, 0, 90.0f, 80.0f, AISKILL_BRUTAL ) );
+	// hit lately: Hard stays back 8 s, Medium 6
+	CHECK( AIAmbulance_pullsBack( 1000 + 7 * second, 1000, 1.0e9f, 80.0f, AISKILL_BRUTAL ) );
+	CHECK( !AIAmbulance_pullsBack( 1000 + 8 * second, 1000, 1.0e9f, 80.0f, AISKILL_BRUTAL ) );
+	CHECK( !AIAmbulance_pullsBack( 1000 + 6 * second, 1000, 1.0e9f, 80.0f, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_pullsBack( 1000, 0, 1.0e9f, 80.0f, AISKILL_BRUTAL ) );
+
+	// only to ground a reorder step clearer: none such, it holds, which is what stops the cycle
+	CHECK( AIAmbulance_movesBack( 20.0f, 200.0f, FALSE ) );
+	CHECK( !AIAmbulance_movesBack( 20.0f, 60.0f, FALSE ) );
+	CHECK( !AIAmbulance_movesBack( 20.0f, -30.0f, FALSE ) );
+	// fire from something it does not know of: back regardless
+	CHECK( AIAmbulance_movesBack( 1.0e9f, 1.0e9f, TRUE ) );
+
+	// forward to a wait spot clear by one and a half margins, or clearer than here; else it stays put
+	CHECK( AIAmbulance_waitsAt( 50.0f, 120.0f, 80.0f ) );
+	CHECK( !AIAmbulance_waitsAt( 50.0f, 110.0f, 80.0f ) );
+	CHECK( AIAmbulance_waitsAt( -20.0f, 90.0f, 80.0f ) );
 
 	// Hard waits a minute and a half, Medium twice as long
-	const UnsignedInt second = LOGICFRAMES_PER_SECOND;
 	CHECK( !AIAmbulance_rebuyWaits( 1000, 0, AISKILL_BRUTAL ) );
 	CHECK( AIAmbulance_rebuyWaits( 1000, 900, AISKILL_BRUTAL ) );
 	CHECK( !AIAmbulance_rebuyWaits( 900 + 90 * second, 900, AISKILL_BRUTAL ) );
 	CHECK( AIAmbulance_rebuyWaits( 900 + 170 * second, 900, AISKILL_MEDIUM ) );
 	CHECK( !AIAmbulance_rebuyWaits( 900 + 180 * second, 900, AISKILL_MEDIUM ) );
+}
+
+/** CleanupHazardUpdate.cpp: an area cleaner out of reach of its hazard counts a scan against it only when
+	 it got no nearer and stood about, so a long drive or a detour is not given up and a stalled one is. */
+extern Bool CleanupHazard_stalls( Real distance, Real driven, Real *closest );
+
+TEST(a_cleaner_counts_only_scans_that_find_it_stuck_short_of_its_hazard)
+{
+	Real closest = 500.0f;
+	// nearer: not stuck, and the new nearest
+	CHECK( !CleanupHazard_stalls( 450.0f, 0.0f, &closest ) );
+	CHECK_NEAR( 450.0f, closest, 0.001f );
+	// stuck at the pathfinder's nearest point, or a step either way: counts
+	CHECK( CleanupHazard_stalls( 450.0f, 0.0f, &closest ) );
+	CHECK( CleanupHazard_stalls( 445.0f, 5.0f, &closest ) );
+	// driving round a river, farther off for now: does not count
+	CHECK( !CleanupHazard_stalls( 600.0f, 80.0f, &closest ) );
+	CHECK_NEAR( 450.0f, closest, 0.001f );
+	// and once round, nearer than before
+	CHECK( !CleanupHazard_stalls( 430.0f, 80.0f, &closest ) );
+	CHECK_NEAR( 430.0f, closest, 0.001f );
 }
 
 
@@ -16768,6 +17059,62 @@ TEST(modfactions_split_a_mod_file_name)
 	TheWritableGlobalData = saved;
 }
 
+// -modfactions: a mod's skirmish scripts name its things as the mod's only where the mod defines that
+// kind of thing under that name
+TEST(modfactions_mod_name_by_type)
+{
+	bootOnce();
+	ModNamespace names;
+	names.scanLine( 0, "Object AmericaTankCrusader" );
+	names.scanLine( 0, "Upgrade Upgrade_AmericaTOWMissile" );
+	names.finishScan( 0 );
+	CHECK_STR( names.modName( 0, MODNAME_OBJECT, AsciiString( "AmericaTankCrusader" ) ).str(), "M1~AmericaTankCrusader" );
+	CHECK_STR( names.modName( 0, MODNAME_UPGRADE, AsciiString( "Upgrade_AmericaTOWMissile" ) ).str(), "M1~Upgrade_AmericaTOWMissile" );
+	CHECK_STR( names.modName( 0, MODNAME_UPGRADE, AsciiString( "AmericaTankCrusader" ) ).str(), "AmericaTankCrusader" );	// not an upgrade
+	CHECK_STR( names.modName( 0, MODNAME_OBJECT, AsciiString( "ChinaTankOverlord" ) ).str(), "ChinaTankOverlord" );		// retail's
+	CHECK_STR( names.modName( 1, MODNAME_OBJECT, AsciiString( "AmericaTankCrusader" ) ).str(), "AmericaTankCrusader" );	// no second mod
+}
+
+// -modfactions: an AI on a mod faction reads its own mod's AIData side, under "M<n>~<side>", and
+// retail's of the side when the mod has none; a retail AI never reads a mod's
+TEST(modfactions_ai_side_lookups_take_the_mods_own_first)
+{
+	bootOnce();
+	CHECK_STR( AI::modSideKey( AsciiString( "America" ), -1 ).str(), "America" );
+	CHECK_STR( AI::modSideKey( AsciiString( "America" ), 1 ).str(), "M2~America" );
+
+	TAiData data;
+	AISideInfo *retail = newInstance(AISideInfo);
+	retail->m_side = "America";
+	data.addSideInfo( retail );
+	AISideInfo *shockwave = newInstance(AISideInfo);
+	shockwave->m_side = AI::modSideKey( AsciiString( "America" ), 0 );
+	data.addSideInfo( shockwave );
+	CHECK( data.findSideInfo( AsciiString( "America" ), -1 ) == retail );
+	CHECK( data.findSideInfo( AsciiString( "America" ), 0 ) == shockwave );
+	CHECK( data.findSideInfo( AsciiString( "America" ), 1 ) == retail );		// a mod without its own entry
+	CHECK( data.findSideInfo( AsciiString( "Russia" ), 1 ) == NULL );
+
+	AISideBuildList *russia = newInstance(AISideBuildList)( AI::modSideKey( AsciiString( "Russia" ), 1 ) );
+	data.addFactionBuildList( russia );
+	CHECK( data.findBuildList( AsciiString( "Russia" ), 1 ) == russia );
+	CHECK( data.findBuildList( AsciiString( "Russia" ), 0 ) == NULL );			// another mod's
+	CHECK( data.findBuildList( AsciiString( "Russia" ), -1 ) == NULL );
+}
+
+// -modfactions: which skirmish player's scripts a computer player runs.  Its own mod's of its side
+// beats retail's, retail's stands in for a mod without any, and another mod's never fits
+TEST(modfactions_skirmish_side_fit)
+{
+	const AsciiString america( "America" );
+	CHECK_EQ( SidesList::skirmishSideFit( america, -1, america, -1 ), 2 );
+	CHECK_EQ( SidesList::skirmishSideFit( america, 0, america, 0 ), 2 );
+	CHECK_EQ( SidesList::skirmishSideFit( america, -1, america, 0 ), 1 );
+	CHECK_EQ( SidesList::skirmishSideFit( america, 1, america, 0 ), 0 );
+	CHECK_EQ( SidesList::skirmishSideFit( america, 0, america, -1 ), 0 );
+	CHECK_EQ( SidesList::skirmishSideFit( AsciiString( "China" ), -1, america, -1 ), 0 );
+}
+
 // -modfactions: a word naming a model, texture or sound the mod ships gets its prefix, so WW3D and the
 // FileSystem serve the mod's copy; art it does not ship stays retail's
 TEST(modfactions_prefix_the_mods_own_art)
@@ -16803,6 +17150,58 @@ TEST(modfactions_prefix_the_mods_own_art)
 	strcpy( line, "  ShowSubObject = AVRanger" );			// a sub-object, not a file
 	CHECK( names.rewriteLine( line, sizeof( line ) ) );
 	CHECK_STR( line, "  ShowSubObject = AVRanger" );
+}
+
+// -modfactions: the file in a path-shaped word is its last part, past either slash
+TEST(modfactions_last_path_part)
+{
+	CHECK_EQ( (Int)ModNamespace::lastPathPart( "x.mp3" ), 0 );
+	CHECK_EQ( (Int)ModNamespace::lastPathPart( "Sub\\x.mp3" ), 4 );
+	CHECK_EQ( (Int)ModNamespace::lastPathPart( "A\\B/x.mp3" ), 4 );
+	CHECK_EQ( (Int)ModNamespace::lastPathPart( "Sub\\" ), 4 );
+	CHECK_EQ( (Int)ModNamespace::lastPathPart( "" ), 0 );
+}
+
+// -modfactions: a MusicTrack Filename names the whole file, maybe in a subfolder; the prefix goes on the
+// last part, where FileSystem::splitModName looks for it
+TEST(modfactions_prefix_the_last_part_of_a_file_path)
+{
+	bootOnce();
+	ModNamespace names;
+	names.addAsset( 0, "Data\\Audio\\Tracks\\Sub\\Score01.mp3" );
+	names.addAsset( 0, "Data\\Audio\\Tracks\\Score02.mp3" );
+	names.finishScan( 0 );
+	names.setActive( 0 );
+
+	char line[ 96 ];
+	strcpy( line, "  Filename = Sub\\Score01.mp3" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Filename = Sub\\M1~Score01.mp3" );
+	strcpy( line, "  Filename = Score02.mp3" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Filename = M1~Score02.mp3" );
+	strcpy( line, "  Filename = Sub/Score02.mp3" );
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Filename = Sub/M1~Score02.mp3" );
+	strcpy( line, "  Filename = Sub\\Retail.mp3" );				// not the mod's: untouched
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Filename = Sub\\Retail.mp3" );
+	strcpy( line, "  Sounds = Score01" );						// a sound event still names the base
+	CHECK( names.rewriteLine( line, sizeof( line ) ) );
+	CHECK_STR( line, "  Sounds = M1~Score01" );
+
+	// and the file system takes the prefix back off that part
+	GlobalData *saved = TheWritableGlobalData;
+	TheWritableGlobalData = NEW GlobalData;
+	TheWritableGlobalData->m_mods.assign( 1, AsciiString( "Mods\\X" ) );
+	TheWritableGlobalData->m_modFactions = TRUE;
+	Int mod = -1;
+	AsciiString bare;
+	CHECK( FileSystem::splitModName( AsciiString( "Data\\Audio\\Tracks\\Sub\\M1~Score01.mp3" ), &mod, &bare ) );
+	CHECK_EQ( mod, 0 );
+	CHECK_STR( bare.str(), "Data\\Audio\\Tracks\\Sub\\Score01.mp3" );
+	delete TheWritableGlobalData;
+	TheWritableGlobalData = saved;
 }
 
 #include "test_minimap_input.inc"

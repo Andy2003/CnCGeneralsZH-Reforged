@@ -109,6 +109,7 @@ OPTION_BOOL_ACCESSORS( m_shadowsForProps )
 OPTION_BOOL_ACCESSORS( m_shadowsForParticles )
 OPTION_BOOL_ACCESSORS( m_particleGroundBounce )
 OPTION_BOOL_ACCESSORS( m_volumetricSmokeShadows )
+OPTION_BOOL_ACCESSORS( m_useCloudMap )
 OPTION_BOOL_ACCESSORS( m_smokeFireLighting )
 OPTION_INT_ACCESSORS( m_shadowQuality )
 
@@ -463,6 +464,14 @@ const OptionDef TheOptionCatalog[] =
 	{ "VolumetricSmokeShadows",		"", "",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_volumetricSmokeShadows, set_m_volumetricSmokeShadows },
+
+	// The shadows of passing clouds scrolled over the terrain.  It used to belong to the detail
+	// preset, which turned it off at Low and gave no other way to; now the preset leaves it alone and
+	// GameData.ini's Yes holds until Options.ini says otherwise.  The terrain asks every frame.  No
+	// control in the game's menu; the launcher writes it.
+	{ "UseCloudMap",							"", "",
+		OPTION_BOOL, APPLY_LIVE, 0, 1,
+		get_m_useCloudMap, set_m_useCloudMap },
 
 	// Classic or Reforged light.  Reforged rebalances each map's lights as the map loads (so a change
 	// shows on the next map), deepens the sun's shadow to match and grades the Direct3D 11 picture,

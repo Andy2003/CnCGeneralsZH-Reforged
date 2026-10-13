@@ -643,8 +643,14 @@ void ModNamespace::addAsset( Int mod, const char *fileName )
 		m_mods.resize( mod + 1 );
 	std::set<std::string> &assets = m_mods[ mod ].assets;
 	// INI names a model or a sound without its extension, and a texture as .tga when the file is a .dds
-	if (extension == "w3d" || extension == "wav" || extension == "mp3")
+	if (extension == "w3d")
 		assets.insert( base );
+	else if (extension == "wav" || extension == "mp3")
+	{
+		// Sounds names the base, a MusicTrack or streamed event's Filename the whole file name
+		assets.insert( base );
+		assets.insert( name );
+	}
 	else if (extension == "dds" || extension == "tga")
 	{
 		assets.insert( base + ".tga" );
@@ -737,14 +743,23 @@ Bool ModNamespace::prefixWords( char *line, size_t capacity, WordTest test ) con
 			first = FALSE;
 			continue;
 		}
-		if ((this->*test)( word, assetField ))
+		// a file field may name a subfolder ("Sub\x.mp3"); the file is its last part
+		const size_t at = assetField ? lastPathPart( word ) : 0;
+		out.append( word, 0, at );
+		if ((this->*test)( word.substr( at ), assetField ))
 			out += prefix;
-		out += word;
+		out.append( word, at, std::string::npos );
 	}
 	if (out.size() >= capacity)
 		return FALSE;
 	memcpy( line, out.c_str(), out.size() + 1 );
 	return TRUE;
+}
+
+size_t ModNamespace::lastPathPart( const std::string &word )
+{
+	const size_t slash = word.find_last_of( "\\/" );
+	return slash == std::string::npos ? 0 : slash + 1;
 }
 
 Bool ModNamespace::findRetailName( const AsciiString &name, ModNameType type, AsciiString *retailName ) const
@@ -770,6 +785,15 @@ Bool ModNamespace::findRetailKey( NameKeyType key, ModNameType type, NameKeyType
 		return FALSE;
 	*retailKey = TheNameKeyGenerator->nameToKey( retailName );
 	return TRUE;
+}
+
+AsciiString ModNamespace::modName( Int mod, ModNameType type, const AsciiString &name ) const
+{
+	if (mod >= (Int)m_mods.size() || m_mods[ mod ].byType[ type ].count( name.str() ) == 0)
+		return name;
+	AsciiString prefixed;
+	prefixed.format( "M%d~%s", mod + 1, name.str() );
+	return prefixed;
 }
 
 //-------------------------------------------------------------------------------------------------

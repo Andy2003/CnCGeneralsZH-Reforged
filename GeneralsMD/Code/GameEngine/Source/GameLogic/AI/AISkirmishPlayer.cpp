@@ -686,14 +686,10 @@ Player *AISkirmishPlayer::getAiEnemy(void)
 */
 void AISkirmishPlayer::buildAIBaseDefense(Bool flank)
 {
-	const AISideInfo *resInfo = TheAI->getAiData()->m_sideInfo;
+	const AISideInfo *resInfo = TheAI->getAiData()->findSideInfo( m_player );
 	AsciiString defenseTemplateName;
-	while (resInfo) {
-		if (resInfo->m_side == m_player->getSide()) {
-			defenseTemplateName = resInfo->m_baseDefenseStructure1;
-			break;
-		}
-		resInfo = resInfo->m_next;
+	if (resInfo) {
+		defenseTemplateName = resInfo->m_baseDefenseStructure1;
 	}
 	// the data names one defence per side, so a script asking for ten got ten of it: the side's mix
 	// comes off a dozer's buttons instead, and the data's choice stands in when no dozer is left
@@ -1235,28 +1231,28 @@ void AISkirmishPlayer::newMap( void )
 	/* Get our proper build list. */
 	AsciiString mySide = m_player->getSide();
 	DEBUG_LOG(("AI Player side is %s\n", mySide.str()));
-	const AISideBuildList *build = TheAI->getAiData()->m_sideBuildLists;
-	while (build) {
-		if (build->m_side == mySide) {
-			BuildListInfo *buildList = build->m_buildList->duplicate();
-			// -modfactions: the build lists are retail's and keyed by side, so a mod's player builds the
-			// mod's own building of each name, and retail's where the mod has none.  Before this its
-			// command center was torn down below and put back as retail's.
-			const Int mod = m_player->getPlayerTemplate()->getModIndex();
-			for (BuildListInfo *info = buildList; mod >= 0 && info != NULL; info = info->getNext())
-			{
-				AsciiString modName;
-				modName.format("M%d~%s", mod + 1, info->getTemplateName().str());
-				const ThingTemplate *modPlan = TheThingFactory->findTemplate( modName );
-				if (modPlan != NULL)
-					info->setTemplateName( modPlan->getName() );
-			}
-			adjustBuildList(buildList); // adjust to  our start position.
-			m_player->setBuildList(buildList);
-			computeCenterAndRadiusOfBase(&m_baseCenter, &m_baseRadius);
-			break;
+	// -modfactions: a mod faction's own mod's list ("M<n>~America", its AIData.ini), retail's of the side without one
+	const PlayerTemplate *pt = m_player->getPlayerTemplate();
+	const Int mod = pt != NULL ? pt->getModIndex() : -1;	// no template: a map whose faction is gone
+	const AISideBuildList *build = TheAI->getAiData()->findBuildList( mySide, mod );
+	if (build) {
+		BuildListInfo *buildList = build->m_buildList->duplicate();
+		// a mod without a list of its own gets retail's, read as the mod's own building of each name
+		// where the mod has one.  Before this its command center was torn down below and put back as
+		// retail's.
+		const Bool retailList = mod >= 0 && build->m_side == mySide;
+		for (BuildListInfo *info = buildList; retailList && info != NULL; info = info->getNext())
+		{
+			AsciiString modName;
+			modName.format("M%d~%s", mod + 1, info->getTemplateName().str());
+			const ThingTemplate *modPlan = TheThingFactory->findTemplate( modName );
+			if (modPlan != NULL)
+				info->setTemplateName( modPlan->getName() );
 		}
-		build = build->m_next;
+		adjustBuildList(buildList); // adjust to  our start position.
+		m_player->setBuildList(buildList);
+		computeCenterAndRadiusOfBase(&m_baseCenter, &m_baseRadius);
+		DEBUG_LOG(("AI Player build list is %s's\n", build->m_side.str()));
 	}
 	DEBUG_ASSERTLOG(build!=NULL, ("Couldn't find build list for skirmish player.\n"));
 

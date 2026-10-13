@@ -308,6 +308,7 @@ ControlBarScheme::ControlBarScheme(void)
 	m_name.clear();
 	m_ScreenCreationRes.x = m_ScreenCreationRes.y = 0;
 	m_side.clear();
+	m_controlBarPro = FALSE;
 	m_buttonQueueImage = NULL;
 	m_rightHUDImage = NULL;
 	m_buildUpClockColor = GameMakeColor(0,0,0,100);
@@ -735,6 +736,7 @@ void ControlBarScheme::drawBackground( Coord2D multi, ICoord2D offset )
 ControlBarSchemeManager::ControlBarSchemeManager( void )
 {
 	m_currentScheme = NULL;
+	m_loadingControlBarPro = FALSE;
 	m_schemeList.clear();
 	m_multiplyer.x = m_multiplyer.y = 1;
 }
@@ -834,7 +836,8 @@ ControlBarScheme *ControlBarSchemeManager::newControlBarScheme( AsciiString name
 		cbScheme->reset();
 		cbScheme->m_name.set( name );
 		cbScheme->m_name.toLower();
-		return cbScheme;		
+		cbScheme->m_controlBarPro = m_loadingControlBarPro;
+		return cbScheme;
 	}
 
 	cbScheme = NEW ControlBarScheme;
@@ -847,6 +850,7 @@ ControlBarScheme *ControlBarSchemeManager::newControlBarScheme( AsciiString name
 
 	cbScheme->m_name.set( name );
 	cbScheme->m_name.toLower();
+	cbScheme->m_controlBarPro = m_loadingControlBarPro;
 
 	m_schemeList.push_back(cbScheme);
 		
@@ -936,7 +940,11 @@ void ControlBarSchemeManager::init( void )
 	// ControlBar Pro's schemes, the bar every side wears: each replaces EA's of the same name whole,
 	// and under a single -mod the mod's of that name, so nothing above reaches it (a Debug build
 	// asserts once a scheme, newControlBarScheme).  -modfactions loads no mod's schemes at all.
+	// A scheme of a name it does not have (a mod's ChinaSpecialWeaponsGeneral) stays the mod's, so the
+	// ones read here are marked and findSchemeForFaction picks among them only.
+	m_loadingControlBarPro = TRUE;
 	ini.load( AsciiString( "Data\\INI\\ControlBarProReforged.ini" ), INI_LOAD_OVERWRITE, NULL );
+	m_loadingControlBarPro = FALSE;
 
 //	//Load the user modified control bar schemes
 //	WIN32_FIND_DATA findData;
@@ -1046,13 +1054,13 @@ AsciiString ControlBarSchemeManager::getCurrentArtTwinSide( void ) const
 /** The side's widest scheme, as EA picked.  Neither interface draws a scheme's painting; the plates
 	* stand in for it (ControlBarPlateForSide), and the scheme only places the bar's own windows. */
 //-----------------------------------------------------------------------------
-ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side ) const
+ControlBarScheme *ControlBarSchemeManager::findSchemeForSide( const AsciiString& side, Bool controlBarProOnly ) const
 {
 	ControlBarScheme *best = NULL;
 	for( ControlBarSchemeList::const_iterator it = m_schemeList.begin(); it != m_schemeList.end(); ++it )
 	{
 		ControlBarScheme *scheme = *it;
-		if( scheme->m_side.compareNoCase( side ) != 0 )
+		if( scheme->m_side.compareNoCase( side ) != 0 || ( controlBarProOnly && !scheme->m_controlBarPro ) )
 			continue;
 		if( best == NULL || scheme->m_ScreenCreationRes.x > best->m_ScreenCreationRes.x )
 			best = scheme;
@@ -1074,22 +1082,24 @@ Bool ControlBarIsModFaction( const PlayerTemplate *pt )
 }
 
 //-----------------------------------------------------------------------------
-/** The bar follows the country.  A side with a scheme of its own (Boss and Observer among them) wears
-	* it; any other wears its country's by name, the way ControlBarPlateForSide reads a side, so a mod's
-	* ChinaCyberGeneral gets China's and its AmericaCyberneticGeneral America's.  A side of no country we
-	* know (Russia, ECA, the civilians) wears America's.  The squished bar does not come here. */
+/** The bar follows the country, and is always ControlBar Pro's.  A side with a ControlBar Pro scheme of
+	* its own (Boss and Observer among them) wears it; any other wears its country's by name, the way
+	* ControlBarPlateForSide reads a side, so a mod's ChinaCyberGeneral gets China's and its
+	* AmericaCyberneticGeneral America's, whatever scheme the mod itself ships for that side (ShockWave's
+	* ChinaSpecialWeaponsGeneral is EA's red China bar).  A side of no country we know (Russia, ECA, the
+	* civilians) wears America's.  The squished bar does not come here. */
 //-----------------------------------------------------------------------------
 ControlBarScheme *ControlBarSchemeManager::findSchemeForFaction( const AsciiString& side ) const
 {
-	ControlBarScheme *scheme = findSchemeForSide( side );
+	ControlBarScheme *scheme = findSchemeForSide( side, TRUE );
 	if( scheme != NULL )
 		return scheme;
 
 	if( side.startsWithNoCase( "China" ) )
-		return findSchemeForSide( AsciiString( "China" ) );
+		return findSchemeForSide( AsciiString( "China" ), TRUE );
 	if( side.startsWithNoCase( "GLA" ) )
-		return findSchemeForSide( AsciiString( "GLA" ) );
-	return findSchemeForSide( AsciiString( "America" ) );
+		return findSchemeForSide( AsciiString( "GLA" ), TRUE );
+	return findSchemeForSide( AsciiString( "America" ), TRUE );
 }
 
 Bool ControlBarSchemeManager::isCurrentSchemePainted( void ) const
