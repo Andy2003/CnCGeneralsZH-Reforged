@@ -306,20 +306,25 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 static std::map< std::string, WideChar > s_playerButtonKeys;
 
 /** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
-	* to 14 stand two rows of seven read down the columns, so Q W E R T Y over A S D F G H take the
-	* first six columns and the last column, slots 13 and 14, takes B over N from the keyboard's third
-	* row, so sell keeps its N.  With grid keys on the grid wins on the bar: a fixed order (FIXED_KEYS)
-	* takes its place's key like any other button.  The launcher's Hotkeys page draws the same table
+	* to 14 stand two rows of seven read down the columns, and take the twelve letters of the Q W E R T
+	* Y / A S D F G H / Z X C V B N block that are no GRID_FIXED_KEYS.  Q W E R T top the first five
+	* columns, Z X D F B under them, each under its own column where the fixed A, S and G leave a gap;
+	* the sixth column is H under attack move's place (slot 11) and the seventh N, sell's key, under
+	* the rally point's (slot 13).  Those two places have no key: a fixed order standing there shows
+	* its own letter, any other button none.  The launcher's Hotkeys page draws the same table
 	* (hotkeys.js, GRID_KEYS). */
-static const WideChar GRID_KEYS[] = { 'Q', 'A', 'W', 'S', 'E', 'D', 'R', 'F', 'T', 'G', 'Y', 'H', 'B', 'N' };
+static const WideChar GRID_KEYS[] = { 'Q', 'Z', 'W', 'X', 'E', 'D', 'R', 'F', 'T', 'B', 0, 'H', 0, 'N' };
 static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
 static Bool s_commandGrid = FALSE;
 
-/** The owner's fixed keys, 2026-10-12, on every bar while grid keys are off: A attack move, S stop,
-	* G guard, Y rally point, V evacuate, N sell, C combat drop, and H for land mines, camo netting
-	* and the GLA's fake and real switches, which go by button name.  No other button may have one of
-	* these letters.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
+/** The owner's fixed keys, 2026-10-12, on every bar: A attack move, S stop, G guard, Y rally
+	* point, V evacuate, N sell, C combat drop, and H for land mines, camo netting and the GLA's fake
+	* and real switches, which go by button name.  No other button may have one of these letters.
+	* With grid keys on only GRID_FIXED_KEYS hold, on any bar and slot; sell and the H buttons take
+	* their place's key.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS and
+	* GRID_FIXED_LETTERS). */
 static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'N', 'C', 'H' };
+static const WideChar GRID_FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'C' };
 static const char *const FIXED_H_BUTTONS[] =
 {
 	"command_upgradechinamines", "command_upgradeempmines", "command_upgradecamonetting", "command_upgradeglacamonetting",
@@ -423,9 +428,13 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 	lower.toLower();
 	Int ownMod = -1;
 	const std::string bare = withoutModPrefix( lower.str(), &ownMod );
-	if( s_commandGrid && barSlot >= 0 )
-		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
 	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType );
+	if( s_commandGrid && barSlot >= 0 )
+	{
+		if( fixed != 0 && isOneOf( fixed, GRID_FIXED_KEYS, (Int)( sizeof( GRID_FIXED_KEYS ) / sizeof( GRID_FIXED_KEYS[ 0 ] ) ) ) )
+			return fixed;
+		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
+	}
 	if( fixed != 0 )
 		return fixed;
 

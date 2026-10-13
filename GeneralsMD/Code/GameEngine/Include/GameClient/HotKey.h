@@ -114,7 +114,7 @@ public:
 		* took the key away, and labelKey, the letter after the label's '&', where the player left the
 		* button alone; upper case.  Attack move, stop, guard, rally point, evacuate and sell have their
 		* fixed letters and no other button gets one.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
-		* barSlot its ButtonCommand number less one, gets its place's key instead, fixed orders too, and any other button
+		* barSlot its ButtonCommand number less one, gets its place's key instead, except attack move, stop, guard, rally point, evacuate and combat drop, and any other button
 		* (barSlot -1) loses a letter the grid uses. */
 	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
 																	 Int commandType );
