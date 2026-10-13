@@ -229,7 +229,8 @@ structure, so a disagreement stops the build instead of desynchronising a game.
 
 **E1**, the replay check (`Tools/replay-check.sh`, `replay-check.ps1` on Windows), plays a headless skirmish,
 plays its replay back and plays the seed again, and compares the three runs' world CRCs. The pinned results
-are seed 0 at 1200 frames `0x43105931`, seed 0 at 12000 `0x240A0702` and seed 1 at 12000 `0x35F5CF4D`, since
+are seed 0 at 2400 frames `0x67F86891`, seed 0 at 24000 `0x6404352D` and seed 1 at 24000 `0x90B6D230` (logic at 60 Hz,
+measured on Windows x64; macOS and Linux not re-run since), since
 upstream 1e94f8c7 was merged; they are identical on macOS arm64, macOS x86_64 under Rosetta,
 Linux x86_64 (GCC), Windows x64 and Windows ARM64 (MSVC; ARM64 from a Windows ARM64 CI run on the integrated
 tree). Replays recorded on one platform play back on the others, and a two-host LAN match between macOS and
@@ -278,7 +279,7 @@ headless game, the renderer funnel, a game that draws, and a game that ships.
 
 `ctest` in the build folder runs every suite: the engine's own (`test_gameengine`), the libraries', and the
 port's (the POSIX device, the shader generators, the file systems, input, audio, LAN, packaging). With
-`-DZH_GAME_DATA=<folder>` the data tests run too: `replay_check` (E1, including two 12000-frame matches),
+`-DZH_GAME_DATA=<folder>` the data tests run too: `replay_check` (E1, including two 24000-frame matches),
 `locomotor_check`, `net_check` (two copies of the game in one LAN match), the install and
 overlay checks and more. Automated runs never make a sound or show a window.
 
@@ -315,7 +316,7 @@ MSVC's own casts on Windows), `license-headers.py --check`, `fingerprint-manifes
 - **The portal's folder dialog itself is untested**: it needs a person to click it. The chooser logic behind it
   is tested headless, the Generals question included.
 - **An `_INTERNAL` build has not been built.** A Windows x64 Debug build compiles and passes ctest and E1 (seed 0
-  at 1200 frames, Release's pin) since 2026-09-29; before that it did not compile, and did not before the port
+  at 2400 frames, Release's pin) since 2026-09-29; before that it did not compile, and did not before the port
   either, for a different reason.
 - **Texture stage 2 is invisible to the Direct3D 11 backend** (suspected, by reading: `shader.cpp` sets it
   through raw `DX8CALL`). Upstream's code, not the port's; not fixed.

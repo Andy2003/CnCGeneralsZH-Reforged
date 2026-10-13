@@ -19,8 +19,8 @@
 #
 #   minimal   the package installed with only what it Depends/Requires (no recommended or weak dependencies),
 #             then cut off the network: E1 (Tools/replay-check.sh --installed) through /usr/bin/zero-hour-reforged,
-#             its launcher and its own overlay discovery, at the pins: seed 0 at 1200 frames, seeds 0 and 1 at
-#             12000.  The game data is mounted read-only (rule 9 as ever: the runs root at a farm of it);
+#             its launcher and its own overlay discovery, at the pins: seed 0 at 2400 frames, seeds 0 and 1 at
+#             24000.  The game data is mounted read-only (rule 9 as ever: the runs root at a farm of it);
 #   drawn     the package installed as a player gets it (recommended dependencies on; on Arch, the Vulkan and
 #             X11 optdepends), Xvfb, and Mesa's software Vulkan (lavapipe): one windowed skirmish frame, written
 #             with -screenshot, which must be a picture (many colours), not a blank.
@@ -58,7 +58,7 @@ PKGS="$(cd "$PKGS" && pwd -P)"; DATA="$(cd "$DATA" && pwd -P)"
 file_of() { ls "$PKGS"/$1 2>/dev/null | head -1; }
 DEB="$(file_of 'zero-hour-reforged_*_amd64.deb')"; RPM="$(file_of 'zero-hour-reforged-*.x86_64.rpm')"
 ARCHPKG="$(file_of 'zero-hour-reforged-*-x86_64.pkg.tar.zst')"; APPIMAGE="$(file_of 'zero-hour-reforged-*-x86_64.AppImage')"
-PIN_1200=0x43105931 PIN_0=0x240A0702 PIN_1=0x35F5CF4D	# E1's pins since upstream 1e94f8c7
+PIN_2400=0x67F86891 PIN_0=0x6404352D PIN_1=0x90B6D230	# E1's pins since the logic went to 60 Hz (measured on Windows x64)
 failed=0 pulled=""
 say() { echo "linux-packages-check: $*"; }
 crc() { printf '%s\n' "$1" | sed -n "s/.*seed $2, 2 players: HEADLESS CRC \(0x[0-9A-Fa-f]*\) at frame $3.*/\1/p" | head -1; }	# <E1 output> <seed> <frame>
@@ -115,14 +115,14 @@ RUNNER
 	chmod +x "$T/runner"
 	local target=( --installed /usr/bin/zero-hour-reforged ) e1a e1b
 	[ "$format" = appimage ] && target=( --appimage "$APPIMAGE" )
-	e1a="$(TMPDIR="$T/tmp" REPLAY_CHECK_RUNNER="$T/runner" bash "$CODE/Tools/replay-check.sh" "${target[@]}" --data "$DATA" --seeds 0 --maxframes 1200 2>&1)"
-	e1b="$(TMPDIR="$T/tmp" REPLAY_CHECK_RUNNER="$T/runner" bash "$CODE/Tools/replay-check.sh" "${target[@]}" --data "$DATA" --seeds "0 1" --maxframes 12000 2>&1)"
+	e1a="$(TMPDIR="$T/tmp" REPLAY_CHECK_RUNNER="$T/runner" bash "$CODE/Tools/replay-check.sh" "${target[@]}" --data "$DATA" --seeds 0 --maxframes 2400 2>&1)"
+	e1b="$(TMPDIR="$T/tmp" REPLAY_CHECK_RUNNER="$T/runner" bash "$CODE/Tools/replay-check.sh" "${target[@]}" --data "$DATA" --seeds "0 1" --maxframes 24000 2>&1)"
 	printf '%s\n%s\n' "$e1a" "$e1b" | grep -E "HEADLESS CRC|agree|DIVERGED|no result|INSTALL" | sed 's/^/  /'
-	[ "$(crc "$e1a" 0 1200)" = $PIN_1200 ] && printf '%s' "$e1a" | grep -q "the playback and the second run agree" \
-		|| { say "$label: E1 seed 0 at 1200 is not $PIN_1200 (or did not agree)"; bad=1; }
-	[ "$(crc "$e1b" 0 12000)" = $PIN_0 ] && [ "$(crc "$e1b" 1 12000)" = $PIN_1 ] \
+	[ "$(crc "$e1a" 0 2400)" = $PIN_2400 ] && printf '%s' "$e1a" | grep -q "the playback and the second run agree" \
+		|| { say "$label: E1 seed 0 at 2400 is not $PIN_2400 (or did not agree)"; bad=1; }
+	[ "$(crc "$e1b" 0 24000)" = $PIN_0 ] && [ "$(crc "$e1b" 1 24000)" = $PIN_1 ] \
 		&& [ "$(printf '%s' "$e1b" | grep -c "the playback and the second run agree")" -eq 2 ] \
-		|| { say "$label: E1 seeds 0 and 1 at 12000 are not $PIN_0 and $PIN_1 (or did not agree)"; bad=1; }
+		|| { say "$label: E1 seeds 0 and 1 at 24000 are not $PIN_0 and $PIN_1 (or did not agree)"; bad=1; }
 	[ $bad -eq 0 ] && say "$label: E1 at the three pins, through the installed launcher (minimal install, offline)"
 	docker rm -f "$name" > /dev/null
 
