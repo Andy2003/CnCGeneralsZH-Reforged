@@ -307,15 +307,15 @@ static std::map< std::string, WideChar > s_playerButtonKeys;
 
 /** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
 	* to 14 stand two rows of seven read down the columns, so Q W E R T Y over A S D F G H take the
-	* first six columns and the keyboard's third row, Z X C V B N, has no place.  A, S, G, Y and H
-	* belong to the fixed orders (FIXED_KEYS), so their places take a key off the grid instead: J, K,
-	* M, U and L.  Slots 13 and 14, the last column, get no key.  The launcher's Hotkeys page draws
-	* the same table (hotkeys.js, GRID_KEYS). */
-static const WideChar GRID_KEYS[] = { 'Q', 'J', 'W', 'K', 'E', 'D', 'R', 'F', 'T', 'M', 'U', 'L' };
+	* first six columns and the last column, slots 13 and 14, takes B over N from the keyboard's third
+	* row, so sell keeps its N.  With grid keys on the grid wins on the bar: a fixed order (FIXED_KEYS)
+	* takes its place's key like any other button.  The launcher's Hotkeys page draws the same table
+	* (hotkeys.js, GRID_KEYS). */
+static const WideChar GRID_KEYS[] = { 'Q', 'A', 'W', 'S', 'E', 'D', 'R', 'F', 'T', 'G', 'Y', 'H', 'B', 'N' };
 static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
 static Bool s_commandGrid = FALSE;
 
-/** The owner's fixed keys, 2026-10-12, on every bar and in both modes: A attack move, S stop,
+/** The owner's fixed keys, 2026-10-12, on every bar while grid keys are off: A attack move, S stop,
 	* G guard, Y rally point, V evacuate, N sell, C combat drop, and H for land mines, camo netting
 	* and the GLA's fake and real switches, which go by button name.  No other button may have one of
 	* these letters.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS). */
@@ -423,11 +423,11 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 	lower.toLower();
 	Int ownMod = -1;
 	const std::string bare = withoutModPrefix( lower.str(), &ownMod );
+	if( s_commandGrid && barSlot >= 0 )
+		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
 	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType );
 	if( fixed != 0 )
 		return fixed;
-	if( s_commandGrid && barSlot >= 0 )
-		return barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
 
 	WideChar letter = labelKey;
 	findPlayerKey( bare, ownMod, &letter );
