@@ -227,7 +227,10 @@ DrawableLocoInfo::DrawableLocoInfo()
   m_pitchModulator = 0.0f;
 	m_leanPitch[0] = m_leanPitch[1] = 0.0f;
 	m_leanRoll[0] = m_leanRoll[1] = 0.0f;
-	m_leanFrame = 0;
+	m_airFrame = 0;
+	m_airPitch = 0.0f;
+	m_airRoll = 0.0f;
+	m_airYaw = 0.0f;
 	for (Int i = 0; i < 3; ++i)
 		m_groundLeanStages[0][i] = m_groundLeanStages[1][i] = 0.0f;
 	m_groundFrame = 0;
@@ -1480,14 +1483,14 @@ void Drawable::updateDrawable( void )
 		{
 			if (m_colorTintEnvelope == NULL)
 				m_colorTintEnvelope = newInstance(TintEnvelope);
-			m_colorTintEnvelope->play( &DARK_GRAY_DISABLED_COLOR, 30, 30, SUSTAIN_INDEFINITELY);
+			m_colorTintEnvelope->play( &DARK_GRAY_DISABLED_COLOR, ConvertRetailFrames(30), ConvertRetailFrames(30), SUSTAIN_INDEFINITELY);
 		}
 		else if( testTintStatus(TINT_STATUS_GAINING_SUBDUAL_DAMAGE) )
 		{
 			// Disabled has precendence, so it goes first
 			if (m_colorTintEnvelope == NULL)
 				m_colorTintEnvelope = newInstance(TintEnvelope);
-			m_colorTintEnvelope->play( &SUBDUAL_DAMAGE_COLOR, 150, 150, SUSTAIN_INDEFINITELY);
+			m_colorTintEnvelope->play( &SUBDUAL_DAMAGE_COLOR, ConvertRetailFrames(150), ConvertRetailFrames(150), SUSTAIN_INDEFINITELY);
 		}
 		else if( testTintStatus(TINT_STATUS_FRENZY) )
 		{
@@ -1495,7 +1498,7 @@ void Drawable::updateDrawable( void )
 			if (m_colorTintEnvelope == NULL)
 				m_colorTintEnvelope = newInstance(TintEnvelope);
 
-      m_colorTintEnvelope->play( isKindOf( KINDOF_INFANTRY) ? &FRENZY_COLOR_INFANTRY:&FRENZY_COLOR, 30, 30, SUSTAIN_INDEFINITELY);
+      m_colorTintEnvelope->play( isKindOf( KINDOF_INFANTRY) ? &FRENZY_COLOR_INFANTRY:&FRENZY_COLOR, ConvertRetailFrames(30), ConvertRetailFrames(30), SUSTAIN_INDEFINITELY);
 		
     }
 //		else if ( testTintStatus( TINT_STATUS_POISONED) )
@@ -1586,7 +1589,7 @@ void Drawable::flashAsSelected( const RGBColor *color ) ///< drawable takes care
 
 	if ( color )
 	{
-		m_selectionFlashEnvelope->play( color, 0, 4 );
+		m_selectionFlashEnvelope->play( color, 0, DEF_DECAY_FRAMES );
 	}
 	else
 	{
@@ -1601,7 +1604,7 @@ void Drawable::flashAsSelected( const RGBColor *color ) ///< drawable takes care
 
 			Real saturation = TheGlobalData->m_selectionFlashSaturationFactor;
 			saturateRGB( tempColor, saturation );
-			m_selectionFlashEnvelope->play( &tempColor, 0, 4 );
+			m_selectionFlashEnvelope->play( &tempColor, 0, DEF_DECAY_FRAMES );
 
 		}
 	}
@@ -1699,7 +1702,12 @@ void Drawable::calcPhysicsXformThrust( const Locomotor *locomotor, PhysicsXformI
 	// we deal with just adjusting pitch, yaw, and roll just a little bit
 	//
 
-	if( WOBBLE_RATE )
+	// stepped on the retail clock, every second logic frame, which the rates above were written for
+	UnsignedInt now = TheGameLogic->getFrame() / LOGICFRAMES_PER_RETAIL_FRAME;
+	Bool step = now != m_locoInfo->m_airFrame;
+	m_locoInfo->m_airFrame = now;
+
+	if( WOBBLE_RATE && step )
 	{
 
 		if( m_locoInfo->m_wobble >= 1.0f )
@@ -1746,15 +1754,21 @@ void Drawable::calcPhysicsXformThrust( const Locomotor *locomotor, PhysicsXformI
 
 		}  // end else
 
+	}  // end if, wobble exists
+
+	if( WOBBLE_RATE )
+	{
+
 		info.m_totalPitch = m_locoInfo->m_pitch;
 		info.m_totalYaw = m_locoInfo->m_yaw;
 
-	}  // end if, wobble exists
+	}  // end if
 
 	if( THRUST_ROLL )
 	{
 
-		m_locoInfo->m_roll += THRUST_ROLL;
+		if( step )
+			m_locoInfo->m_roll += THRUST_ROLL;
 		info.m_totalRoll = m_locoInfo->m_roll;
 
 	}  // end if
@@ -1802,6 +1816,20 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
 	const Coord3D* accel = physics->getAcceleration();
 	const Coord3D* vel = physics->getVelocity();
 
+	/* Stepped on the retail clock, every second logic frame, so the springs, the locomotor's stiffness,
+		 damping and correction rates and the lean's ease frames keep the timing they were tuned at; the
+		 logic frame in between draws the last result, as calcPhysicsXformGround does. */
+	UnsignedInt now = TheGameLogic->getFrame() / LOGICFRAMES_PER_RETAIL_FRAME;
+	if (now == m_locoInfo->m_airFrame)
+	{
+		info.m_totalPitch = m_locoInfo->m_airPitch;
+		info.m_totalRoll = m_locoInfo->m_airRoll;
+		info.m_totalYaw = m_locoInfo->m_airYaw;
+		info.m_totalZ = 0.0f;
+		return;
+	}
+	m_locoInfo->m_airFrame = now;
+
 	m_locoInfo->m_pitchRate += ((-PITCH_STIFFNESS * m_locoInfo->m_pitch) + (-PITCH_DAMPING * m_locoInfo->m_pitchRate));		// spring/damper
 	m_locoInfo->m_rollRate += ((-ROLL_STIFFNESS * m_locoInfo->m_roll) + (-ROLL_DAMPING * m_locoInfo->m_rollRate));		// spring/damper
 
@@ -1824,7 +1852,7 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
 		const Real LEAN_AT_FULL_ACCEL = 0.2f;	// radians, at the locomotor's own Acceleration
 		const Real LEAN_AT_FULL_SPEED = 0.12f;	// radians, held at the locomotor's own Speed
 		const Real SOFT_LEAN = 0.27f;					// the lean flattens out towards this, about 15 degrees
-		const Real LEAN_EASE_FRAMES = 5.0f;		// each of the two smoothing stages, in logic frames
+		const Real LEAN_EASE_FRAMES = 5.0f;		// each of the two smoothing stages, in retail frames
 		const Real MAX_LEAN = 0.4f;
 		if (accelPitchLimit == 0.0f)
 			accelPitchLimit = MAX_LEAN;
@@ -1848,18 +1876,12 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
 			rollTarget = SOFT_LEAN * tanh((lateralAccel * accelScale + lateralVel * speedScale) / SOFT_LEAN);
 		}
 
-		/* The acceleration jumps from one logic frame to the next, and the spring below runs once a
-			 drawn frame, which at 120 frames a second is fast enough to copy every jump. Two smoothing
-			 stages stepped once a logic frame ease the lean in and out over about half a second. */
-		UnsignedInt now = TheGameLogic->getFrame();
-		if (now != m_locoInfo->m_leanFrame)
-		{
-			m_locoInfo->m_leanFrame = now;
-			m_locoInfo->m_leanPitch[0] += (pitchTarget - m_locoInfo->m_leanPitch[0]) / LEAN_EASE_FRAMES;
-			m_locoInfo->m_leanPitch[1] += (m_locoInfo->m_leanPitch[0] - m_locoInfo->m_leanPitch[1]) / LEAN_EASE_FRAMES;
-			m_locoInfo->m_leanRoll[0] += (rollTarget - m_locoInfo->m_leanRoll[0]) / LEAN_EASE_FRAMES;
-			m_locoInfo->m_leanRoll[1] += (m_locoInfo->m_leanRoll[0] - m_locoInfo->m_leanRoll[1]) / LEAN_EASE_FRAMES;
-		}
+		/* The acceleration jumps from one logic frame to the next, and the spring below would copy
+			 every jump. Two smoothing stages ease the lean in and out over about half a second. */
+		m_locoInfo->m_leanPitch[0] += (pitchTarget - m_locoInfo->m_leanPitch[0]) / LEAN_EASE_FRAMES;
+		m_locoInfo->m_leanPitch[1] += (m_locoInfo->m_leanPitch[0] - m_locoInfo->m_leanPitch[1]) / LEAN_EASE_FRAMES;
+		m_locoInfo->m_leanRoll[0] += (rollTarget - m_locoInfo->m_leanRoll[0]) / LEAN_EASE_FRAMES;
+		m_locoInfo->m_leanRoll[1] += (m_locoInfo->m_leanRoll[0] - m_locoInfo->m_leanRoll[1]) / LEAN_EASE_FRAMES;
 		pitchTarget = m_locoInfo->m_leanPitch[1];
 		rollTarget = m_locoInfo->m_leanRoll[1];
 	}
@@ -1888,18 +1910,22 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
 			}
 		}
 
-		// cause the chassis to pitch & roll in reaction to current speed
-		Real forwardVel = dir->x * vel->x + dir->y * vel->y;
+		// cause the chassis to pitch & roll in reaction to current speed; the coefficients were tuned
+		// against speeds per retail frame and accelerations per retail frame squared, and physics
+		// keeps them per logic frame
+		const Real RETAIL_VEL = (Real)LOGICFRAMES_PER_RETAIL_FRAME;
+		const Real RETAIL_ACCEL = RETAIL_VEL * RETAIL_VEL;
+		Real forwardVel = (dir->x * vel->x + dir->y * vel->y) * RETAIL_VEL;
 		m_locoInfo->m_pitch += -(FORWARD_VEL_COEFF * forwardVel);
 
-		Real lateralVel = -dir->y * vel->x + dir->x * vel->y;
+		Real lateralVel = (-dir->y * vel->x + dir->x * vel->y) * RETAIL_VEL;
 		m_locoInfo->m_roll += -(LATERAL_VEL_COEFF * lateralVel);
 
 		// cause the chassis to pitch & roll in reaction to acceleration/deceleration
-		Real forwardAccel = dir->x * accel->x + dir->y * accel->y;
+		Real forwardAccel = (dir->x * accel->x + dir->y * accel->y) * RETAIL_ACCEL;
 		m_locoInfo->m_accelerationPitchRate += -(FORWARD_ACCEL_COEFF * forwardAccel);
 
-		Real lateralAccel = -dir->y * accel->x + dir->x * accel->y;
+		Real lateralAccel = (-dir->y * accel->x + dir->x * accel->y) * RETAIL_ACCEL;
 		m_locoInfo->m_accelerationRollRate += -(LATERAL_ACCEL_COEFF * lateralAccel);
 	}
 
@@ -1925,14 +1951,16 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
   info.m_totalYaw = RUDDER_CORRECTION_DEGREE * sin( m_locoInfo->m_yawModulator += RUDDER_CORRECTION_RATE );
   info.m_totalPitch += ELEVATOR_CORRECTION_DEGREE * cos( m_locoInfo->m_pitchModulator += ELEVATOR_CORRECTION_RATE );
 
-
+	m_locoInfo->m_airPitch = info.m_totalPitch;
+	m_locoInfo->m_airRoll = info.m_totalRoll;
+	m_locoInfo->m_airYaw = info.m_totalYaw;
 	info.m_totalZ = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Treads, wheels and motorcycles. EA stepped their springs once a drawn frame, which was once a
 	* logic frame at the 30 pictures a second the game was tuned at; at 120 the chassis bounced and
-	* settled four times as fast. They are stepped once a logic frame here, catching up when a slow
+	* settled four times as fast. They are stepped once a retail frame here, catching up when a slow
 	* picture let more than one go by, and the pictures in between show the last result: the unit's
 	* position does not move between logic frames either.
 	*
@@ -1951,11 +1979,15 @@ void Drawable::calcPhysicsXformGround( const Locomotor *locomotor, PhysicsXformI
 		m_locoInfo = newInstance(DrawableLocoInfo);
 
 	const UnsignedInt MAX_CATCH_UP_FRAMES = 4;	// more than this unseen and there is nothing to measure against
-	const Real LEAN_EASE_FRAMES = 3.0f;					// each of the three smoothing stages, in logic frames
+	const Real LEAN_EASE_FRAMES = 3.0f;					// each of the three smoothing stages, in retail frames
 	const Real START_GAIN = 11.0f;							// a one frame start from rest to top speed peaks at tanh(1.2) of the limit
 	const Real DEFAULT_LEAN_LIMIT = 0.07f;			// 4 degrees, for a locomotor that reacts but names no limit, like the Humvee's
 
-	UnsignedInt now = TheGameLogic->getFrame();
+	/* Stepped on the retail clock, every second logic frame, so the springs, the locomotor's
+		 stiffness and damping and the ease frames below keep the timing they were tuned at.  Speeds are
+		 per logic frame and only ever divided by the locomotor's own top speed, which cancels; the turn
+		 rate does not, so it is taken per retail frame. */
+	UnsignedInt now = TheGameLogic->getFrame() / LOGICFRAMES_PER_RETAIL_FRAME;
 	UnsignedInt steps = now - m_locoInfo->m_groundFrame;
 	if (steps != 0)
 	{
@@ -1989,7 +2021,7 @@ void Drawable::calcPhysicsXformGround( const Locomotor *locomotor, PhysicsXformI
 		if (locomotor->getForwardAccelCoef() != 0.0f || locomotor->getLateralAccelCoef() != 0.0f)
 		{
 			Real maxSpeed = locomotor->getMaxSpeedForCondition(bdt);
-			Real maxLateral = maxSpeed * locomotor->getMaxTurnRate(bdt);
+			Real maxLateral = maxSpeed * locomotor->getMaxTurnRate(bdt) * LOGICFRAMES_PER_RETAIL_FRAME;
 			pitchIn = maxSpeed > 0.0f ? -START_GAIN * forwardAccel / maxSpeed : 0.0f;
 			rollIn = maxLateral > 0.0f ? -lateralAccel / maxLateral : 0.0f;
 		}
@@ -2114,7 +2146,8 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 				amount = 1.0f;
 
 			// rough vibrations proportional to speed when we drive over something
-			Real rough = (vel->x*vel->x + vel->y*vel->y) * OVERLAP_ROUGH_VIBRATION_FACTOR;
+			// the speed per retail frame, which the factor was tuned for
+			Real rough = (vel->x*vel->x + vel->y*vel->y) * sqr((Real)LOGICFRAMES_PER_RETAIL_FRAME) * OVERLAP_ROUGH_VIBRATION_FACTOR;
 			if (rough > MAX_ROUGH_VIBRATION)
 				rough = MAX_ROUGH_VIBRATION;
 			
@@ -2286,7 +2319,7 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 
 	const Real ACCEL_PITCH_LIMIT = locomotor->getAccelPitchLimit();
 	const Real DECEL_PITCH_LIMIT = locomotor->getDecelPitchLimit();
-	const Real BOUNCE_ANGLE_KICK = locomotor->getBounceKick();
+	const Real BOUNCE_ANGLE_KICK = locomotor->getBounceKick() * LOGICFRAMES_PER_RETAIL_FRAME;	// parsed per logic frame, stepped per retail frame
 	const Real PITCH_STIFFNESS = locomotor->getPitchStiffness();
 	const Real ROLL_STIFFNESS =  locomotor->getRollStiffness();
 	const Real PITCH_DAMPING = locomotor->getPitchDamping();
@@ -2568,7 +2601,7 @@ void Drawable::calcPhysicsXformMotorcycle( const Locomotor *locomotor, PhysicsXf
 
 	const Real ACCEL_PITCH_LIMIT = locomotor->getAccelPitchLimit();
 	const Real DECEL_PITCH_LIMIT = locomotor->getDecelPitchLimit();
-	const Real BOUNCE_ANGLE_KICK = locomotor->getBounceKick();
+	const Real BOUNCE_ANGLE_KICK = locomotor->getBounceKick() * LOGICFRAMES_PER_RETAIL_FRAME;	// parsed per logic frame, stepped per retail frame
 	const Real PITCH_STIFFNESS = locomotor->getPitchStiffness();
 	const Real ROLL_STIFFNESS =  locomotor->getRollStiffness();
 	const Real PITCH_DAMPING = locomotor->getPitchDamping();

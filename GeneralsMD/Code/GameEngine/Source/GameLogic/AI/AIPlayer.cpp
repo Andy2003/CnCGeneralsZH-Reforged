@@ -1024,8 +1024,9 @@ Object *AIPlayer::buildStructureNow(const ThingTemplate *bldgPlan, BuildListInfo
 	* cells either way: half the width of the square rings it replaced. */
 static const Int BUILD_SEARCH_CELLS = 5;
 static const Int SKIRMISH_BUILD_SEARCH_CELLS = 60;
-static const Int BUILD_PROBES_PER_FRAME = 32;			///< isLocationLegalToBuild calls one frame may spend
-static const Int BUILD_EXPANSIONS_PER_FRAME = 512;	///< cells one frame may take off the flood's queue
+/// Budgets fitted at 30 logic frames a second, halved at 60 so a search runs at the same pace per second.
+static const Int BUILD_PROBES_PER_FRAME = 32 / LOGICFRAMES_PER_RETAIL_FRAME;			///< isLocationLegalToBuild calls one frame may spend
+static const Int BUILD_EXPANSIONS_PER_FRAME = 512 / LOGICFRAMES_PER_RETAIL_FRAME;	///< cells one frame may take off the flood's queue
 
 /** How far from the base center, in base radii, a building that stays home may stand.  Two, the
 	* reach the home guard already answers to (the 2.0f * m_baseRadius lists).  1.25 was tried first:
@@ -1127,7 +1128,7 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 		 landing together, because a completed building shortcuts the timer that was meant to keep
 		 the players apart.
 
-		 The loser waits exactly one frame - a thirtieth of a second on a building that takes half a
+		 The loser waits exactly one frame - a sixtieth of a second on a building that takes half a
 		 minute to put up. The order is the player list order, so every machine defers the same
 		 player on the same frame and a replay still matches. */
 	if (!TheAI->claimBuildingPlacement(TheGameLogic->getFrame())) {

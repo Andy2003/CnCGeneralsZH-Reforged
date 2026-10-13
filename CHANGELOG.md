@@ -8,6 +8,12 @@ found and fixed â€” EA's own, not port damage.**
 
 ---
 
+## The battle runs at 60 steps a second
+
+- The game now works out the battle 60 times a second, double the 30 Zero Hour has run at since 2003. Each step is 17 milliseconds where it was 33, so an order you give waits half as long for the step that carries it out, and a unit turning, braking or firing moves in steps half the size.
+- The match plays at the speed it always did. Every speed, delay, reload and build time in the game's data was converted to the shorter step, so a Crusader still fires every two seconds and the game speed setting means what it did. The balance is the one you know.
+- Replays and saved games from earlier versions will not load in this one. A player on an earlier version cannot join a match with a player on this version, whichever of them hosts, so a LAN party needs everyone on the same build.
+
 ## Zero Hour on a Mac, on Linux and on the Steam Deck
 
 - The game runs on Apple silicon Macs and on Linux, the Steam Deck included, as a program built for that machine. There is no Wine or Proton underneath. It draws through Metal on a Mac and through Vulkan on Linux, from the same Zero Hour files you already own.

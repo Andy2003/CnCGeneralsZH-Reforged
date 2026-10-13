@@ -80,7 +80,7 @@ StealthUpdateModuleData::StealthUpdateModuleData()
     m_stealthSpeed		= 0.0f;
     m_friendlyOpacityMin = 0.5f;
     m_friendlyOpacityMax = 1.0f;
-    m_pulseFrames = 30;
+    m_pulseFrames = LOGICFRAMES_PER_SECOND;
     m_teamDisguised		= false;
     m_revealDistanceFromTarget = 0.0f;
     m_orderIdleEnemiesToAttackMeUponReveal = false;
@@ -144,7 +144,7 @@ StealthUpdate::StealthUpdate( Thing *thing, const ModuleData* moduleData ) : Upd
 	//Initialization(s) inserted
 	m_detectionExpiresFrame = 0;
 	//
-	m_pulsePhaseRate		= 0.2f;
+	m_pulsePhaseRate		= ConvertRetailPerFrameRate(0.2f);
 	m_pulsePhase				= GameClientRandomValueReal(0, PI);
 
 	m_disguiseAsPlayerIndex			= -1;
@@ -310,7 +310,7 @@ Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
 		// set from now, don't accumulate: after the object slept for a while the timer was far
 		// behind the current frame, and advancing it one interval per call meant the full
 		// iterateObjects player scan below ran EVERY frame until it caught up.
-		m_nextBlackMarketCheckFrame = now + data->m_blackMarketCheckFrames + GameLogicRandomValue( 0, 10 ); 
+		m_nextBlackMarketCheckFrame = now + data->m_blackMarketCheckFrames + GameLogicRandomValue( 0, ConvertRetailFrames( 10 ) );
 		
 		//If we can't find an active black market, then we can't stealth.
 		Bool blackMarket = FALSE;

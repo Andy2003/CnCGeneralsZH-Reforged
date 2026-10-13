@@ -994,7 +994,8 @@ void ControlBarSchemeManager::update( void )
 	static UnsignedInt lastStepMs = 0;
 	static Real stepAccumMs = 0.0f;
 
-	if (!GameClient_isUiAnimStepDue(lastStepMs, stepAccumMs, Clock_Milliseconds(), UI_ANIM_STEPS_PER_SEC))
+	// Duration is parsed from ms into logic frames, so the steps are logic frames too
+	if (!GameClient_isUiAnimStepDue(lastStepMs, stepAccumMs, Clock_Milliseconds(), LOGICFRAMES_PER_SECONDS_REAL))
 		return;
 
 	if(m_currentScheme)

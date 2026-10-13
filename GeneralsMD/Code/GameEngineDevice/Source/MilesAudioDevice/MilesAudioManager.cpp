@@ -527,7 +527,7 @@ void MilesAudioManager::reset()
 	* exactly 1/30 of a second of sound per logic frame, however long the frame took on the wall clock.
 	* So the file is as long as the frames it spans and lines up with the picture of the same frames,
 	* in a run that plays at the speed a person hears, in a -directorrecord run that crawls, and on a
-	* machine with no speakers.  A sound asked for during frame N starts N/30 seconds in, because the
+	* machine with no speakers.  A sound asked for during frame N starts N/LOGICFRAMES_PER_SECOND seconds in, because the
 	* requests are only played after this has mixed up to N.  Nothing is heard while it runs. */
 static void updateSoundCapture( void )
 {

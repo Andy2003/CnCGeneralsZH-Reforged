@@ -66,7 +66,7 @@
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
-enum { OVERLAY_REFRESH_RATE = 6 };  ///< over updates once this many frames
+enum { OVERLAY_REFRESH_RATE = 6 * LOGICFRAMES_PER_RETAIL_FRAME };  ///< over updates once this many frames
 
 //-------------------------------------------------------------------------------------------------
 /** Is the point legal, that is, inside the resolution of the radar cells */

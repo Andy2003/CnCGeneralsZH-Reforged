@@ -1406,13 +1406,14 @@ Int parseIgnoreStackTrace(char *args[], int num)
 #endif
 
 /* -fps <n> is the game speed itself: the rate the logic tick is paced at, the command-line twin of
-	 the skirmish menu's game speed slider.  MSG_NEW_GAME only honours 1..1000. */
+	 the skirmish menu's game speed slider.  MSG_NEW_GAME only honours 1..1000.  n is in retail 30 Hz
+	 frames, so -fps 30 is still normal speed and every script that passes it keeps its meaning. */
 
 Int parseFPSLimit(char *args[], int num)
 {
 	if (TheWritableGlobalData && num > 1)
 	{
-		TheWritableGlobalData->m_framesPerSecondLimit = atoi(args[1]);
+		TheWritableGlobalData->m_framesPerSecondLimit = ConvertRetailFrames(atoi(args[1]));
 	}
 	return 2;
 }
@@ -1599,11 +1600,12 @@ Int parseDirectorRecord(char *args[], int num)
 	return consumed;
 }
 
-/* -recordfps <n>: the frame rate -video and -directorrecord record at, a multiple of the logic's 30.
+/* -recordfps <n>: the frame rate -video and -directorrecord record at, a multiple of the logic's
+	 * LOGICFRAMES_PER_SECOND (60).
 	 *
-	 * At 30 a picture is a logic frame.  At 60 each recorded logic frame is drawn twice before the next
+	 * At 60 a picture is a logic frame.  At 120 each recorded logic frame is drawn twice before the next
 	 * one runs, the first picture blended half way from the frame before (smooth motion, on for it
-	 * whatever the option says), and ffmpeg is told 60.  The logic runs the same frames either way. */
+	 * whatever the option says), and ffmpeg is told 120.  The logic runs the same frames either way. */
 Int parseRecordFps(char *args[], int num)
 {
 	if (num < 2)
@@ -1612,7 +1614,7 @@ Int parseRecordFps(char *args[], int num)
 		return num;
 	}
 	// four pictures a frame at most: W3D's clock moves in whole milliseconds, and a picture's share of a
-	// 33 ms frame has to be one at least or the drawables are never drawn
+	// 16 ms frame has to be one at least or the drawables are never drawn
 	const Int MOST_PICTURES = 4;
 	const Int fps = atoi(args[1]);
 	if (fps < LOGICFRAMES_PER_SECOND || fps % LOGICFRAMES_PER_SECOND != 0 || fps > MOST_PICTURES * LOGICFRAMES_PER_SECOND)

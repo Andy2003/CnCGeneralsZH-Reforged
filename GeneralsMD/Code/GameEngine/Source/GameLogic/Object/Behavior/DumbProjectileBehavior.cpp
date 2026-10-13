@@ -397,9 +397,10 @@ void DumbProjectileBehavior::projectileFireAtObjectOrPosition( const Object *vic
  	PhysicsBehavior* physics = projectile->getPhysics();
  	if ( d->m_tumbleRandomly && physics)
 	{
-		physics->setPitchRate( GameLogicRandomValueReal( -1.0f/PI, 1.0f/PI ) );
-		physics->setYawRate( GameLogicRandomValueReal( -1.0f/PI, 1.0f/PI ) );
-		physics->setRollRate( GameLogicRandomValueReal( -1.0f/PI, 1.0f/PI ) );
+		const Real maxTumbleRate = ConvertRetailPerFrameRate( 1.0f/PI );
+		physics->setPitchRate( GameLogicRandomValueReal( -maxTumbleRate, maxTumbleRate ) );
+		physics->setYawRate( GameLogicRandomValueReal( -maxTumbleRate, maxTumbleRate ) );
+		physics->setRollRate( GameLogicRandomValueReal( -maxTumbleRate, maxTumbleRate ) );
 	}
 
 	m_flightPathStart = *getObject()->getPosition();

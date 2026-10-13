@@ -1239,7 +1239,7 @@ void W3DInGameUI::drawMoveHints( View *view )
 	{
 		Int elapsed = TheGameClient->getFrame() - m_moveHint[i].frame;
 
-		if( m_moveHint[ i ].frame != 0 && elapsed <= 40 )
+		if( m_moveHint[ i ].frame != 0 && elapsed <= ConvertRetailFrames( 40 ) )
 		{
 			// create render object and add to scene of needed
 			if( m_moveHintRenderObj[ i ] == NULL )

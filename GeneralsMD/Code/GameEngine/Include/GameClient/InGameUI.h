@@ -787,7 +787,7 @@ public:  // ********************************************************************
 	// first structure really does exist by the time the second order arrives.
 	//
 	enum { PENDING_PLACEMENTS = 64 };						///< orders in flight at once, a whole shift-dragged row among them; the oldest is overwritten
-	enum { PENDING_PLACEMENT_FRAMES = 60 };			///< logic frames one is remembered for - two seconds,
+	enum { PENDING_PLACEMENT_FRAMES = LOGICFRAMES_PER_SECOND * 2 };			///< logic frames one is remembered for - two seconds,
 																							///  comfortably longer than any network delay
 
 	/// the ground a structure stands on: its box with the bib, turned to its heading
@@ -1237,7 +1237,8 @@ protected:
 		UnsignedInt blockBeginFrame;							///< The frame at which the block started it's current state
 		ICoord2D blockPos;												///< where the upper left of the block should begin
 		UnsignedInt incrementOnFrame;							///< if we're currently on a frame greater then this, increment our position
-		Color color;															///< what color should we display the military subtitles
+		UnsignedInt fadeStep;											///< retail frames past its lifetime when the fade was last applied
+		Color color;														///< what color should we display the military subtitles
 	};
 
 	typedef std::list<Object *> ObjectList;
@@ -1409,7 +1410,7 @@ protected:
 		Color color;
 	};
 	ClassicMessage							m_classicMessages[ CLASSIC_MESSAGES ];	///< newest first
-	UnsignedInt									m_classicMessageFadeFrame;			///< the last logic frame the fade was stepped on
+	UnsignedInt									m_classicMessageFadeFrame;			///< the last retail 30 Hz frame the fade was stepped on
 	void addClassicMessage( const UnicodeString &text, const Color *color );
 	void fadeClassicMessages( void );
 	void drawClassicMessages( void );

@@ -66,10 +66,10 @@ inline Bool supplyDockHasNextBox( Int stockLeft, Int dockerBoxes, Int dockerMax 
 	* spot is, and that spot is the clear ground nearest the building on the worker's side.  A stash
 	* built at the legal limit leaves a gap about 24 feet wide beside the pile, and a worker standing
 	* in it is on both approach spots at once: it loaded and unloaded without taking a step, a box
-	* every 15 frames where a worker that walks the same gap needs 37 or more.  37 frames is that
-	* shortest walked leg, so the floor only ever catches a worker that did not walk. */
+	* every 15 frames where a worker that walks the same gap needs 37 or more (30 Hz frames).  37 is
+	* that shortest walked leg, so the floor only ever catches a worker that did not walk. */
 //-------------------------------------------------------------------------------------------------
-enum { SUPPLY_DOCK_MIN_LEG_FRAMES = 37 };
+enum { SUPPLY_DOCK_MIN_LEG_FRAMES = ConvertRetailFrames( 37 ) };
 
 inline UnsignedInt supplyDockLegDelay( UnsignedInt dockDelay, UnsignedInt now, UnsignedInt lastActionFrame )
 {

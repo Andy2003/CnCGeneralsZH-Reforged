@@ -91,7 +91,7 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 	{ "UseTrees",									INI::parseBool,				NULL,			offsetof( GlobalData, m_useTrees ) },
 	{ "UseFPSLimit",							INI::parseBool,				NULL,			offsetof( GlobalData, m_useFpsLimit ) },
 	{ "DumpAssetUsage",						INI::parseBool,				NULL,			offsetof( GlobalData, m_dumpAssetUsage ) },
-	{ "FramesPerSecondLimit",			INI::parseInt,				NULL,			offsetof( GlobalData, m_framesPerSecondLimit ) },
+	{ "FramesPerSecondLimit",			INI::parseRetailFramesInt,	NULL,			offsetof( GlobalData, m_framesPerSecondLimit ) },	// retail 30 is normal speed: LOGICFRAMES_PER_SECOND
 	{ "ChipsetType",							INI::parseInt,				NULL,			offsetof( GlobalData, m_chipSetType ) },
 	{ "MaxShellScreens",					INI::parseInt,				NULL,			offsetof( GlobalData, m_maxShellScreens ) },
 	{ "UseCloudMap",							INI::parseBool,				NULL,			offsetof( GlobalData, m_useCloudMap ) },
@@ -1078,7 +1078,7 @@ GlobalData::GlobalData()
 
 	// By default, show all asserts.
 
-	m_unlookPersistDuration		= 30;
+	m_unlookPersistDuration		= ConvertRetailFrames(30);
 
 	//-----------------------------------------------------------------------------------------------
 

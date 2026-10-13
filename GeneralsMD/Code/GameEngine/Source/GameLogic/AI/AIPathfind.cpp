@@ -227,7 +227,7 @@ private:
 static Int frameToShowObstacles;
 
 
-static UnsignedInt ZONE_UPDATE_FREQUENCY = 300;
+static UnsignedInt ZONE_UPDATE_FREQUENCY = 10 * LOGICFRAMES_PER_SECOND;
 
 //-----------------------------------------------------------------------------------
 PathNode::PathNode() :
@@ -1421,7 +1421,7 @@ void Path::computePointOnPath(
 				/* The last place a lane can die: the band measured as one cell wide, the taper closed
 					 it, or the line to the lane point is not drivable. Logged once a second per unit -
 					 every frame is a megabyte a minute and says nothing more. */
-				if (TheGlobalData->m_showLanes && (TheGameLogic->getFrame() % 30) == 0)
+				if (TheGlobalData->m_showLanes && (TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND) == 0)
 				{
 					DEBUG_LOG(("SHOWLANES cpop: unit %d lane=%.2f room=%.0f/%.0f left=%.0f lateral=%.1f applied=%d\n",
 						obj->getID(), ai->getLaneFraction(), leftRoom, rightRoom, remaining, lateral,
@@ -1528,8 +1528,11 @@ Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
 
 	 Tried a second time next to the request cap below, in case the cap changed the arithmetic: it
 	 does not. 2500 cells with three requests a frame gives mean 1.24ms to 1.30 and blocked 7,191 to
-	 9,837. Cells are the wrong knob on this queue; requests are the right one. */
-enum { PATHFIND_CELLS_PER_FRAME=5000}; // Number of cells we will search pathfinding per frame.
+	 9,837. Cells are the wrong knob on this queue; requests are the right one.
+
+	 Those numbers are at 30 logic frames a second. At 60 the budget is halved, so the queue searches
+	 the same 150,000 cells a second it was fitted at and a frame half as long spends half the time. */
+enum { PATHFIND_CELLS_PER_FRAME = 5000 / LOGICFRAMES_PER_RETAIL_FRAME }; // Number of cells we will search pathfinding per frame.
 // A* open+closed sets draw from this pool; running dry aborts the search (no path) after
 // burning the time.  Retail 30000 was sized for 2003 memory - a long detour around a
 // mountain on a large map can need more.  48 bytes each, so this is ~7 MB.
@@ -7644,6 +7647,9 @@ void Pathfinder::processPathfindQueue(void)
 		 waiting answered the backlog sooner and made the army leave later, the last unit 23.2 s after
 		 the order against 19.1 s, with one of them never arriving. The back of a packed army waits for
 		 the front to clear, not for its path, and more paths at once is more units shoving. */
+	/* Kept at three per frame at 60 logic frames a second rather than halved: one and a half is not a
+		 count, two was measured worse, and the cap is there to clip a burst within a frame, which a
+		 frame half as long needs no less. */
 	enum { PATHFIND_REQUESTS_PER_FRAME = 3 };
 	Int requestsThisFrame = 0;
 

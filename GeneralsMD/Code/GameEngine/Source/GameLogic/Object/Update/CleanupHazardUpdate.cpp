@@ -275,7 +275,7 @@ void CleanupHazardUpdate::fireWhenReady()
 			{
 				//We were in range last frame, but the target has moved out of firing range, so 
 				//re-evaluate by forcing a new scan.
-				m_nextScanFrames = GameLogicRandomValue( 0, 3 );
+				m_nextScanFrames = GameLogicRandomValue( 0, ConvertRetailFrames( 3 ) );
 				m_bestTargetID = INVALID_ID;
 				m_inRange = false;	// or every later out-of-range target rescans and drops too
 				if( !m_nextScanFrames )

@@ -80,7 +80,7 @@ MissileAIUpdateModuleData::MissileAIUpdateModuleData()
 	m_lockDistance = 75.0f;	
 	m_distanceScatterWhenJammed = 75.0f;
     m_detonateCallsKill = FALSE;
-    m_killSelfDelay   = 3; // just long enough for the contrail to catch up to me
+    m_killSelfDelay   = ConvertRetailFrames(3); // just long enough for the contrail to catch up to me
 }
 
 //-----------------------------------------------------------------------------
@@ -229,7 +229,8 @@ void MissileAIUpdate::projectileFireAtObjectOrPosition( const Object *victim, co
 		Locomotor* curLoco = getCurLocomotor();
 		if (curLoco)
 		{
-			m_maxAccel = weaponSpeed;
+			// the speed doubles as an acceleration: full speed in one retail frame, which is two now
+			m_maxAccel = ConvertRetailPerFrameRate(weaponSpeed);
 			curLoco->setMaxSpeed(weaponSpeed);
 			curLoco->setMaxAcceleration(m_maxAccel);
 		}

@@ -7049,7 +7049,8 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			}
 			else
 			{
-				TheGameEngine->setFramesPerSecondLimit(pAction->getParameter(0)->getInt());
+				// the map asks for a 30 Hz logic rate; 30 is normal speed
+				TheGameEngine->setFramesPerSecondLimit(ConvertRetailFrames(pAction->getParameter(0)->getInt()));
 			}
 			// Setting the fps limit doesn't do much good if we don't use it.  jba.
 			TheWritableGlobalData->m_useFpsLimit = true; 
@@ -7274,20 +7275,21 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			doTeamStopSequentialScript(pAction->getParameter(0)->getString());
 			return;
 
+		// map frame counts are 30 Hz frames
 		case ScriptAction::UNIT_GUARD_FOR_FRAMECOUNT:
-			doUnitGuardForFramecount(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			doUnitGuardForFramecount(pAction->getParameter(0)->getString(), ConvertRetailFrames(pAction->getParameter(1)->getInt()));
 			return;
 
 		case ScriptAction::UNIT_IDLE_FOR_FRAMECOUNT:
-			doUnitIdleForFramecount(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			doUnitIdleForFramecount(pAction->getParameter(0)->getString(), ConvertRetailFrames(pAction->getParameter(1)->getInt()));
 			return;
-		
+
 		case ScriptAction::TEAM_GUARD_FOR_FRAMECOUNT:
-			doTeamIdleForFramecount(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			doTeamIdleForFramecount(pAction->getParameter(0)->getString(), ConvertRetailFrames(pAction->getParameter(1)->getInt()));
 			return;
-		
+
 		case ScriptAction::TEAM_IDLE_FOR_FRAMECOUNT:
-			doTeamIdleForFramecount(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			doTeamIdleForFramecount(pAction->getParameter(0)->getString(), ConvertRetailFrames(pAction->getParameter(1)->getInt()));
 			return;
 
 		case ScriptAction::WATER_CHANGE_HEIGHT:
@@ -7418,7 +7420,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			return;
 
 		case ScriptAction::TEAM_SPIN_FOR_FRAMECOUNT:
-			doTeamSpinForFramecount( pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt() );
+			doTeamSpinForFramecount( pAction->getParameter(0)->getString(), ConvertRetailFrames(pAction->getParameter(1)->getInt()) );
 			return;
 
 		case ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NAMED:

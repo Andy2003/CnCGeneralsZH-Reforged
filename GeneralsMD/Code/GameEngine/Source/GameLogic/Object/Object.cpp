@@ -1798,7 +1798,8 @@ inline Bool isPosDifferent(const Coord3D* a, const Coord3D* b)
 	// "standing still", due to roundoff errors. It's important that we only invalidate
 	// the PartitionManager stuff when the pos/orientation really changes (for efficiency purposes)
 	// so we must put in some cleverness...
-	const Real THRESH = 0.01f;
+	// a move per frame: scaled with the frame so the slowest mover that dirties its cells is unchanged
+	const Real THRESH = ConvertRetailPerFrameRate(0.01f);
 
 	if (fabs(a->x - b->x) > THRESH)
 		return true;
@@ -1820,7 +1821,7 @@ inline Bool isAngleDifferent(Real a, Real b)
 	// the PartitionManager stuff when the pos/orientation really changes (for efficiency purposes)
 	// so we must put in some cleverness...
 
-	const Real THRESH = 0.01f;	// in radians, this is approx 1/2 degree.
+	const Real THRESH = ConvertRetailPerFrameRate(0.01f);	// radians turned in one frame; 0.01 is approx 1/2 degree.
 
 	if (fabs(a - b) > THRESH)
 		return true;
@@ -5059,7 +5060,7 @@ void Object::onDie( DamageInfo *damageInfo )
 	// Just in case I have been sporting one of thise fancy Terrain Decals,
 	//I naturally lose it now, because I'm dead.
 	Drawable *draw = getDrawable();
-	if (draw) draw->setTerrainDecalFadeTarget(0.0f, -0.03f);//fade...
+	if (draw) draw->setTerrainDecalFadeTarget(0.0f, ConvertRetailPerFrameRate(-0.03f));//fade...
 	//if (draw) draw->setTerrainDecal(TERRAIN_DECAL_NONE);//pop!
 
 

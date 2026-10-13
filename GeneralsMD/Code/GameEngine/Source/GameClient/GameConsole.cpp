@@ -150,8 +150,8 @@ static AsciiString runCheat( const ConsoleCheat &cheat, AsciiString arguments )
 	* often a logic frame runs and nothing inside one, so a network game, which runs at the pace the
 	* whole room agrees on, is the one place it is refused. */
 //-------------------------------------------------------------------------------------------------
-static const Int SPEED_MIN_PERCENT = 17;		///< 5 logic frames a second
-static const Int SPEED_MAX_PERCENT = 666;		///< 200 logic frames a second
+static const Int SPEED_MIN_PERCENT = 17;		///< 10 logic frames a second
+static const Int SPEED_MAX_PERCENT = 666;		///< 400 logic frames a second
 static const Int SPEED_NORMAL_PERCENT = 100;
 
 static AsciiString runSpeed( AsciiString arguments )

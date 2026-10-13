@@ -655,11 +655,11 @@ void ConnectionManager::processRunAheadMetrics(NetRunAheadMetricsCommandMsg *msg
 		m_latencyAverages[player] = msg->getAverageLatency();
 		m_fpsAverages[player] = msg->getAverageFps();
 		//DEBUG_LOG(("ConnectionManager::processRunAheadMetrics - player %d, fps = %d, latency = %f\n", player, msg->getAverageFps(), msg->getAverageLatency()));
-		if (m_fpsAverages[player] > 100) {
-			// limit the reported frame rate average to 100.  This is done because if a
+		if (m_fpsAverages[player] > ConvertRetailFrames(100)) {
+			// limit the reported frame rate average to 100 retail frames.  This is done because if a
 			// user alt-tab's out of the game their frame rate climbs to in the neighborhood of
 			// 300, that was deemed "ugly" by the powers that be.
-			m_fpsAverages[player] = 100;
+			m_fpsAverages[player] = ConvertRetailFrames(100);
 		}
 	}
 }
@@ -1333,6 +1333,9 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 				 on the settled rate rather than this one: it is the room's honest measured speed, and
 				 sizing a safety window on the rate we are hoping for is how the window comes up short. */
 			Int commandedFps = probeRoomFrameRate(minFps, TheGlobalData->m_framesPerSecondLimit);
+			// the rate crosses the wire as an UnsignedByte, and -fps is in logic frames now (twice retail)
+			if (commandedFps > UCHAR_MAX)
+				commandedFps = UCHAR_MAX;
 			Int newRunAhead = computeRunAhead(getMaximumLatency(), minFps,
 				TheGlobalData->m_networkRunAheadSlack, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2);
 

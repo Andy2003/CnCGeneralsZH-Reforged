@@ -939,7 +939,7 @@ const FieldParse InGameUI::s_fieldParseTable[] =
 	{ "MilitaryCaptionBold",						INI::parseBool,					NULL,		offsetof( InGameUI, m_militaryCaptionBold ) },
 
 	{ "MilitaryCaptionRandomizeTyping",	INI::parseBool,					NULL,		offsetof( InGameUI, m_militaryCaptionRandomizeTyping ) },
-	{ "MilitaryCaptionSpeed",						INI::parseInt,					NULL,		offsetof( InGameUI, m_militaryCaptionSpeed ) },
+	{ "MilitaryCaptionSpeed",						INI::parseRetailFramesInt,					NULL,		offsetof( InGameUI, m_militaryCaptionSpeed ) },
 
 	{ "MilitaryCaptionPosition",				INI::parseICoord2D,			NULL,		offsetof( InGameUI, m_militaryCaptionPosition ) },
 
@@ -1101,7 +1101,7 @@ InGameUI::InGameUI()
 	m_militaryCaptionBold = FALSE;
 
 	m_militaryCaptionRandomizeTyping = FALSE;
-	m_militaryCaptionSpeed = 1;
+	m_militaryCaptionSpeed = ConvertRetailFrames( 1 );
 	m_popupMessageColor = GameMakeColor(255,255,255,255);
 
 	m_tooltipsDisabledUntil = 0;
@@ -2361,24 +2361,33 @@ void InGameUI::update( void )
 		// if it's time to remove the subtitle, Then remove it
 		if((Int)m_militarySubtitle->lifetime < (Int)currLogicFrame)
 		{
-			//steal colins fade from above :)
-			GameGetColorComponents( m_militarySubtitle->color, &r, &g, &b, &a );
-			// start fading the alpha on this color down
-			amount = REAL_TO_INT( ((currLogicFrame - m_militarySubtitle->lifetime ) * 0.1f) );
-			if( a - amount < 0 )
+			// the fade takes 0.1 more alpha each step than the last, so it is stepped once a retail
+			// frame of the subtitle's age, the logic frame and render passes in between holding the
+			// colour; a script freeze ages it through lifetime, so the age is the clock, not the frame
+			const UnsignedInt fadeStep = (currLogicFrame - m_militarySubtitle->lifetime) / LOGICFRAMES_PER_RETAIL_FRAME;
+			if( fadeStep != m_militarySubtitle->fadeStep )
 			{
-				removeMilitarySubtitle();
-			}
-			else
-			{
-				a -= amount;
-				m_militarySubtitle->color = GameMakeColor(r, g, b, a);
+				m_militarySubtitle->fadeStep = fadeStep;
+				//steal colins fade from above :)
+				GameGetColorComponents( m_militarySubtitle->color, &r, &g, &b, &a );
+				// start fading the alpha on this color down
+				amount = REAL_TO_INT( fadeStep * 0.1f );
+				if( a - amount < 0 )
+				{
+					removeMilitarySubtitle();
+				}
+				else
+				{
+					a -= amount;
+					m_militarySubtitle->color = GameMakeColor(r, g, b, a);
+				}
 			}
 		}
 		else
 		{
 			// trigger whether or not we should draw the block	
-			if( m_militarySubtitle->blockBeginFrame + 9 < currLogicFrame )
+			// retail toggled every 10 frames, its 9 plus the strict <'s one; the 10 is doubled, not the 9
+			if( m_militarySubtitle->blockBeginFrame + ConvertRetailFrames( 10 ) - 1 < currLogicFrame )
 			{
 				m_militarySubtitle->blockBeginFrame = currLogicFrame;
 				m_militarySubtitle->blockDrawn = !m_militarySubtitle->blockDrawn;
@@ -2435,10 +2444,12 @@ void InGameUI::update( void )
 					// lets make a sound
 					static AudioEventRTS click("MilitarySubtitlesTyping");
 					TheAudio->addAudioEvent(&click);
+					// a letter every speed + 1 retail frames, the strict < above being the + 1: the speed is
+					// parsed doubled, so the + 1 is doubled here too
 					if(TheGlobalLanguageData)
-						m_militarySubtitle->incrementOnFrame = currLogicFrame + TheGlobalLanguageData->m_militaryCaptionSpeed;
+						m_militarySubtitle->incrementOnFrame = currLogicFrame + TheGlobalLanguageData->m_militaryCaptionSpeed + LOGICFRAMES_PER_RETAIL_FRAME - 1;
 					else
-						m_militarySubtitle->incrementOnFrame = currLogicFrame + m_militaryCaptionSpeed;
+						m_militarySubtitle->incrementOnFrame = currLogicFrame + m_militaryCaptionSpeed + LOGICFRAMES_PER_RETAIL_FRAME - 1;
 
 				}
 				// increment the index			
@@ -2562,7 +2573,7 @@ void InGameUI::update( void )
 
 	Real cameraSteps = 1.0f;
 	if( m_cameraKeyLastMs != 0 )
-		cameraSteps = (Real)(cameraNowMs - m_cameraKeyLastMs) * (LOGICFRAMES_PER_SECOND / 1000.0f);
+		cameraSteps = (Real)(cameraNowMs - m_cameraKeyLastMs) * (RETAIL_LOGICFRAMES_PER_SECOND / 1000.0f);
 	m_cameraKeyLastMs = cameraNowMs;
 	if( cameraSteps > 4.0f )
 		cameraSteps = 4.0f;
@@ -2790,7 +2801,7 @@ void InGameUI::addClassicMessage( const UnicodeString &text, const Color *color 
 //-------------------------------------------------------------------------------------------------
 void InGameUI::fadeClassicMessages( void )
 {
-	const UnsignedInt now = TheGameLogic->getFrame();
+	const UnsignedInt now = TheGameLogic->getFrame() / LOGICFRAMES_PER_RETAIL_FRAME;	// EA's steps are retail 30 Hz frames
 	if( now == m_classicMessageFadeFrame )
 		return;
 	m_classicMessageFadeFrame = now;
@@ -2799,11 +2810,11 @@ void InGameUI::fadeClassicMessages( void )
 	for( Int i = CLASSIC_MESSAGES - 1; i >= 0; i-- )
 	{
 		ClassicMessage &line = m_classicMessages[ i ];
-		if( line.text == NULL || now - line.frame <= timeout )
+		if( line.text == NULL || now - line.frame / LOGICFRAMES_PER_RETAIL_FRAME <= timeout )
 			continue;
 		UnsignedByte r, g, b, a;
 		GameGetColorComponents( line.color, &r, &g, &b, &a );
-		const Int amount = REAL_TO_INT( ( now - line.frame ) * 0.01f );
+		const Int amount = REAL_TO_INT( ( now - line.frame / LOGICFRAMES_PER_RETAIL_FRAME ) * 0.01f );
 		a = ( a - amount < 0 ) ? 0 : a - amount;
 		line.color = GameMakeColor( r, g, b, a );
 		if( a == 0 )
@@ -6773,6 +6784,7 @@ void InGameUI::militarySubtitle( const AsciiString& label, Int duration )
 	m_militarySubtitle->blockPos.x =  m_militarySubtitle->position.x = box.x + m_militaryCaptionPosition.x * multiplier.x;
 	m_militarySubtitle->blockPos.y =  m_militarySubtitle->position.y = box.y + m_militaryCaptionPosition.y * multiplier.y;
 	m_militarySubtitle->incrementOnFrame = currLogicFrame + (Int)(((Real)LOGICFRAMES_PER_SECOND * TheGlobalLanguageData->m_militaryCaptionDelayMS)/1000.0f);
+	m_militarySubtitle->fadeStep = 0;
 	m_militarySubtitle->index = 0;
 	for (int i = 1; i < MAX_SUBTITLE_LINES; i ++)
 		m_militarySubtitle->displayStrings[i] = NULL;
@@ -7855,7 +7867,8 @@ void InGameUI::updateFloatingText( void )
 		{
 			// modify the color
 			GameGetColorComponents(ftd->m_color, &r, &g, &b, &a);		
-			amount = REAL_TO_INT( (currLogicFrame - ftd->m_frameTimeOut) * m_floatingTextMoveVanishRate);
+			// age times rate is a per-frame-squared amount: the parser halved the rate, this halves it again
+			amount = REAL_TO_INT( (currLogicFrame - ftd->m_frameTimeOut) * ConvertRetailPerFrameRate( m_floatingTextMoveVanishRate ));
 			if(a - amount < 0)
 				a = 0;
 			else
@@ -9831,7 +9844,7 @@ void InGameUI::updateAndDrawWorldAnimations( void )
 
 			// update the Z value
 			if( wad->m_zRisePerSecond )
-				wad->m_worldPos.z += wad->m_zRisePerSecond / LOGICFRAMES_PER_SECOND;
+				wad->m_worldPos.z += wad->m_zRisePerSecond / RETAIL_LOGICFRAMES_PER_SECOND;	// a render pass, not a logic frame: kept as it was
 
 		}  // end if
 

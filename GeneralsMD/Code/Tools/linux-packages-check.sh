@@ -139,7 +139,7 @@ RUNNER
 			-e APPIMAGE_EXTRACT_AND_RUN=1 -e TMPDIR="$T/tmp" -e LIBGL_ALWAYS_SOFTWARE=1 -w "$T" "$name" sh -c \
 			"Xvfb :77 -screen 0 1024x768x24 -nolisten tcp > '$T/xvfb.log' 2>&1 & sleep 2; DISPLAY=:77 timeout 900 '$run' -root '$FARM' \
 				-quickstart -noshellmap -multiInstance -noaudio -xres 800 -yres 600 -randommap 0 2 -autoskirmish 2 -aidiff brutal \
-				-seed 0 -observer -maxframes 90 -screenshot 80 > '$T/draw.out' 2> '$T/draw.err'; echo \$? > '$T/draw.status'"
+				-seed 0 -observer -maxframes 180 -screenshot 160 > '$T/draw.out' 2> '$T/draw.err'; echo \$? > '$T/draw.status'"
 		shot="$(find "$T/draw-user" -name 'sshot*.bmp' | head -1)"
 		local colours=0
 		[ -n "$shot" ] && colours="$(od -An -v -tu1 -j 54 "$shot" | tr -s ' ' '\n' | sort -u | wc -l)"

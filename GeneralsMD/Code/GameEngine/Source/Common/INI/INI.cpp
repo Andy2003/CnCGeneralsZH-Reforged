@@ -2147,6 +2147,33 @@ void INI::parseAccelerationReal( INI *ini, void * /*instance*/, void *store, con
 }
 
 //-------------------------------------------------------------------------------------------------
+// fields that EA wrote as a count of 30 Hz frames, or as an amount applied every 30 Hz frame
+void INI::parseRetailFramesUnsignedInt( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
+{
+	*(UnsignedInt *)store = ConvertRetailFrames(scanUnsignedInt(ini->getNextToken()));
+}
+
+void INI::parseRetailFramesInt( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
+{
+	*(Int *)store = ConvertRetailFrames(scanInt(ini->getNextToken()));
+}
+
+void INI::parseRetailFramesReal( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
+{
+	*(Real *)store = ConvertRetailFrames(scanReal(ini->getNextToken()));
+}
+
+void INI::parseRetailPerFrameReal( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
+{
+	*(Real *)store = ConvertRetailPerFrameRate(scanReal(ini->getNextToken()));
+}
+
+void INI::parseRetailPerFrameFactorReal( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
+{
+	*(Real *)store = ConvertRetailPerFrameFactor(scanReal(ini->getNextToken()));
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void INI::parseVeterancyLevelFlags(INI* ini, void* /*instance*/, void* store, const void* /*userData*/)
 {

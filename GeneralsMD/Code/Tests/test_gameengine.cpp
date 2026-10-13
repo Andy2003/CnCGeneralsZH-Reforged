@@ -1640,8 +1640,8 @@ extern Bool Signal_isThrottled( UnsignedInt now, UnsignedInt lastSignalFrame );
 TEST(a_signal_waits_a_second_after_the_last_one)
 {
 	CHECK( Signal_isThrottled( 1000, 1000 ) );
-	CHECK( Signal_isThrottled( 1029, 1000 ) );
-	CHECK( !Signal_isThrottled( 1030, 1000 ) );
+	CHECK( Signal_isThrottled( 1000 + LOGICFRAMES_PER_SECOND - 1, 1000 ) );
+	CHECK( !Signal_isThrottled( 1000 + LOGICFRAMES_PER_SECOND, 1000 ) );
 
 	/* a frame left over from a longer earlier match does not silence the new one */
 	CHECK( !Signal_isThrottled( 40, 50000 ) );
@@ -2072,14 +2072,14 @@ extern Bool AIAttackMove_engageWasADud( Bool victimStillAlive, Int ammoAtEngage,
 
 TEST(attack_move_charges_the_reacquire_delay_only_for_a_fight_that_never_happened)
 {
-	const Int DUD = 15;		/* ATTACK_MOVE_DUD_ENGAGE_FRAMES, protected on the state */
+	const Int DUD = LOGICFRAMES_PER_SECOND / 2;		/* ATTACK_MOVE_DUD_ENGAGE_FRAMES, protected on the state */
 
 	/* stood next to it for a moment, fired nothing, it is still alive: a dud. */
 	CHECK( AIAttackMove_engageWasADud( true, 8, 8, 1000, 1000, DUD ) );
-	CHECK( AIAttackMove_engageWasADud( true, 8, 8, 1000, 1014, DUD ) );
+	CHECK( AIAttackMove_engageWasADud( true, 8, 8, 1000, 1000 + DUD - 1, DUD ) );
 
 	/* the same non-fight, but long enough that it was a real attempt, not a bounce. */
-	CHECK( !AIAttackMove_engageWasADud( true, 8, 8, 1000, 1015, DUD ) );
+	CHECK( !AIAttackMove_engageWasADud( true, 8, 8, 1000, 1000 + DUD, DUD ) );
 	CHECK( !AIAttackMove_engageWasADud( true, 8, 8, 1000, 9999, DUD ) );
 
 	/* it died. whatever we did worked, so go straight back to scanning. */
@@ -2097,7 +2097,7 @@ TEST(attack_move_charges_the_reacquire_delay_only_for_a_fight_that_never_happene
 	   the answer there is the conservative "dud", not whatever was in the block. */
 	CHECK( AIAttackMove_engageWasADud( true, 0, 0, 1000, 1000, DUD ) );
 	CHECK( AIAttackMove_engageWasADud( true, 0, 12, 1000, 1000, DUD ) );
-	CHECK( !AIAttackMove_engageWasADud( true, 0, 12, 1000, 1015, DUD ) );
+	CHECK( !AIAttackMove_engageWasADud( true, 0, 12, 1000, 1000 + DUD, DUD ) );
 
 	/* a unit with no ammunition at all on either side of a fight it could not start. */
 	CHECK( AIAttackMove_engageWasADud( true, 0, 0, 0, 0, DUD ) );
@@ -2115,15 +2115,15 @@ extern Bool AIAttackMove_shouldRetaliate( UnsignedInt lastDamageFrame, UnsignedI
 
 TEST(attack_move_turns_on_whoever_is_shooting_it)
 {
-	const Int WINDOW = 30;		/* ATTACK_MOVE_RETALIATE_FRAMES, protected on the state */
+	const Int WINDOW = LOGICFRAMES_PER_SECOND;		/* ATTACK_MOVE_RETALIATE_FRAMES, protected on the state */
 
 	/* hit this second, can shoot back, busy with somebody else: turn on the shooter. */
 	CHECK( AIAttackMove_shouldRetaliate( 1000, 1000, WINDOW, false, true ) );
-	CHECK( AIAttackMove_shouldRetaliate( 1000, 1029, WINDOW, false, true ) );
-	CHECK( AIAttackMove_shouldRetaliate( 1000, 1030, WINDOW, false, true ) );
+	CHECK( AIAttackMove_shouldRetaliate( 1000, 1000 + WINDOW - 1, WINDOW, false, true ) );
+	CHECK( AIAttackMove_shouldRetaliate( 1000, 1000 + WINDOW, WINDOW, false, true ) );
 
 	/* an old grudge is not a fight. */
-	CHECK( !AIAttackMove_shouldRetaliate( 1000, 1031, WINDOW, false, true ) );
+	CHECK( !AIAttackMove_shouldRetaliate( 1000, 1000 + WINDOW + 1, WINDOW, false, true ) );
 	CHECK( !AIAttackMove_shouldRetaliate( 1000, 9999, WINDOW, false, true ) );
 
 	/* already fighting them, or cannot touch them: leave the current target alone,
@@ -4040,9 +4040,9 @@ TEST(controlbar_seconds_round_up_and_never_reach_zero_early)
 TEST(controlbar_seconds_are_real_seconds_at_the_current_game_speed)
 {
 	/* The number on a build button is a promise about how long you will be waiting, and the logic
-	   rate is a knob in this fork (the game speed keys move it between 5 and 200). The same 600
-	   frames of work is 20 seconds at the nominal rate and 10 at double speed. */
-	const Real frames = 600.0f;
+	   rate is a knob in this fork (the game speed keys move it between 5 and 200). The same
+	   work is 20 seconds at the nominal rate and 10 at double speed. */
+	const Real frames = 20.0f * LOGICFRAMES_PER_SECOND;
 	CHECK_EQ( ControlBar_secondsFromFramesAt( frames, LOGICFRAMES_PER_SECOND ), 20 );
 	CHECK_EQ( ControlBar_secondsFromFramesAt( frames, LOGICFRAMES_PER_SECOND * 2 ), 10 );
 	CHECK_EQ( ControlBar_secondsFromFramesAt( frames, LOGICFRAMES_PER_SECOND / 2 ), 40 );
@@ -5152,44 +5152,44 @@ TEST(selfslug_does_not_fire_on_a_cushion_nobody_has_measured)
 
 TEST(selfslug_fires_once_the_margin_eats_into_the_slack)
 {
-	// run-ahead 20, slack 10% -> the threshold is 2 frames of margin
-	CHECK( shouldSelfSlug( 0, 20, 10 ) );
-	CHECK( shouldSelfSlug( 1, 20, 10 ) );
-	CHECK( !shouldSelfSlug( 2, 20, 10 ) );
-	CHECK( !shouldSelfSlug( 19, 20, 10 ) );
+	// run-ahead 40, slack 10% -> the threshold is 4 frames of margin
+	CHECK( shouldSelfSlug( 0, 40, 10 ) );
+	CHECK( shouldSelfSlug( 3, 40, 10 ) );
+	CHECK( !shouldSelfSlug( 4, 40, 10 ) );
+	CHECK( !shouldSelfSlug( 39, 40, 10 ) );
 
 	// a bigger run-ahead is given proportionally more margin before it worries
-	CHECK( shouldSelfSlug( 5, 60, 10 ) );
-	CHECK( !shouldSelfSlug( 6, 60, 10 ) );
+	CHECK( shouldSelfSlug( 11, 120, 10 ) );
+	CHECK( !shouldSelfSlug( 12, 120, 10 ) );
 
 	// a run-ahead too small for the slack to round to a whole frame still gets the brake: see
 	// selfslug_threshold_has_a_floor_the_shipped_run_ahead_cannot_undercut
 	CHECK( shouldSelfSlug( 0, 9, 10 ) );
-	CHECK( shouldSelfSlug( 1, 9, 10 ) );
-	CHECK( !shouldSelfSlug( 2, 9, 10 ) );
+	CHECK( shouldSelfSlug( SELFSLUG_MIN_THRESHOLD_FRAMES - 1, 9, 10 ) );
+	CHECK( !shouldSelfSlug( SELFSLUG_MIN_THRESHOLD_FRAMES, 9, 10 ) );
 }
 
 TEST(selfslug_threshold_has_a_floor_the_shipped_run_ahead_cannot_undercut)
 {
-	/* The run-ahead a real room plays on is a handful of frames - MIN_RUNAHEAD is four, and
+	/* The run-ahead a real room plays on is a handful of frames - MIN_RUNAHEAD is eight, and
 		 computeRunAhead only clears that above about 240 ms round trip - so NetworkRunAheadSlack's
 		 10 % of it is worth well under a frame.  A brake that waits until less than one frame of
-		 margin is left has already lost: at 30 Hz that is under 33 ms of warning for a hitch that
+		 margin is left has already lost: at 60 Hz that is under 17 ms of warning for a hitch that
 		 takes longer than that to signal, let alone correct.  Hence the floor. */
 	CHECK_EQ( selfSlugThreshold( 10, 10 ), SELFSLUG_MIN_THRESHOLD_FRAMES );
 
 	// the floor holds wherever the arithmetic would land under it, including at zero slack
 	CHECK_EQ( selfSlugThreshold( 10, 0 ), SELFSLUG_MIN_THRESHOLD_FRAMES );
 	CHECK_EQ( selfSlugThreshold( 1, 10 ), SELFSLUG_MIN_THRESHOLD_FRAMES );
-	CHECK_EQ( selfSlugThreshold( 19, 10 ), SELFSLUG_MIN_THRESHOLD_FRAMES );
+	CHECK_EQ( selfSlugThreshold( 39, 10 ), SELFSLUG_MIN_THRESHOLD_FRAMES );
 
 	// and gets out of the way as soon as the configured slack is worth more than it
-	CHECK_EQ( selfSlugThreshold( 30, 10 ), 3 );
-	CHECK_EQ( selfSlugThreshold( 64, 10 ), 6 );
+	CHECK_EQ( selfSlugThreshold( 60, 10 ), 6 );
+	CHECK_EQ( selfSlugThreshold( 128, 10 ), 12 );
 	CHECK_EQ( selfSlugThreshold( 20, 50 ), 10 );
 
 	// the floor is what shouldSelfSlug actually uses - no second copy of the arithmetic
-	for( Int runAhead = 1; runAhead <= 64; ++runAhead )
+	for( Int runAhead = 1; runAhead <= 128; ++runAhead )
 	{
 		Int threshold = selfSlugThreshold( runAhead, 10 );
 		CHECK( threshold >= SELFSLUG_MIN_THRESHOLD_FRAMES );
@@ -5217,7 +5217,7 @@ TEST(the_run_ahead_covers_the_trip_it_is_sized_for)
 	for( Int ms = 0; ms <= 800; ms += 5 )
 	{
 		Real latency = (Real)ms / 1000.0f;
-		for( Int fps = 5; fps <= 30; fps += 5 )
+		for( Int fps = 5; fps <= LOGICFRAMES_PER_SECOND; fps += 5 )
 		{
 			Int runAhead = computeRunAhead( latency, fps, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 );
 
@@ -5272,18 +5272,19 @@ TEST(a_stalled_frame_is_not_filed_as_round_trip_time)
 	CHECK_NEAR( sanitizeLatencySample( -3.0f, MAX_PLAUSIBLE_LATENCY_SECONDS ), 0.0f, 0.0001f );
 
 	/* and the point of all of it: what the run-ahead does with the clamped numbers.  Two players at
-		 the ceiling still cost far less than the 64 frames the raw samples bought. */
+		 the ceiling still cost far less than the 2.1 s the raw samples bought. */
 	Real clamped = sanitizeLatencySample( 7.636834f, MAX_PLAUSIBLE_LATENCY_SECONDS )
 								 + sanitizeLatencySample( 1.785224f, MAX_PLAUSIBLE_LATENCY_SECONDS );
-	Int runAhead = computeRunAhead( clamped, 30, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 );
-	CHECK( runAhead < 64 );
-	CHECK( runAhead <= 29 );			// 0.97 s at 30 Hz, and only with both players at the ceiling
-	CHECK( runAhead <= (Int)(MAX_PLAUSIBLE_LATENCY_SECONDS * 30.0f * 1.2f) + RUNAHEAD_JITTER_FRAMES );
+	const Int fps = LOGICFRAMES_PER_SECOND;
+	Int runAhead = computeRunAhead( clamped, fps, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 );
+	CHECK( runAhead < ConvertRetailFrames( 64 ) );
+	CHECK( runAhead <= 58 );			// 0.97 s at 60 Hz, and only with both players at the ceiling
+	CHECK( runAhead <= (Int)(MAX_PLAUSIBLE_LATENCY_SECONDS * (Real)fps * 1.2f) + RUNAHEAD_JITTER_FRAMES );
 
 	/* a LAN is untouched by any of this */
 	CHECK_EQ( computeRunAhead( sanitizeLatencySample( 0.051f, MAX_PLAUSIBLE_LATENCY_SECONDS ) * 2.0f,
-														 30, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 ),
-						computeRunAhead( 0.102f, 30, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 ) );
+														 fps, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 ),
+						computeRunAhead( 0.102f, fps, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 ) );
 }
 
 /* The other half of that match: nothing ever asked for the lost frame.  FrameData escalates to
@@ -5330,11 +5331,11 @@ TEST(the_run_ahead_carries_a_margin_the_percentage_alone_cannot_give)
 	for( Int ms = 0; ms <= 800; ms += 5 )
 	{
 		Real latency = (Real)ms / 1000.0f;
-		Int runAhead = computeRunAhead( latency, 30, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 );
+		Int runAhead = computeRunAhead( latency, LOGICFRAMES_PER_SECOND, 10, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2 );
 
 		// at least RUNAHEAD_JITTER_FRAMES of room beyond the trip itself, at every latency
-		Real slackSeconds = ( (Real)runAhead / 30.0f ) - ( latency / 2.0f );
-		CHECK( slackSeconds >= ( (Real)RUNAHEAD_JITTER_FRAMES / 30.0f ) - 0.0005f );
+		Real slackSeconds = ( (Real)runAhead / LOGICFRAMES_PER_SECONDS_REAL ) - ( latency / 2.0f );
+		CHECK( slackSeconds >= ( (Real)RUNAHEAD_JITTER_FRAMES / LOGICFRAMES_PER_SECONDS_REAL ) - 0.0005f );
 	}
 }
 
@@ -5343,21 +5344,22 @@ TEST(the_run_ahead_is_shorter_than_the_shipped_floor_on_the_links_that_do_not_ne
 	/* What the change is for.  A LAN game and a good broadband game used to be given the same third
 		 of a second of input delay as a transatlantic one, because the floor was ten frames and the
 		 formula never beat it. */
-	const Int shippedFloor = 10;			// EA's MIN_RUNAHEAD, 333 ms of input delay at 30 Hz
+	const Int shippedFloor = ConvertRetailFrames( 10 );	// EA's MIN_RUNAHEAD, 333 ms of input delay
+	const Int fps = LOGICFRAMES_PER_SECOND;
 
-	CHECK( computeRunAhead( 0.000f, 30, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// LAN
-	CHECK( computeRunAhead( 0.040f, 30, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 40 ms
-	CHECK( computeRunAhead( 0.100f, 30, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 100 ms
-	CHECK( computeRunAhead( 0.160f, 30, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 160 ms
+	CHECK( computeRunAhead( 0.000f, fps, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// LAN
+	CHECK( computeRunAhead( 0.040f, fps, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 40 ms
+	CHECK( computeRunAhead( 0.100f, fps, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 100 ms
+	CHECK( computeRunAhead( 0.160f, fps, 10, MIN_RUNAHEAD, 64 ) < shippedFloor );		// 160 ms
 
 	// and the shortest of them is the floor itself, not something under it
-	CHECK_EQ( computeRunAhead( 0.000f, 30, 10, MIN_RUNAHEAD, 64 ), MIN_RUNAHEAD );
+	CHECK_EQ( computeRunAhead( 0.000f, fps, 10, MIN_RUNAHEAD, 64 ), MIN_RUNAHEAD );
 
 	/* And what it is not: the links that were relying on the floor get more window than the floor
 		 gave them, not less.  600 ms summed round trip is where EA's formula finally reached ten. */
-	CHECK( computeRunAhead( 0.300f, 30, 10, MIN_RUNAHEAD, 64 ) >= 7 );
-	CHECK( computeRunAhead( 0.600f, 30, 10, MIN_RUNAHEAD, 64 ) > shippedFloor );
-	CHECK( computeRunAhead( 1.000f, 30, 10, MIN_RUNAHEAD, 64 ) > 16 );
+	CHECK( computeRunAhead( 0.300f, fps, 10, MIN_RUNAHEAD, 64 ) >= ConvertRetailFrames( 7 ) );
+	CHECK( computeRunAhead( 0.600f, fps, 10, MIN_RUNAHEAD, 64 ) > shippedFloor );
+	CHECK( computeRunAhead( 1.000f, fps, 10, MIN_RUNAHEAD, 64 ) > ConvertRetailFrames( 16 ) );
 }
 
 TEST(the_run_ahead_stays_inside_the_bounds_the_network_buffers_are_built_for)
@@ -5518,10 +5520,10 @@ TEST(room_frame_rate_still_pins_to_a_genuinely_slow_player_without_oscillating)
 TEST(resend_window_is_measured_from_the_start_of_the_match_not_four_billion)
 {
 	/* ConnectionManager::sendSingleFrameToPlayer refuses to resend a frame older than
-		 FRAMES_TO_KEEP, which is (MAX_FRAMES_AHEAD / 2) + 1 = 65 - about two seconds at 30 Hz, and
+		 FRAMES_TO_KEEP, which is (MAX_FRAMES_AHEAD / 2) + 1 = 129 - about two seconds at 60 Hz, and
 		 exactly the window a stalled player can be behind by, since nobody advances while the room
 		 is waiting for them. */
-	const Int KEEP = 65;
+	const Int KEEP = FRAMES_TO_KEEP;
 
 	// the frame we are on, and everything inside the window, is resendable
 	CHECK( !frameIsTooOldToResend( 1000, 1000, KEEP ) );
@@ -7376,27 +7378,27 @@ TEST(a_strike_or_cargo_plane_wears_a_health_bar)
 }
 
 /** Only a slow gun wears the amber reload bar: over three seconds a shot, a clip's reload spread
-	 over the shots in it. Frames, at 30 a second. */
+	 over the shots in it. Frames written at the retail 30 a second, converted to the logic rate. */
 TEST(only_a_slow_firing_weapon_wears_a_reload_bar)
 {
-	CHECK( Drawable_weaponWearsReloadBar( 0, 300, 0, FALSE ) == TRUE );		// Nuke Cannon, 10 s
-	CHECK( Drawable_weaponWearsReloadBar( 0, 120, 0, FALSE ) == TRUE );		// Inferno Cannon, 4 s
-	CHECK( Drawable_weaponWearsReloadBar( 1, 0, 300, FALSE ) == TRUE );		// SCUD, one missile and a 10 s reload
-	CHECK( Drawable_weaponWearsReloadBar( 2, 6, 450, FALSE ) == TRUE );		// Scorpion's two missiles, 15 s reload
-	CHECK( Drawable_weaponWearsReloadBar( 0, 60, 0, FALSE ) == FALSE );		// a tank gun, 2 s
-	CHECK( Drawable_weaponWearsReloadBar( 0, 90, 0, FALSE ) == FALSE );		// exactly three seconds is not over three
-	CHECK( Drawable_weaponWearsReloadBar( 6, 6, 180, FALSE ) == FALSE );		// Rocket Buggy, six rockets, 6 s reload
-	CHECK( Drawable_weaponWearsReloadBar( 2, 7, 120, FALSE ) == FALSE );		// Paladin's point defence laser
-	CHECK( Drawable_weaponWearsReloadBar( 20, 6, 900, FALSE ) == FALSE );	// Comanche rocket pods
+	CHECK( Drawable_weaponWearsReloadBar( 0, ConvertRetailFrames( 300 ), 0, FALSE ) == TRUE );		// Nuke Cannon, 10 s
+	CHECK( Drawable_weaponWearsReloadBar( 0, ConvertRetailFrames( 120 ), 0, FALSE ) == TRUE );		// Inferno Cannon, 4 s
+	CHECK( Drawable_weaponWearsReloadBar( 1, 0, ConvertRetailFrames( 300 ), FALSE ) == TRUE );		// SCUD, one missile and a 10 s reload
+	CHECK( Drawable_weaponWearsReloadBar( 2, ConvertRetailFrames( 6 ), ConvertRetailFrames( 450 ), FALSE ) == TRUE );		// Scorpion's two missiles, 15 s reload
+	CHECK( Drawable_weaponWearsReloadBar( 0, ConvertRetailFrames( 60 ), 0, FALSE ) == FALSE );		// a tank gun, 2 s
+	CHECK( Drawable_weaponWearsReloadBar( 0, ConvertRetailFrames( 90 ), 0, FALSE ) == FALSE );		// exactly three seconds is not over three
+	CHECK( Drawable_weaponWearsReloadBar( 6, ConvertRetailFrames( 6 ), ConvertRetailFrames( 180 ), FALSE ) == FALSE );		// Rocket Buggy, six rockets, 6 s reload
+	CHECK( Drawable_weaponWearsReloadBar( 2, ConvertRetailFrames( 7 ), ConvertRetailFrames( 120 ), FALSE ) == FALSE );		// Paladin's point defence laser
+	CHECK( Drawable_weaponWearsReloadBar( 20, ConvertRetailFrames( 6 ), ConvertRetailFrames( 900 ), FALSE ) == FALSE );	// Comanche rocket pods
 }
 
 /** The Dozer's mine-clearing scoop is one shot and a 4 s reload, slow enough for the bar on the
 	 numbers alone, and the Dozer wore it after every mine. A DISARM weapon is not a gun. */
 TEST(a_mine_clearing_weapon_wears_no_reload_bar)
 {
-	CHECK( Drawable_weaponWearsReloadBar( 1, 0, 120, FALSE ) == TRUE );		// the same numbers on a gun
-	CHECK( Drawable_weaponWearsReloadBar( 1, 0, 120, TRUE ) == FALSE );		// DozerMineDisarmingWeapon
-	CHECK( Drawable_weaponWearsReloadBar( 0, 30, 0, TRUE ) == FALSE );		// WorkerMineDisarmingWeapon
+	CHECK( Drawable_weaponWearsReloadBar( 1, 0, ConvertRetailFrames( 120 ), FALSE ) == TRUE );		// the same numbers on a gun
+	CHECK( Drawable_weaponWearsReloadBar( 1, 0, ConvertRetailFrames( 120 ), TRUE ) == FALSE );		// DozerMineDisarmingWeapon
+	CHECK( Drawable_weaponWearsReloadBar( 0, ConvertRetailFrames( 30 ), 0, TRUE ) == FALSE );		// WorkerMineDisarmingWeapon
 }
 
 /** A launcher that shares its reload is told when it can fire next and keeps an old start frame;
@@ -10333,8 +10335,8 @@ TEST(headless_run_ends_on_a_decision_or_on_the_frame_limit)
 	// player owning nothing, which reads as eliminated, and VictoryConditions stores that as an end
 	// frame inside the settle window - an unattended run must not take it for a result.
 	CHECK( GameEngine_headlessRunResult( 40, 1, 0 ) == NULL );
-	CHECK( GameEngine_headlessRunResult( 40, 30, 0 ) == NULL );
-	CHECK_STR( GameEngine_headlessRunResult( 40, 31, 0 ), "decided" );
+	CHECK( GameEngine_headlessRunResult( 40, LOGICFRAMES_PER_SECOND, 0 ) == NULL );
+	CHECK_STR( GameEngine_headlessRunResult( 40, LOGICFRAMES_PER_SECOND + 1, 0 ), "decided" );
 
 	// -maxframes is the floor under a stalemate, and the comparison is >= so a limit that was
 	// already passed still ends the run rather than never matching
@@ -11183,14 +11185,16 @@ TEST(the_ai_buys_ambulances_by_army_and_calls_in_the_hurt_nearby)
 	CHECK( !AIAmbulance_mayBuyMore( 3, AISKILL_MEDIUM ) );
 	CHECK( !AIAmbulance_mayBuyMore( 0, AISKILL_EASY ) );
 
-	CHECK( AIAmbulance_callsPatient( 0.3f, 100.0f, 60 ) );
-	CHECK( AIAmbulance_callsPatient( 0.49f, 900.0f, 60 ) );
+	// two seconds since the last hit is quiet enough
+	const UnsignedInt quiet = 2 * LOGICFRAMES_PER_SECOND;
+	CHECK( AIAmbulance_callsPatient( 0.3f, 100.0f, quiet ) );
+	CHECK( AIAmbulance_callsPatient( 0.49f, 900.0f, quiet ) );
 	// half health or more stays in the fight
-	CHECK( !AIAmbulance_callsPatient( 0.5f, 100.0f, 60 ) );
+	CHECK( !AIAmbulance_callsPatient( 0.5f, 100.0f, quiet ) );
 	// too far off to walk over
-	CHECK( !AIAmbulance_callsPatient( 0.1f, 901.0f, 60 ) );
+	CHECK( !AIAmbulance_callsPatient( 0.1f, 901.0f, quiet ) );
 	// still being shot: it would die on the way
-	CHECK( !AIAmbulance_callsPatient( 0.3f, 100.0f, 59 ) );
+	CHECK( !AIAmbulance_callsPatient( 0.3f, 100.0f, quiet - 1 ) );
 }
 
 /** AIPlayer.cpp: an Ambulance pulls back when shot at or inside a known gun's reach, and a lost one is
@@ -11206,12 +11210,13 @@ TEST(the_ai_ambulance_pulls_back_when_hit_and_is_not_rebought_at_once)
 	CHECK( !AIAmbulance_pullsBack( 1000, 0, FALSE ) );
 	CHECK( !AIAmbulance_pullsBack( 1000, 500, FALSE ) );
 
+	// Hard waits a minute and a half, Medium twice as long
+	const UnsignedInt second = LOGICFRAMES_PER_SECOND;
 	CHECK( !AIAmbulance_rebuyWaits( 1000, 0, AISKILL_BRUTAL ) );
 	CHECK( AIAmbulance_rebuyWaits( 1000, 900, AISKILL_BRUTAL ) );
-	CHECK( !AIAmbulance_rebuyWaits( 10000, 900, AISKILL_BRUTAL ) );
-	// Medium waits twice as long
-	CHECK( AIAmbulance_rebuyWaits( 6000, 900, AISKILL_MEDIUM ) );
-	CHECK( !AIAmbulance_rebuyWaits( 6500, 900, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_rebuyWaits( 900 + 90 * second, 900, AISKILL_BRUTAL ) );
+	CHECK( AIAmbulance_rebuyWaits( 900 + 170 * second, 900, AISKILL_MEDIUM ) );
+	CHECK( !AIAmbulance_rebuyWaits( 900 + 180 * second, 900, AISKILL_MEDIUM ) );
 }
 
 

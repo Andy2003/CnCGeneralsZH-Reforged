@@ -522,7 +522,7 @@ struct ScenarioArrival
 /// how long a unit on its way has to stand still before it counts as having stopped
 static const Int SCENARIO_STALL_FRAMES = LOGICFRAMES_PER_SECOND;
 /// less than this from one frame to the next is standing still
-static const Real SCENARIO_STILL_DISTANCE = 0.05f;
+static const Real SCENARIO_STILL_DISTANCE = ConvertRetailPerFrameRate( 0.05f );
 
 /// how far a unit has to have gone from where it stood before it counts as having obeyed the order
 static const Real SCENARIO_DEPARTED_DISTANCE = 20.0f;
@@ -1797,8 +1797,9 @@ void ScenarioDrill_tick( void )
 
 	updateStatues( now );
 
+	// a scenario file counts 30 Hz frames, so the files written before 60 Hz logic play at the same seconds
 	while (theScenarioCursor < (Int)theScenarioActions.size()
-				 && theScenarioActions[ theScenarioCursor ].frame <= now)
+				 && ConvertRetailFrames( theScenarioActions[ theScenarioCursor ].frame ) <= now)
 	{
 		if (ScenarioDrill_execute( theScenarioActions[ theScenarioCursor ] ))
 			++theScenarioActionsRun;

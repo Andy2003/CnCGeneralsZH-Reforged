@@ -2412,7 +2412,14 @@ AGAIN:
 	W3DView *primaryW3DView=(W3DView *)getFirstView();
 	if (!freezeTime && TheScriptEngine->isTimeFast())
 	{
-		primaryW3DView->updateCameraMovements();  // Update camera motion effects.
+		// the scripted camera moves step once a retail frame, as everywhere else
+		static UnsignedInt lastCameraRetailFrame = ~0u;
+		const UnsignedInt cameraRetailFrame = TheGameClient->getFrame() / LOGICFRAMES_PER_RETAIL_FRAME;
+		if (cameraRetailFrame != lastCameraRetailFrame)
+		{
+			lastCameraRetailFrame = cameraRetailFrame;
+			primaryW3DView->updateCameraMovements();  // Update camera motion effects.
+		}
 		syncTime += TheW3DFrameLengthInMsec;
 		return;
 	}
@@ -2458,15 +2465,22 @@ AGAIN:
 
 		UnsignedInt deltaMs = nowSyncMs - prevSyncMs;
 		prevSyncMs = nowSyncMs;
-		if (deltaMs > TheW3DFrameLengthInMsec * 4)
-			deltaMs = TheW3DFrameLengthInMsec * 4;	// a level load must not fast-forward everything
+		// a level load must not fast-forward everything; four retail frames, as it was at 30
+		const UnsignedInt MAX_SYNC_STEP_MS = TheW3DFrameLengthInMsec * 4 * LOGICFRAMES_PER_RETAIL_FRAME;
+		if (deltaMs > MAX_SYNC_STEP_MS)
+			deltaMs = MAX_SYNC_STEP_MS;
 		// a recorded picture is its share of a logic frame however long it took to draw and save, so the
-		// clock moves that much too, or the footage plays every animation fast
+		// clock moves that much too, or the footage plays every animation fast.  Read off the pictures'
+		// own clock rather than added up: a 60 Hz frame is not a whole number of milliseconds, and
+		// TheW3DFrameLengthInMsec's 16 played the footage 4% slow
 		if (videoRecordingFrame())
 		{
-			const Int pictures = GameEngine_videoPictures();
-			const Int shown = GameEngine_videoPicture();
-			deltaMs = TheW3DFrameLengthInMsec * (shown + 1) / pictures - TheW3DFrameLengthInMsec * shown / pictures;
+			static UnsignedInt prevPictureMs = 0;
+			const UnsignedInt pictureMs = GameEngine_pictureMilliseconds();
+			deltaMs = pictureMs - prevPictureMs;
+			if (pictureMs < prevPictureMs || deltaMs > MAX_SYNC_STEP_MS)
+				deltaMs = TheW3DFrameLengthInMsec / GameEngine_videoPictures();	// the first recorded picture
+			prevPictureMs = pictureMs;
 		}
 
 		syncTime += deltaMs;
@@ -2585,9 +2599,9 @@ AGAIN:
 
 		// start render block
 		#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-    if ( (TheGameLogic->getFrame() % 30 == 1) || ( ! ( !TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode) ) )
+    if ( (TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND == 1) || ( ! ( !TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode) ) )
 		#else
-	    if ( (TheGameLogic->getFrame() % 30 == 1) || ( ! (!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame())) )
+	    if ( (TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND == 1) || ( ! (!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame())) )
     #endif
 		{
 			USE_PERF_TIMER(BigAssRenderLoop)

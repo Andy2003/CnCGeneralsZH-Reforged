@@ -781,7 +781,7 @@ static void startAutoSkirmish( Int numPlayersWanted )
 		 back to m_framesPerSecondLimit *unclamped*, which is how a stray -fps would still get through.
 		 -noFPSLimit deliberately does not appear here - it uncaps the renderer, not the simulation. */
 	Int maxFPS = TheGlobalData->m_framesPerSecondLimit;
-	if (maxFPS < 15)
+	if (maxFPS < ConvertRetailFrames( 15 ))
 		maxFPS = DEFAULT_MAX_FPS;
 	if (maxFPS > 1000)
 		maxFPS = 1000;
@@ -2338,7 +2338,7 @@ static void updateAutoCamera( void )
  */
 const char *GameEngine_headlessRunResult( UnsignedInt frame, UnsignedInt victoryEndFrame, Int maxGameFrames )
 {
-	const UnsignedInt SETTLE_FRAMES = 30;
+	const UnsignedInt SETTLE_FRAMES = LOGICFRAMES_PER_SECOND;
 	if (victoryEndFrame > SETTLE_FRAMES)
 		return "decided";
 	if (maxGameFrames > 0 && frame >= (UnsignedInt)maxGameFrames)
@@ -2591,7 +2591,7 @@ static void updateHeadlessRun( void )
 		 frames after it is decided and drops to the shell, which would leave without these lines.  The
 		 decision's own CRC is logged on its frame, the one the scouting pass closed on. */
 	static UnsignedInt filmDecidedOn = 0;
-	const UnsignedInt FILM_PAST_DECISION_FRAMES = 105;
+	const UnsignedInt FILM_PAST_DECISION_FRAMES = ConvertRetailFrames( 105u );
 	if (TheGlobalData->m_directorRecord && strcmp( why, "decided" ) == 0)
 	{
 		if (filmDecidedOn == 0)
@@ -2811,7 +2811,7 @@ void GameEngine::update( void )
 			 not: its mix moves with the logic frames, not the wall clock (updateSoundCapture).  The five seconds before a -screenshot run at the real rate.  Taken straight out of
 			 fast-forward, a shot differed from its own repeat on 5.6% of the pixels; settled first, on
 			 0.01%, where two paced runs differ on 0.1%. */
-		const Int TURBO_SETTLE_FRAMES = 150;
+		const Int TURBO_SETTLE_FRAMES = 5 * LOGICFRAMES_PER_SECOND;
 		const Int turboFrame = (Int)TheGameLogic->getFrame();
 		const Bool turboSettling = TheGlobalData->m_screenShotFrame > 0
 			&& turboFrame + TURBO_SETTLE_FRAMES >= TheGlobalData->m_screenShotFrame

@@ -152,9 +152,9 @@ enum { K_SCRIPTS_DATA_VERSION_1 = 1 };
 enum { MAX_SPIN_COUNT = 20 };
 #define NONE_STRING "<none>"
 
-static const Int FRAMES_TO_SHOW_WIN_LOSE_MESSAGE = 120;
+static const Int FRAMES_TO_SHOW_WIN_LOSE_MESSAGE = ConvertRetailFrames(120);
 
-static const Int FRAMES_TO_FADE_IN_AT_START = 33;
+static const Int FRAMES_TO_FADE_IN_AT_START = ConvertRetailFrames(33);
 
 
 //------------------------------------------------------------------------------ Performance Timers 
@@ -6551,9 +6551,10 @@ void ScriptEngine::setFade( ScriptAction *pAction )
 	m_curFadeFrame = 0;
 	m_minFade = pAction->getParameter(0)->getReal();
 	m_maxFade = pAction->getParameter(1)->getReal();
-	m_fadeFramesIncrease = pAction->getParameter(2)->getInt();
-	m_fadeFramesHold = pAction->getParameter(3)->getInt();
-	m_fadeFramesDecrease = pAction->getParameter(4)->getInt();
+	// the map's frame counts are 30 Hz frames
+	m_fadeFramesIncrease = ConvertRetailFrames(pAction->getParameter(2)->getInt());
+	m_fadeFramesHold = ConvertRetailFrames(pAction->getParameter(3)->getInt());
+	m_fadeFramesDecrease = ConvertRetailFrames(pAction->getParameter(4)->getInt());
 	m_curFadeValue = m_minFade;
 	if( m_fadeFramesIncrease == 0 )
 	{
@@ -6573,9 +6574,13 @@ void ScriptEngine::setSway( ScriptAction *pAction )
 	m_breezeInfo.m_directionVec.y = Cos(m_breezeInfo.m_direction);
 	m_breezeInfo.m_intensity = pAction->getParameter(1)->getReal();
 	m_breezeInfo.m_lean = pAction->getParameter(2)->getReal();
-	m_breezeInfo.m_breezePeriod = pAction->getParameter(3)->getInt();
-	if (m_breezeInfo.m_breezePeriod<1) 
-		m_breezeInfo.m_breezePeriod = 1;
+	// 30 Hz frames in the map; the period is a Short, so clamp before it narrows
+	Int breezePeriod = ConvertRetailFrames(pAction->getParameter(3)->getInt());
+	if (breezePeriod > SHRT_MAX)
+		breezePeriod = SHRT_MAX;
+	if (breezePeriod < 1)
+		breezePeriod = 1;
+	m_breezeInfo.m_breezePeriod = (Short)breezePeriod;
 	m_breezeInfo.m_randomness = pAction->getParameter(4)->getReal();
 
 }
@@ -6911,7 +6916,7 @@ void ScriptEngine::setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool 
 			Int randomValue = pAction->getParameter(2)->getInt();
 			value = GameLogicRandomValue(value, randomValue);
 		}
-		m_counters[counterNdx].value = value;
+		m_counters[counterNdx].value = ConvertRetailFrames(value);	// 30 Hz frames in the map
 	}
 	m_counters[counterNdx].isCountdownTimer = true;
 }

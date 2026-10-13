@@ -402,6 +402,12 @@ public:
 	static void parseVelocityReal( INI *ini, void *instance, void *store, const void* userData );
 	// parse acceleration in (dist/sec^2) and convert to (dist/frame^2)
 	static void parseAccelerationReal( INI *ini, void *instance, void *store, const void* userData );
+	// parse a count of retail (30 Hz) frames, or a per-retail-frame amount or factor, into current frames (GameCommon.h)
+	static void parseRetailFramesUnsignedInt( INI *ini, void *instance, void *store, const void* userData );
+	static void parseRetailFramesInt( INI *ini, void *instance, void *store, const void* userData );
+	static void parseRetailFramesReal( INI *ini, void *instance, void *store, const void* userData );
+	static void parseRetailPerFrameReal( INI *ini, void *instance, void *store, const void* userData );
+	static void parseRetailPerFrameFactorReal( INI *ini, void *instance, void *store, const void* userData );
 	// parse angle in degrees and convert to radians
 	static void parseAngleReal( INI *ini, void *instance, void *store, const void *userData );
 	// note that this parses in degrees/sec, and converts to rads/frame!

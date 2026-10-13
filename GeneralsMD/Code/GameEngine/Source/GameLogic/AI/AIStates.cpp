@@ -1557,7 +1557,7 @@ StateReturnType AIDeadState::update()
 		{
 			// we want 'em to stop, but looks wonky if they stop dead in their tracks in onEnter.
 			// this slows 'em down quickly 
-			const Real FACTOR = 0.8f;	// 0.8 ^ 30 == 0.012, so they slow to 4% of speed over 1 sec
+			const Real FACTOR = ConvertRetailPerFrameFactor( 0.8f );	// 0.8 ^ 30 == 0.012 a second, so they slow to 4% of speed over 1 sec
 			Real vel = phys->getVelocityMagnitude();
 			phys->scrubVelocity2D(vel * FACTOR);
 		}
@@ -3278,7 +3278,7 @@ StateReturnType AIPickUpCrateState::onEnter()
 	}
 	setAdjustsDestination(true);
 	m_goalPosition = *goalObj->getPosition();
-	m_delayCounter = 3;
+	m_delayCounter = ConvertRetailFrames( 3 );
 	return STATE_CONTINUE;
 
 }
@@ -5124,7 +5124,7 @@ StateReturnType AIWanderState::onEnter()
 		m_groupOffset.y = GameLogicRandomValue(-delta, delta)*PATHFIND_CELL_SIZE_F;
 	}
 	m_timer = 0;
-	m_waitFrames = 10 + (getMachineOwner()->getID() & 0x7);
+	m_waitFrames = ConvertRetailFrames( (Int)(10 + (getMachineOwner()->getID() & 0x7)) );
 	// set initial movement goal
 	computeGoal(false);
 	StateReturnType ret = AIInternalMoveToState::onEnter();
@@ -5249,7 +5249,7 @@ StateReturnType AIWanderInPlaceState::onEnter()
 	m_goalPosition.x += offset.x;
 	m_goalPosition.y += offset.y;
 	m_timer = 0;
-	m_waitFrames = 10 + (getMachineOwner()->getID() & 0x7);
+	m_waitFrames = ConvertRetailFrames( (Int)(10 + (getMachineOwner()->getID() & 0x7)) );
 	StateReturnType ret = AIInternalMoveToState::onEnter();
 	return ret;
 }
@@ -5360,7 +5360,7 @@ StateReturnType AIPanicState::onEnter()
 	StateReturnType ret = AIInternalMoveToState::onEnter();
 
 	m_timer = 0;
-	m_waitFrames = 10 + (getMachineOwner()->getID() & 0x7);
+	m_waitFrames = ConvertRetailFrames( (Int)(10 + (getMachineOwner()->getID() & 0x7)) );
 	// Update the extra path distance.   AIInternalMoveToState::onEnter resets it.
 	ai->setPathExtraDistance(calcExtraPathDistance());
 	if (obj)
