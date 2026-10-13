@@ -9476,14 +9476,6 @@ void InGameUI_numberBuildPlans( std::vector<BuildPlanNumber>& plans )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The scoreboard key is EA's diplomacy key, and gives the diplomacy screen as EA's did. */
-//-------------------------------------------------------------------------------------------------
-void InGameUI::openScoreboard( void )
-{
-	ToggleDiplomacy( FALSE );
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Everything the local player has coming, as lines of text down the left side over the control
 	* bar: every producer's queue and every building a dozer or a worker has going up, soonest to
 	* finish first, in the superweapon countdown's font and the player's colour.  PRODUCTION_LIST_LINES

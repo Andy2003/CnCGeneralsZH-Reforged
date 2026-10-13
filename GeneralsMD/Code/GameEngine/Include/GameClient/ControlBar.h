@@ -512,7 +512,7 @@ enum OrderKeyExtra
 	* finds its own taken goes on B, then N, then the first free place in reading order. */
 void ControlBar_orderKeyPlaces( const Int *places, Int count, Bool fights, Int *keys );
 enum { MAX_RIGHT_HUD_UPGRADE_CAMEOS = 5};
-enum { MAX_MULTI_SELECT_GROUPS = 36 };	///< unit types a multi-selection tells apart (6x6 grid, Tab focus)
+enum { MAX_MULTI_SELECT_GROUPS = 36 };	///< unit types a multi-selection tells apart (6x6 grid)
 enum { 
 			 MAX_PURCHASE_SCIENCE_RANK_1 = 4,
 			 MAX_PURCHASE_SCIENCE_RANK_3 = 15,
@@ -870,11 +870,8 @@ public:
 	/** forget a marked column.  TRUE when there was one to forget. */
 	Bool clearPurchaseScienceColumn( void );
 
-	/** with multiple units selected the right HUD shows the unit types; Tab (+1) and
-		Shift-Tab (-1) walk the focus between them */
-	void cycleMultiSelectFocus( Int direction );
-
-	/** a left click at screen (x, y) on one of those type tiles keeps only that type selected, and
+	/** with multiple units selected the right HUD shows the unit types; a left click at
+		screen (x, y) on one of those type tiles keeps only that type selected, and
 		with shift drops that type from the selection; FALSE when (x, y) is on no tile */
 	Bool clickMultiSelectTile( Int x, Int y );
 
@@ -1313,7 +1310,7 @@ protected:
 	Int m_multiSelectGroupSize[ MAX_MULTI_SELECT_GROUPS ];	///< how many of that type are selected
 	DrawableID m_multiSelectGroupFirst[ MAX_MULTI_SELECT_GROUPS ];	///< a member of the group, the context representative
 	Int m_multiSelectGroupCount;																///< number of type groups
-	Int m_multiSelectFocus;																			///< the group Tab currently focuses
+	Int m_multiSelectFocus;																			///< the group that drives the context
 
 	//cameo flash
 	Bool m_flash;                                       ///< tells update whether or not to check for flash

@@ -3362,13 +3362,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_DIPLOMACY:
-			// Tab is the scoreboard in any game that has seats, up while the key is held; the diplomacy
-			// screen, with its mute buttons, stays on the command bar's own button
-			if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() && TheGameInfo)
-			{
-				TheInGameUI->openScoreboard();
-			}
-			else if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame())
+			if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame())
 			{
 				ToggleDiplomacy( FALSE );
 			}

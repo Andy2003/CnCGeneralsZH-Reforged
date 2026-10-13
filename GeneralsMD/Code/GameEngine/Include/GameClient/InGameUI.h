@@ -424,7 +424,6 @@ public:  // ********************************************************************
 	void playerMessage( Player *player, const UnicodeString &text );	///< a message about that player, in his colour
 	void chatMessage( Player *player, const UnicodeString &text );		///< a line of chat, "[name] text" in his colour
 	virtual void toggleMessages( void ) { m_messagesOn = 1 - m_messagesOn; }	///< toggle messages on/off
-	void openScoreboard( void );		///< EA's diplomacy screen
 	virtual Bool isMessagesOn( void ) { return m_messagesOn; }	///< are the display messages on
 	void freeMessageResources( void );				///< empty the message list
 	Color getMessageColor(Bool altColor) { return (altColor)?m_messageColor2:m_messageColor1; }

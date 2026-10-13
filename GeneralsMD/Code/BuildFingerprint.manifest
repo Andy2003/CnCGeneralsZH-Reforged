@@ -15,7 +15,6 @@ Data/Art/Textures/ReforgedHudBlankTexture.tga
 Data/Art/Textures/ReforgedHudChinaCommandBar.dds
 Data/Art/Textures/ReforgedHudChinaPowers.dds
 Data/Art/Textures/ReforgedHudControlButtons.dds
-Data/Art/Textures/ReforgedHudDiplomacyWindow.dds
 Data/Art/Textures/ReforgedHudDisconnectWindow.dds
 Data/Art/Textures/ReforgedHudGlaCommandBar.dds
 Data/Art/Textures/ReforgedHudGlaPowers.dds
@@ -142,7 +141,6 @@ Data/INI/MappedImages/HandCreated/ReforgedHudBlankTexture.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudChinaCommandBar.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudChinaPowers.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudControlButtons.ini
-Data/INI/MappedImages/HandCreated/ReforgedHudDiplomacyWindow.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudDisconnectWindow.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudGlaCommandBar.ini
 Data/INI/MappedImages/HandCreated/ReforgedHudGlaPowers.ini
@@ -320,7 +318,6 @@ Data/Turkish/Generals.str
 Data/Window/ControlBar.wnd
 Data/Window/ControlBarPopupDescription.wnd
 Data/Window/ControlBarPro.txt
-Data/Window/Diplomacy.wnd
 Data/Window/GenPowersShortcutBarChina.wnd
 Data/Window/GenPowersShortcutBarGLA.wnd
 Data/Window/GenPowersShortcutBarUS.wnd

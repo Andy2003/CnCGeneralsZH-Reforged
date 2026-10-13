@@ -39,7 +39,6 @@
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
 
-#include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GameClient.h"
@@ -489,24 +488,6 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 		if( keyState & KEY_STATE_ALT )
 		{
 			newModState |= ALT;
-		}
-
-		//
-		// Tab / Shift-Tab walks the focus through a multi-selection's units on the control bar.
-		// Handled here rather than through the MetaMap because CommandMap.ini lives in the
-		// shipped game data and has no slot for it.  The game as it shipped did nothing with Tab.
-		//
-		if( t == GameMessage::MSG_RAW_KEY_DOWN && key == MK_TAB &&
-				( newModState & ( CTRL | ALT ) ) == 0 &&
-				!( keyState & KEY_STATE_AUTOREPEAT ) &&
-				TheGameClient->getFrame() >= 1 &&
-				!( TheShell && TheShell->isShellActive() ) &&
-				TheInGameUI && TheInGameUI->getSelectCount() > 1 &&
-				TheControlBar )
-		{
-			TheControlBar->cycleMultiSelectFocus( ( newModState & SHIFT ) ? -1 : 1 );
-			m_lastModState = newModState;
-			return DESTROY_MESSAGE;
 		}
 
 		//
