@@ -13326,13 +13326,6 @@ TEST(gameplay_conveniences_are_forced_on_and_left_the_catalog)
 
 	CHECK( scratch->m_workersReturnToSupply );
 	CHECK( scratch->m_archiveReplays );
-	/* The HUD overlay is out of the catalog too, but its default is the build's: on in the developer
-		 builds, off in Release (a project rule; GameData.ini or -showHudOverlay turns it on). */
-#if defined(_DEBUG) || defined(_INTERNAL)
-	CHECK( scratch->m_showHudOverlay );
-#else
-	CHECK( !scratch->m_showHudOverlay );
-#endif
 
 	/* HealthBars is what is left, and it is still a menu row. */
 	const OptionDef *bars = findOptionDef( "HealthBars" );
@@ -13747,12 +13740,8 @@ TEST(net_box_is_a_check_box_that_starts_on_under_its_own_key)
 	TheWritableGlobalData = scratch;
 
 	CHECK( scratch->m_showNetBox );
-	// the older plate's own switch is not this one's to move.  Its default is the build's (on in the
-	// developer builds, off in Release), so what is checked is that the net box leaves it as it was.
-	const Bool hudOverlayBefore = scratch->m_showHudOverlay;
 	def->set( 0 );
 	CHECK( !scratch->m_showNetBox );
-	CHECK_EQ( (Int)scratch->m_showHudOverlay, (Int)hudOverlayBefore );
 
 	TheWritableGlobalData = saved;
 	delete scratch;

@@ -448,8 +448,7 @@ public:
 	Int m_menuTransitionSpeed;			///< percent of the authored speed the menus slide and fade at; 100 = as drawn
 	Int m_textureFilterMode;			///< 0 bilinear, 1 trilinear, 2 anisotropic
 	Int m_anisotropyLevel;				///< samples anisotropic filtering may take; 0 = whatever the card offers
-	Bool m_showHudOverlay;				///< draw the fps / elapsed time / income line in the corner
-	Bool m_showNetBox;					///< the player's own switch for that corner: the network box, or the plate where the bar has no page
+	Bool m_showNetBox;					///< the player's own switch for the top right info strip (InGameUI::drawHudOverlay)
 	Bool m_showEmptyBuildingPips;		///< the row of empty slots over a building nobody is in
 	Bool m_workersReturnToSupply;		///< a worker that finishes a build job goes back to the dock it left
 	Bool m_archiveReplays;					///< keep a timestamped copy of every replay, instead of only the last one

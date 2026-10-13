@@ -168,11 +168,10 @@ which are now accepted in Release. A hidden or offscreen run is silent unless `Z
 `ZH_UNATTENDED=1` (or `-headless`) makes the message boxes that could wait for a person print to stderr and exit
 instead.
 
-The corner readout (the render rate, the clock, the renderer and the frame; upstream's `ShowHudOverlay`) is off
-by default in Release builds and on in Debug and `_INTERNAL` ones. `ShowHudOverlay = Yes` in GameData.ini turns it
-on, and `-showHudOverlay` turns it on for one run whatever the INI says; the harnesses whose screenshots are
-evidence pass it. Nothing shipped may force it on: the staged overlay and the packages refuse a
-`ShowHudOverlay = Yes`.
+The top right info strip (the clock, the frame rates and the connection) is the player's own `ShowNetBox` option,
+on by default in every build. Upstream's `ShowHudOverlay` decides nothing here: the GameData.ini key is read and
+ignored so an old file still loads, and `-showHudOverlay` is gone. The staged overlay and the packages still refuse
+a `ShowHudOverlay = Yes`, a check left from when the key turned the readout on.
 
 **Menu Layout** (Options, Display) chooses how the 800x600 menu layouts meet a wider screen. **Fit**, the default
 on macOS and Linux, draws them at one scale, centred, so panels, logos and the map preview keep their shape;

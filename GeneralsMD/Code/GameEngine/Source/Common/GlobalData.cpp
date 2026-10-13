@@ -72,8 +72,8 @@ GlobalData* TheWritableGlobalData = NULL;				///< The global data singleton
 //-------------------------------------------------------------------------------------------------
 GlobalData* GlobalData::m_theOriginal = NULL;
 
-// A key the shipped GameData.ini still carries but nothing reads. It has to stay in the table,
-// because an unknown key throws, so it is parsed into nothing.
+// A key the shipped GameData.ini, or an older player's own, still carries but nothing reads. It has to
+// stay in the table, because an unknown key throws, so it is parsed into nothing.
 static void parseIgnoredField( INI *, void *, void *, const void * )
 {
 }
@@ -216,7 +216,7 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 	{ "IsometricCamera",					INI::parseBool,				NULL,			offsetof( GlobalData, m_isometricCamera ) },
 	{ "FormationDrag",						INI::parseBool,				NULL,			offsetof( GlobalData, m_formationDrag ) },
 	{ "ChromaLighting",						INI::parseBool,				NULL,			offsetof( GlobalData, m_chromaLighting ) },
-	{ "ShowHudOverlay",						INI::parseBool,				NULL,			offsetof( GlobalData, m_showHudOverlay ) },
+	{ "ShowHudOverlay",						parseIgnoredField,		NULL,			0 },
 	{ "WorkersReturnToSupply",		INI::parseBool,				NULL,			offsetof( GlobalData, m_workersReturnToSupply ) },
 	{ "ArchiveReplays",						INI::parseBool,				NULL,			offsetof( GlobalData, m_archiveReplays ) },
 	{ "Bloom",										INI::parseInt,				NULL,			offsetof( GlobalData, m_bloomIntensity ) },
@@ -1181,14 +1181,6 @@ GlobalData::GlobalData()
 	m_moneyPerMinute = 0;
 	m_buildPlacementOpacity = PLACEMENT_SILHOUETTE_OPACITY;
 	m_buildPlacementShadows = TRUE;
-	// The corner readout (InGameUI::drawHudOverlay): on in the developer builds (Debug, _INTERNAL), off in
-	// Release, RELEASE_DEBUG_LOGGING included, which is a Release build that also logs.  A player turns it on
-	// with "ShowHudOverlay = Yes" in GameData.ini; a harness whose pictures must show it passes -showHudOverlay.
-#if defined(_DEBUG) || defined(_INTERNAL)
-	m_showHudOverlay = TRUE;
-#else
-	m_showHudOverlay = FALSE;
-#endif
 	m_showNetBox = TRUE;
 	m_showEmptyBuildingPips = TRUE;
 	m_workersReturnToSupply = TRUE;
