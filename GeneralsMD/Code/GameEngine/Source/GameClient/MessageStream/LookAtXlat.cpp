@@ -83,6 +83,9 @@ static const Real CTRL_WHEEL_ZOOM_NOTCHES = 5.0f;
 // Alt+wheel tilts the camera this far a notch.
 static const Real TILT_PER_NOTCH = 2.0f * PI / 180.0f;
 
+// A mouse side button tilts this far a press: eight presses cross the 20 to 60 degree range.
+static const Real TILT_PER_SIDE_BUTTON = 5.0f * PI / 180.0f;
+
 //-----------------------------------------------------------------------------
 /** The player's tilt keeps the camera between 20 and 60 degrees above the ground.  The view's
 	* pitch is an offset from GameData's CameraPitch, and a larger pitch lays the camera flatter,
@@ -574,6 +577,19 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			break;	// without this the case fell into MSG_META_OPTIONS below and every wheel
 					// notch called stopScrolling(), killing zoom-while-panning and leaving
 					// m_isScrolling/m_scrollType torn.
+		}
+
+		//-----------------------------------------------------------------------------
+		// The side buttons step the tilt: forward (X2) lays the camera flatter, as Alt+wheel forward
+		// does, back (X1) stands it up.  Not on the Classic mouse, which has no Alt+wheel tilt either.
+		case GameMessage::MSG_RAW_MOUSE_SIDE_BUTTON:
+		{
+			// nor in the menus or a cinematic, where WindowXlat eats the wheel before it gets here
+			if (TheGlobalData->isClassicMouse() || TheShell->isShellActive() || !TheInGameUI->getInputEnabled())
+				break;
+			const Real steps = (Real)msg->getArgument( 1 )->integer;
+			TheTacticalView->setPitch( LookAt_clampPlayerPitch( TheTacticalView->getPitch() + steps * TILT_PER_SIDE_BUTTON ) );
+			return DESTROY_MESSAGE;
 		}
 
 

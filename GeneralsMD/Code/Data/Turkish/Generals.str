@@ -9229,6 +9229,10 @@ CONTROLBAR:ObsPlayerLabel
 "%ls (Takım %ls)"
 END
 
+CONTROLBAR:ObsLookingThrough
+"Haritayı %ls oyuncusunun gözünden izliyorsun. Esc tüm haritayı geri getirir."
+END
+
 GUI:LowTextureDetail
 "Düşük Doku Ayrıntısı"
 END
@@ -14695,6 +14699,10 @@ END
 
 GUI:GameResumed
 "Oyun devam ediyor."
+END
+
+GUI:ReplayResume
+"Sürdür"
 END
 
 GUI:HumanSlot

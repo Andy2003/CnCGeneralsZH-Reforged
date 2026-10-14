@@ -364,6 +364,7 @@ found and fixed â€” EA's own, not port damage.**
 - Shift and a number puts what you have selected into that control group and keeps everyone already in it, the way StarCraft does it. Fresh tanks off the line join group 1 with one key, where you used to select group 1, shift-click the new tanks in and press Ctrl+1 again. The selection stays as it is. Retail used Shift and a number to pull a group into your selection instead; that is gone, and Alt and the number still centres the view on the group.
 - Ordering a very large army works. A selection of more than 254 units reaches the game whole, and Ctrl+number groups keep all their units.
 - Hold Alt and drag with the middle mouse button, or hold Alt and turn the wheel, to tilt the camera between 20 and 60 degrees. Home resets heading, tilt and zoom, the way Numpad 5 does.
+- The side buttons on your mouse tilt the camera five degrees a press, forward flatter and back steeper, on Windows, Mac and Linux. The game used to ignore them.
 
 ## Aircraft, guards, and orders that used to be ignored
 
@@ -542,6 +543,7 @@ found and fixed â€” EA's own, not port damage.**
 - A replay whose header the game cannot read warns you instead of starting anyway. It used to
   report the file as compatible and go straight into playback on something it had already failed to
   parse.
+- The replay has a control strip over the middle of the command bar: the time reached and the whole length, a pause button and five speeds from 0.5x to 8x, and the timeline under them. Drag along the timeline and the replay jumps when you let go, not once for every pixel you crossed. Grab the strip anywhere else and put it where you like; a double click sends it home. P pauses, minus and plus step through the speeds, unless your keys give those letters to something else.
 
 ## Placing a building, then changing your mind
 
@@ -873,6 +875,7 @@ A third pass went through the generals' powers, promotions and unit abilities.
 - The command bar slides up from the bottom of the screen again when a match starts. The new steel frame had been drawn at its final place from the first frame, so the buttons rose into a frame that was already standing.
 - A building that is still going up shows Cancel on S, and the seconds it has left across the top of the grid. A map building that hands out units shows that countdown there too, with the bar under it. Sell stands on N. One that sets a rally point puts that on B instead. Both used to stay where the old command panel had drawn them, off the new grid.
 - The Escape menu is Zero Hour's own again, the window, the logo, the buttons and the way it opens, along with the box that asks whether you really want to leave. The steel plate that replaced it for a while, and ControlBar Pro's version after that, are gone. Options on it opens the volume sliders, since every other setting lives in the launcher. The promotion screen opens across the middle of the screen.
+- Watching, click a player's button on the observer bar and you see through his eyes: his fog and his camera. The same button again, the cancel button or Esc gives you the whole map and the camera you had before.
 
 ## Placing buildings
 

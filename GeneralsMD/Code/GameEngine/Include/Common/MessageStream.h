@@ -142,6 +142,7 @@ public:
 		MSG_RAW_MOUSE_RIGHT_BUTTON_UP,							///< (pixel, modifiers, time)
 		MSG_RAW_MOUSE_RIGHT_DRAG,										///< drag of the mouse with a button held down
 		MSG_RAW_MOUSE_WHEEL,												///< (Real spin in notches, + is away, - is toward user)
+		MSG_RAW_MOUSE_SIDE_BUTTON,									///< (pixel, Int +1 forward/X2 or -1 back/X1, modifiers) a side button went down (fork)
 		MSG_RAW_MOUSE_END,
 
 		MSG_RAW_KEY_DOWN,														///< (KeyDefType) the given key was pressed (uses Microsoft VK_ codes)

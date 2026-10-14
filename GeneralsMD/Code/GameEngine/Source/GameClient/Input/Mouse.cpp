@@ -221,6 +221,7 @@ void Mouse::processMouseEvent( Int index )
 
 	// Cumulate Wheel Adjustments
 	m_currMouse.wheelPos += m_mouseEvents[ index ].wheelPos;
+	m_currMouse.sideButton = m_mouseEvents[ index ].sideButton;
 
 	// Check Left Mouse State
 	if( m_mouseEvents[ index ].leftFrame )
@@ -839,7 +840,15 @@ void Mouse::createStreamMessages( void )
 			msg->appendRealArgument( (Real)m_currMouse.wheelPos / 120.0f );  // wheel delta, in notches
 			msg->appendIntegerArgument( TheKeyboard->getModifierFlags() );
 		}  // end if
-	
+
+		if( m_currMouse.sideButton != 0 )
+		{
+			msg = TheMessageStream->appendMessage( GameMessage::MSG_RAW_MOUSE_SIDE_BUTTON );
+			msg->appendPixelArgument( m_currMouse.pos );
+			msg->appendIntegerArgument( m_currMouse.sideButton );
+			msg->appendIntegerArgument( TheKeyboard->getModifierFlags() );
+		}
+
 	}	// end for
 }  // end createStreamMessages
 

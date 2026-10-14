@@ -1514,6 +1514,7 @@ ObserverCamera::ObserverCamera()
 	// the timeline is the whole process's, read once and kept across the resets a match start makes
 	m_scoutScanned = 0;
 	m_timelineLoaded = FALSE;
+	m_modeBeforeLook = OBSERVER_CAMERA_FREE;
 	reset();
 }
 
@@ -1880,6 +1881,31 @@ void ObserverCamera::followPlayer( Int playerIndex )
 	m_followed = playerIndex;
 	m_driving = FALSE;
 	m_placeValid = FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Picking a second player while looking through the first keeps the camera the watcher had before
+	* either, so one Esc always goes back to it. */
+//-------------------------------------------------------------------------------------------------
+void ObserverCamera::lookThrough( Int playerIndex )
+{
+	if( m_followed == NO_PLAYER && !m_fog )
+		m_modeBeforeLook = m_mode;
+	followPlayer( playerIndex );
+	m_fog = TRUE;
+	setMode( OBSERVER_CAMERA_PLAYER );
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool ObserverCamera::stopLooking( void )
+{
+	if( m_followed == NO_PLAYER && !m_fog )
+		return FALSE;
+
+	followPlayer( NO_PLAYER );
+	m_fog = FALSE;
+	setMode( m_modeBeforeLook );
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

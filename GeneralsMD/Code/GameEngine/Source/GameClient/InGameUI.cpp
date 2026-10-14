@@ -1767,8 +1767,12 @@ static AsciiString TheReplayCheckpointsOf;
 	* message stream, and the click is a message the stream is in the middle of handing round. */
 static Bool TheReplayRewindWaiting = FALSE;
 
+/// when the seek running now was asked for, for the log line when it lands
+static UnsignedInt TheReplaySeekStartMs = 0;
+
 static void seekReplay( UnsignedInt target )
 {
+	TheReplaySeekStartMs = Clock_Milliseconds();
 	TheGameLogic->setGamePaused( FALSE );
 	// the first checkpoint is taken on the first frame, so only frame 0 has none behind it
 	TheReplayRewindWaiting = target <= TheGameLogic->getFrame() && !TheReplayCheckpoints.empty();
@@ -1923,7 +1927,11 @@ static void updateReplaySeek( void )
 	const Bool seeking = frame < TheReplaySeekFrame;
 	TheWritableGlobalData->m_TiVOFastMode = seeking;
 	if( !seeking )
+	{
+		DEBUG_LOG(( "REPLAY SEEK to frame %u landed on %u in %u ms at %d fps\n", TheReplaySeekFrame, frame,
+			(UnsignedInt)( Clock_Milliseconds() - TheReplaySeekStartMs ), TheGameEngine->getFramesPerSecondLimit() ));
 		TheReplaySeekFrame = 0;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6570,6 +6578,9 @@ void InGameUI::createReplayControl( void )
 {
 
 	m_replayWindow = TheWindowManager->winCreateFromScript( AsciiString("ReplayControl.wnd") );
+	// the parent draws the replay strip itself (ReplayControls.cpp); the layout has it see-through
+	m_replayWindow->winClearStatus( WIN_STATUS_SEE_THRU | WIN_STATUS_BORDER );
+	m_replayWindow->winSetDrawFunc( ReplayControlDraw );
 
 /*	
 	// hide all windows created from this layout

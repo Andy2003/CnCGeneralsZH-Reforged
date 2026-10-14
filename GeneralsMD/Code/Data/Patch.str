@@ -84,6 +84,11 @@ GUI:GameResumed
 "Game resumed."
 END
 
+// The replay strip's pause button while the replay is paused.
+GUI:ReplayResume
+"Resume"
+END
+
 // Skirmish lobby: an opponent seat with no AI behind it (Shift-Ctrl-T takes it over).
 GUI:HumanSlot
 "Human"
@@ -1114,6 +1119,10 @@ END
 
 CONTROLBAR:MoneyDescription
 "The money you have, and what you earned a second over the last half minute"
+END
+
+CONTROLBAR:ObsLookingThrough
+"Watching through %ls's eyes. Esc brings back the whole map."
 END
 
 GUI:ScoreboardFavourite

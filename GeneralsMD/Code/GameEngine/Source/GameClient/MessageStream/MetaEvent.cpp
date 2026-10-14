@@ -643,6 +643,29 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 			disp = DESTROY_MESSAGE;
 		}
 
+		// A replay's strip on the keyboard, unless CommandMap.ini gave the key to something else: P
+		// pauses and resumes, minus and plus step through the speed buttons.  Nobody gives orders in
+		// a replay, so the keys are free there.
+		if( disp == KEEP_MESSAGE && newModState == NONE && TheGameLogic->isInReplayGame() &&
+				( keyState & KEY_STATE_DOWN ) && !( keyState & KEY_STATE_AUTOREPEAT ) )
+		{
+			if( key == MK_P )
+			{
+				TheMessageStream->appendMessage( GameMessage::MSG_META_TOGGLE_PAUSE );
+				disp = DESTROY_MESSAGE;
+			}
+			else if( key == MK_MINUS || key == MK_KPMINUS )
+			{
+				ReplayControlStepSpeed( -1 );
+				disp = DESTROY_MESSAGE;
+			}
+			else if( key == MK_EQUAL || key == MK_KPPLUS )
+			{
+				ReplayControlStepSpeed( 1 );
+				disp = DESTROY_MESSAGE;
+			}
+		}
+
 		// remember, or forget, that this key is held with these modifiers
 		if( !isModifierKey && newModState != NONE && key >= 0 && key < NUM_MAPPABLE_KEYS )
 		{

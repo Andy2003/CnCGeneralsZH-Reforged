@@ -673,6 +673,19 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			}  // end WM_LBUTTONDOWN
 
 			//-------------------------------------------------------------------------
+			// the side buttons step the camera's tilt; only the press is an event, and a handled
+			// WM_XBUTTON returns TRUE or Windows also sends it on as browser back/forward
+			case WM_XBUTTONDOWN:
+			{
+
+				if( TheWin32Mouse )
+					TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
+
+				return TRUE;
+
+			}  // end WM_XBUTTONDOWN
+
+			//-------------------------------------------------------------------------
 			case 0x020A: // WM_MOUSEWHEEL
 			{
 				long x = (long) LOWORD(lParam);

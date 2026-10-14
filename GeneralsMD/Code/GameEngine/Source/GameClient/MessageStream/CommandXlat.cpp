@@ -66,6 +66,7 @@
 #include "GameClient/ParticleSys.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/KeyDefs.h"
+#include "GameClient/ObserverCamera.h"
 #include "GameClient/Shell.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/SelectionInfo.h"
@@ -3457,6 +3458,13 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			if( TheInGameUI->isSignalArmed() )
 			{
 				TheInGameUI->disarmSignal();
+				cancelledSomething = TRUE;
+			}
+
+			// a watcher looking through one player's eyes gets the whole map back, menu shut first
+			if( cancelledSomething == FALSE && !TheInGameUI->isQuitMenuVisible() && TheObserverCamera.stopLooking() )
+			{
+				TheControlBar->watchPlayer( NULL );
 				cancelledSomething = TRUE;
 			}
 
