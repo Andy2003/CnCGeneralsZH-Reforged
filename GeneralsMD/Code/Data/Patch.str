@@ -1153,6 +1153,10 @@ LAN:NoMod
 "none"
 END
 
+GUI:SaveFromOlderGame
+"This save was made by the original game or by an older version of Reforged, and cannot be loaded."
+END
+
 GUI:KickVoteStarted
 "%ls wants %ls out of the match. Type /yes or /no in chat: every other player has 30 seconds to agree."
 END

@@ -598,9 +598,22 @@ static void startPendingSaveGame( void )
 	}
 
 	// getSaveGameInfoFromFile opens the name it is handed as-is, so give it the path (the menu's
-	// iterateSaveFiles callback does the same).
-	TheGameState->getSaveGameInfoFromFile(
-		TheGameState->getFilePathInSaveDirectory( thePendingSaveFile ), &gameInfo.saveGameInfo );
+	// iterateSaveFiles callback does the same).  A broken file throws out of the header read, which
+	// the menu's callback catches too; nothing is set up yet, so it ends like a name not there.
+	try
+	{
+		TheGameState->getSaveGameInfoFromFile(
+			TheGameState->getFilePathInSaveDirectory( thePendingSaveFile ), &gameInfo.saveGameInfo );
+	}
+	catch( ... )
+	{
+		DEBUG_LOG(("-loadsave: '%s' could not be loaded, its header is broken\n", gameInfo.filename.str()));
+		if (TheGlobalData->m_headless)
+			TheGameEngine->setQuitting( TRUE );
+		else
+			TheWritableGlobalData->m_shellMapOn = TRUE;
+		return;
+	}
 
 	TheGameLogic->prepareNewGame( GAME_SINGLE_PLAYER, DIFFICULTY_NORMAL, 0 );
 

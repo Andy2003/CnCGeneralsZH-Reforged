@@ -15569,6 +15569,10 @@ CONTROLBAR:Demo_ToolTipGLAScienceRebelAmbush
 "Her yerde Asilerle ani bir pusu kurmanızı sağlar \n \n Seviye 1: 4 Asi \n Seviye 2: 6 Asi \n Seviye 3: 10 Asi \n \n Çağrıldığı yer: Komuta Merkezi"
 END
 
+GUI:SaveFromOlderGame
+"Bu kayıt orijinal oyunla ya da Reforged'ın eski bir sürümüyle yapılmış, yüklenemez."
+END
+
 GUI:KickVoteStarted
 "%ls, %ls oyuncusunun maçtan atılmasını istiyor. Sohbete /yes ya da /no yazın: diğer oyuncuların kabul etmek için 30 saniyesi var."
 END
