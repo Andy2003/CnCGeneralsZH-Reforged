@@ -5704,10 +5704,12 @@ void ScriptEngine::update( void )
 		TheScriptConditions->update();
 	}
 	SCRIPT_PHASE_END( SCRIPT_PHASE_CONDITIONS );
-	// Update any countdown timers.
+	// Update any countdown timers.  They count retail 30 Hz frames, one every other logic frame,
+	// because maps compare a running timer's value with numbers written for 30 Hz ("timer < 1700").
 	Int i;
+	const Bool retailTick = (TheGameLogic->getFrame() % LOGICFRAMES_PER_RETAIL_FRAME) == 0;
 	// Note - counters start at 1.  0 means not assigned.
-	for (i=1; i<m_numCounters; i++) {
+	for (i=1; retailTick && i<m_numCounters; i++) {
 		if (m_counters[i].isCountdownTimer) {
 			// If counter has any time left, decrement.  Counters go to -1 and stop.
 			if (m_counters[i].value >= 0) {
@@ -6892,6 +6894,13 @@ Bool ScriptEngine::evaluateTimer( Condition *pCondition )
 	return (value < 1);
 }
 
+/** Seconds to timer frames.  Script timers count retail 30 Hz frames (see update), and this is
+	* retail's own msec-to-frames sum, so a timer holds the number EA's maps compare it with. */
+static Int retailTimerFrames( Real seconds )
+{
+	return REAL_TO_INT_CEIL( seconds * 1000.0f * ((Real)RETAIL_LOGICFRAMES_PER_SECOND / (Real)MSEC_PER_SECOND) );
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Starts a timer. */
 //-------------------------------------------------------------------------------------------------
@@ -6909,14 +6918,14 @@ void ScriptEngine::setTimer( ScriptAction *pAction, Bool millisecondTimer, Bool 
 			Real randomValue = pAction->getParameter(2)->getReal();
 			value = GameLogicRandomValue(value, randomValue);
 		}
-		m_counters[counterNdx].value = REAL_TO_INT_CEIL(ConvertDurationFromMsecsToFrames(value*1000));
+		m_counters[counterNdx].value = retailTimerFrames(value);
 	} else {
 		Int value = pAction->getParameter(1)->getInt();
 		if (random) {
 			Int randomValue = pAction->getParameter(2)->getInt();
 			value = GameLogicRandomValue(value, randomValue);
 		}
-		m_counters[counterNdx].value = ConvertRetailFrames(value);	// 30 Hz frames in the map
+		m_counters[counterNdx].value = value;	// 30 Hz frames in the map, and timers tick at 30 Hz
 	}
 	m_counters[counterNdx].isCountdownTimer = true;
 }
@@ -6966,7 +6975,7 @@ void ScriptEngine::adjustTimer( ScriptAction *pAction, Bool millisecondTimer, Bo
 		Real value = pAction->getParameter(0)->getReal();
 		if (!add)
 			value = -value;
-		m_counters[counterNdx].value += REAL_TO_INT_CEIL(ConvertDurationFromMsecsToFrames(value*1000));
+		m_counters[counterNdx].value += retailTimerFrames(value);
 	} else {
 		Int value = pAction->getParameter(0)->getInt();
 		if (!add)

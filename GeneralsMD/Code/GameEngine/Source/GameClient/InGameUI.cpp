@@ -6445,7 +6445,7 @@ void InGameUI::postDraw( void )
 				Int framesLeft = TheScriptEngine->getCounter(timerName)->value;
 				UnsignedInt readyFrame = TheGameLogic->getFrame();
 				if (framesLeft > 0)
-					readyFrame += framesLeft;
+					readyFrame += framesLeft * LOGICFRAMES_PER_RETAIL_FRAME;	// script timers count retail frames
 				Int readySecs = ControlBar_secondsFromFrames( (Real)(readyFrame - TheGameLogic->getFrame()) );
 				if ( (info->isCountdown && readySecs != info->timestamp) || (!info->isCountdown && framesLeft != info->timestamp) )
 				{
