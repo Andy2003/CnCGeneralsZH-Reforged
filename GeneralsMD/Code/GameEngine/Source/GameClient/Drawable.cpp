@@ -55,7 +55,6 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"		// for logic frame count
 #include "GameLogic/Object.h"
-#include "GameLogic/Module/OCLUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "Common/SpecialPower.h"
 		// countdown text over a building
@@ -65,9 +64,6 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
-#include "GameLogic/Module/AutoDepositUpdate.h"
-#include "GameLogic/Module/HackInternetAIUpdate.h"
-#include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "Common/Upgrade.h"
 #include "GameLogic/Module/StealthUpdate.h"
@@ -4818,8 +4814,8 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 		}
 
 		//
-		// A superweapon charging, or a building on a timed payout (the supply drop zone), gets the
-		// same white bar the production queue uses - stacked above it rather than on top of it,
+		// A superweapon charging gets the same white bar the production queue uses - stacked above
+		// it rather than on top of it,
 		// which is what a Chinese nuclear silo researching an upgrade while its missile charges used
 		// to draw: two bars and two countdowns in the same row of pixels. Only powers that carry a public timer count -
 		// that is the flag the superweapon list in the corner goes by.
@@ -4874,72 +4870,6 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 				}
 			}
 
-			if( chargePct < 0.0f )
-			{
-				static const NameKeyType key_OCLUpdate = NAMEKEY( "OCLUpdate" );
-				OCLUpdate *ocl = (OCLUpdate*)obj->findUpdateModule( key_OCLUpdate );
-				if( ocl != NULL )
-				{
-					//
-					// Both OCLUpdate accessors subtract frame numbers as UnsignedInt, so once the
-					// creation frame is behind us they wrap to something enormous rather than going
-					// negative. Clamping the bar hides that; the seconds would print it, so take the
-					// frame count only while the raw percentage is still inside its own range.
-					//
-					const Real rawPct = ocl->getCountdownPercent();
-
-					chargePct = rawPct * 100.0f;
-					if( chargePct < 0.0f ) chargePct = 0.0f;
-					if( chargePct > 100.0f ) chargePct = 100.0f;
-
-					if( rawPct >= 0.0f && rawPct < 1.0f )
-						chargeFramesLeft = ocl->getRemainingFrames();
-				}
-			}
-
-			//
-			// Nothing charging?  Then show what the thing is doing for a living instead: a worker
-			// fetching or handing over a box of supplies, a hacker waiting out the delay before the
-			// next payout, a black market or oil derrick on its deposit clock.  All three of those
-			// are money arriving on a timer that the player had no way at all to see - the cash just
-			// appeared - and the worker one doubles as "yes, it really is working".
-			//
-			// No seconds are written over these: chargeFramesLeft is left at zero on purpose, the
-			// bar is the whole message.
-			//
-			if( chargePct < 0.0f )
-			{
-				Real workPct = -1.0f;
-
-				AIUpdateInterface *ai = obj->getAIUpdateInterface();
-				if( ai != NULL )
-				{
-					SupplyTruckAIInterface *supply = ai->getSupplyTruckAIInterface();
-					if( supply != NULL )
-						workPct = supply->getDockActionProgress();
-
-					if( workPct < 0.0f )
-					{
-						HackInternetAIInterface *hack = ai->getHackInternetAIInterface();
-						if( hack != NULL )
-							workPct = hack->getHackProgress();
-					}
-				}
-
-				if( workPct < 0.0f )
-				{
-					static const NameKeyType key_autoDeposit = NAMEKEY( "AutoDepositUpdate" );
-					AutoDepositUpdate *deposit = (AutoDepositUpdate*)obj->findUpdateModule( key_autoDeposit );
-					if( deposit != NULL )
-						workPct = deposit->getDepositProgress();
-				}
-
-				if( workPct > 1.0f )
-					workPct = 1.0f;
-				if( workPct >= 0.0f )
-					chargePct = workPct * 100.0f;
-			}
-
 			if( chargePct >= 0.0f )
 			{
 				Int chargeY = stackY - healthBoxHeight;
@@ -4949,18 +4879,10 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 																	(healthBoxWidth - 2) * chargePct * 0.01f, healthBoxHeight - 2,
 																	GameMakeColor( 255, 255, 255, 255 ) );
 
-				//
-				// ... and how long that is, the same way a production bar says it. A bar filling up
-				// tells you something is coming; it does not tell you whether to wait for it. The
-				// supply drop zone is the one this matters most for - its whole job is a payout on
-				// a clock.
-				//
-				if( chargeFramesLeft > 0 )
-					drawOwnCountdown( m_chargeTimeDisplayString,
-														ControlBar_secondsFromFrames( INT_TO_REAL( chargeFramesLeft ) ),
-														healthBarRegion->lo.x, chargeY );
-				else
-					freeOwnCountdown( m_chargeTimeDisplayString );
+				// ... and how long that is, the same way a production bar says it
+				drawOwnCountdown( m_chargeTimeDisplayString,
+													ControlBar_secondsFromFrames( INT_TO_REAL( chargeFramesLeft ) ),
+													healthBarRegion->lo.x, chargeY );
 			}
 			else
 				freeOwnCountdown( m_chargeTimeDisplayString );
