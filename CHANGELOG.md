@@ -42,6 +42,7 @@ found and fixed â€” EA's own, not port damage.**
 - A Paladin under Contra no longer crashes the game. Reforged gives every Paladin a second laser for infantry, and that laser borrowed a Zero Hour weapon nothing else fires. Contra deleted it, so the laser had no gun, and the game went down a moment after the first Paladin rolled out. The laser is Reforged's own weapon now and is there whatever mod you load. The same kind of gap took the guns off Contra's Toxin Tunnel Defender and Toxin Stinger soldier, the Chemical Suits off its Rangers, and the death blast off its Demolition Scud Launcher, Toxin demo trap and Toxin Tractors (ShockWave's trap too). Where Reforged names a weapon or armour the mod dropped, the unit now keeps the mod's own, and the death blasts carry Zero Hour's charge.
 - Contra's units have their attack move, guard and stop buttons again, and A, G and S press them. Contra draws its command bar with eighteen buttons and keeps those three in the last row, which our fourteen-button bar does not have, so they went missing on every Contra unit, the Cybernetic general's cyborgs among them. A button a mod puts past the end of our bar now moves to an empty one, the three orders to the places Zero Hour gives them.
 - Contra's cyborgs no longer stand on black squares. Their little ground shadow is drawn the way Zero Hour draws it again, darkening the ground by the shape painted in the picture, so it comes out as a soft patch under the feet. We had been reading the shape from the picture's transparency instead, and Contra's shadow picture has none: it filled its whole square. Zero Hour's own shadows look as they did.
+- A `-mod` path with `.` or `..` in it is refused. An archive counts as your mod's only when it was loaded for that mod. Two mods under `-modfactions` that define a command set with the same name both load now, and the later one wins.
 
 ## One interface
 
@@ -353,6 +354,8 @@ found and fixed â€” EA's own, not port damage.**
 - Ctrl+D takes every unit of the kinds you have selected that is on the screen, and pressed twice inside half a second takes them across the whole map. One tank selected and two keystrokes is your whole armour, wherever it is standing. It was on Shift+Ctrl+E, which is three fingers for something you do in every fight, and it only ever reached across the map when the screen had nothing left to give - so the wide selection happened to you instead of being asked for.
 - U takes you to the next combat unit standing with no orders: it is selected and the view centres on it. Press again for the one after. Idle workers stay on I.
 - Shift and a number puts what you have selected into that control group and keeps everyone already in it, the way StarCraft does it. Fresh tanks off the line join group 1 with one key, where you used to select group 1, shift-click the new tanks in and press Ctrl+1 again. The selection stays as it is. Retail used Shift and a number to pull a group into your selection instead; that is gone, and Alt and the number still centres the view on the group.
+- Ordering a very large army works. A selection of more than 254 units reaches the game whole, and Ctrl+number groups keep all their units.
+- Hold Alt and drag with the middle mouse button, or hold Alt and turn the wheel, to tilt the camera between 20 and 60 degrees. Home resets heading, tilt and zoom, the way Numpad 5 does.
 
 ## Aircraft, guards, and orders that used to be ignored
 
@@ -1129,6 +1132,7 @@ A third pass went through the generals' powers, promotions and unit abilities.
 - Switch it mid-match and the map repaints itself. So does the picture when an alliance is made or broken by a map script.
 - A building being captured flashes in the capturer's colour from the setting too. It used to blink in the capturer's original colour while that player's units, radar dots and capture clock showed the new one. The flash on a selected unit and the flashes a mission script asks for follow the setting the same way.
 ## You can see where your ally is pointing
+- Vote kick. Type /kick and a name in chat to start a 30-second vote. It passes only when every other living player answers /yes, and it needs at least two voters besides the one being voted on.
 
 - Your ally's mouse is on your map: a soft pool of their own player colour on the ground where it rests, with their name across the middle of it. No second arrow on your screen - one is confusing enough, and the name is the part that says whose it is.
 - Two people playing together spend half the match describing places to each other. "Behind the oil derrick, no, the other one" is a sentence nobody has to type when you can watch where they are pointing while they say it.
@@ -1622,6 +1626,14 @@ The whole HUD is on the hardware. Four colours carry it, and they mean the same 
 - A missing save folder no longer costs you maps. The game listed the folder it runs from instead, and the tidy-up after a match deleted the .map files it found there.
 - Screenshots come out straight at any width. At 1366 wide each row slid sideways, and at any width that does not divide by eight the game read past the end of the picture.
 - Quitting the Windows game under Proton, the way a Steam Deck used to run it, no longer crashes on the way out.
+- A full disk or a crash in the middle of a save no longer destroys the earlier save in that slot. A broken or tampered save is refused instead of crashing the game or overwriting other files, and a save from the original game or from an older Reforged version is refused with a clear message.
+- A Chinook or Helix repaired at an airfield no longer takes off while infantry are still boarding or getting out.
+- A rare crash when infantry thrown out of a transport were in the middle of an attack is fixed.
+- A Battle Bus under a damage-reducing bonus such as Hold the Line no longer loses its first life to a hit it would have survived.
+- On AMD X3D processors with two halves, the 7950X3D and the 9950X3D, the game runs on the half with the big cache.
+- Another player can no longer make your game write files the host never announced, rewrite or remove someone else's LAN game, crash you with a malformed network or lobby message, or flood your memory with oversized commands. A command with an invalid weapon slot is refused.
+- Crash fixes: ordering an upgrade with a Supply Drop Zone, a GLA Hole or a captured Oil Derrick selected, a map that shows a counter it never set, a camera shake at a waypoint that is not there, and closing a menu while it animates. A map message with a percent sign in it shows as written.
+- Stopped sounds really stop. A destroyed unit's engine loop and a turret's turning loop no longer play on, and the Idle Worker tooltip shows its key.
 
 ## Units take corners wide, and drive round a jam instead of into it
 

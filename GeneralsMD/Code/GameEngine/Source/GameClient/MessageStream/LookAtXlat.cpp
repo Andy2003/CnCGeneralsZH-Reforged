@@ -80,6 +80,27 @@ static const Int edgeScrollSize = 3;
 // farthest is about fifteen notches, so three of these cross it.
 static const Real CTRL_WHEEL_ZOOM_NOTCHES = 5.0f;
 
+// Alt+wheel tilts the camera this far a notch.
+static const Real TILT_PER_NOTCH = 2.0f * PI / 180.0f;
+
+//-----------------------------------------------------------------------------
+/** The player's tilt keeps the camera between 20 and 60 degrees above the ground.  The view's
+	* pitch is an offset from GameData's CameraPitch, and a larger pitch lays the camera flatter,
+	* so the elevation it gives is CameraPitch minus the pitch. */
+//-----------------------------------------------------------------------------
+Real LookAt_clampPlayerPitch( Real pitch )
+{
+	const Real DEGREES = PI / 180.0f;
+	const Real base = TheGlobalData->m_cameraPitch * DEGREES;
+	const Real flattest = base - 20.0f * DEGREES;
+	const Real steepest = base - 60.0f * DEGREES;
+	if (pitch > flattest)
+		return flattest;
+	if (pitch < steepest)
+		return steepest;
+	return pitch;
+}
+
 //-----------------------------------------------------------------------------
 Int EdgeScroll_bandForHeight( Int displayHeight )
 {
@@ -366,7 +387,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			// The middle button turns the camera: drag it sideways and the heading follows.  The pan
 			// is on the right button, so no modifier is needed.  A click without a drag puts the
-			// camera back, below.
+			// camera back, below.  With Alt held the drag tilts the camera up and down instead.
+			if (TheKeyboard->isAlt())
+			{
+				m_isPitching = true;
+				break;
+			}
 			m_isRotating = true;
 			// the drag turns this, and under SnapCameraRotateTo45 the camera stands on whichever
 			// eighth it is nearest - so start it where the camera already is.
@@ -383,6 +409,7 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			const UnsignedInt PIXEL_OFFSET = 5;
 
 			m_isRotating = false;
+			m_isPitching = false;
 			Int dx = m_currentPos.x-m_originalAnchor.x;
 			if (dx<0) dx = -dx;
 			Int dy = m_currentPos.y-m_originalAnchor.y;
@@ -477,7 +504,7 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				Real angle = FACTOR * (m_currentPos.y - m_anchor.y);
 
 				// Dragging down tips the camera down.  The sign used to be the other way round.
-				TheTacticalView->setPitch( TheTacticalView->getPitch() - angle );
+				TheTacticalView->setPitch( LookAt_clampPlayerPitch( TheTacticalView->getPitch() - angle ) );
 				m_anchor = msg->getArgument( 0 )->pixel;
 			}
 
@@ -516,6 +543,13 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			if (!classic && TheKeyboard->isCtrl() && rotateSteps != 0 &&
 					TheInGameUI->rotatePendingPlacement( rotateSteps ))
 				return DESTROY_MESSAGE;
+
+			// Alt+wheel tilts instead of zooming: forward lays the camera flatter, toward the horizon.
+			if (!classic && TheKeyboard->isAlt())
+			{
+				TheTacticalView->setPitch( LookAt_clampPlayerPitch( TheTacticalView->getPitch() + spin * TILT_PER_NOTCH ) );
+				return DESTROY_MESSAGE;
+			}
 
 			// ZoomToCursor: the view holds the ground under the cursor while the zoom eases in.  It does
 			// it inside its own update, between the zoom moving and the frame being drawn; held from

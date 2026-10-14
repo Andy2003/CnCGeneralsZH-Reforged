@@ -174,6 +174,8 @@ class ArchiveFileSystem : public SubsystemInterface
 	// Unprotected this for copy-protection routines
 	AsciiString						getArchiveFilenameForFile(const AsciiString& filename) const;
 	void loadMods( void );
+	/// the -mod or -modpatch path, exactly as given, that loadMods loaded this archive for; empty for retail's
+	AsciiString						modLayerOf( const AsciiString& archiveFilename ) const;
 
 	/// FileSystem::setFocus: a -mod index sees that mod's archives alone.  FILE_FOCUS_ALL is the merged
 	/// tree, which -modfactions leaves as retail's and FILE_FOCUS_RETAIL always is.
@@ -199,6 +201,7 @@ protected:
 	ArchivedDirectoryInfo m_rootDirectory;
 	std::vector<ArchivedDirectoryInfo> m_modRoots;	///< -modfactions: each -mod's archives alone, in its own order
 	std::map<AsciiString, Int> m_archiveMod;				///< -modfactions: archive -> -mod index; retail's are not in it
+	std::map<AsciiString, AsciiString> m_archiveLayer;	///< archive -> the -mod or -modpatch path that loaded it (modLayerOf)
 	Int m_focus;
 };
 

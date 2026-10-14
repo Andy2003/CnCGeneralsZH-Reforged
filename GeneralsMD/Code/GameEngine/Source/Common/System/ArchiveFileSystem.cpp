@@ -247,6 +247,7 @@ void ArchiveFileSystem::loadMods() {
 				continue;
 			}
 			DEBUG_LOG(("ArchiveFileSystem::loadMods - loading %s into the directory tree.\n", it->str()));
+			m_archiveLayer[*it] = mod;
 			addModArchive(layers[layer].first, archiveFile, *it);
 		}
 	}
@@ -256,6 +257,12 @@ void ArchiveFileSystem::loadMods() {
 		DEBUG_LOG(("ArchiveFileSystem::loadMods - %s back over the mods\n", forkArt[i].str()));
 		loadIntoDirectoryTree(m_archiveFileMap[forkArt[i]], forkArt[i], TRUE);
 	}
+}
+
+AsciiString ArchiveFileSystem::modLayerOf(const AsciiString& archiveFilename) const
+{
+	std::map<AsciiString, AsciiString>::const_iterator it = m_archiveLayer.find(archiveFilename);
+	return it == m_archiveLayer.end() ? AsciiString() : it->second;
 }
 
 void ArchiveFileSystem::keepModsApart(size_t modCount)

@@ -3650,7 +3650,10 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			TheInGameUI->setCameraZoomOut( false );
 			break;
 		case GameMessage::MSG_META_CAMERA_RESET:
-			TheInGameUI->resetCamera();
+			// the same home view as a middle click: InGameUI::resetCamera eased the scripted pitch
+			// factor back but left the player's own tilt where Alt+drag or Alt+wheel put it.
+			TheTacticalView->setAngleAndPitchToDefault();
+			TheTacticalView->setZoomToDefault();
 			break;
 		case GameMessage::MSG_META_TOGGLE_CAMERA_TRACKING_DRAWABLE:
 			TheInGameUI->setCameraTrackingDrawable( true );

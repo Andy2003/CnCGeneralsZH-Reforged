@@ -2620,6 +2620,16 @@ static Int addMod(char *args[], Int num, Bool isPatch)
 	if (TheWritableGlobalData && num > 1)
 	{
 		AsciiString modPath = args[1];
+		// "." or ".." as a part would let a relative -mod climb out of the user folder, and give one
+		// folder two names that the file system's prefix and archive checks read as two mods
+		std::string parts( modPath.str() );
+		std::replace( parts.begin(), parts.end(), '/', '\\' );
+		parts = "\\" + parts + "\\";
+		if (parts.find( "\\.\\" ) != std::string::npos || parts.find( "\\..\\" ) != std::string::npos)
+		{
+			DEBUG_LOG(("Mod path '%s' is refused: it holds a '.' or '..' part.\n", modPath.str()));
+			return 2;
+		}
 		if (strchr(modPath.str(), ':') || modPath.startsWith("/") || modPath.startsWith("\\"))
 		{
 			// full path passed in.  Don't append base path.

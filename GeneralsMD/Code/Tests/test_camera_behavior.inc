@@ -285,6 +285,68 @@ TEST(ctrl_wheel_zooms_five_notches_for_one)
 	CHECK_NEAR(1000.0f - heightAfterOneNotch(), plain, 0.01f);
 }
 
+TEST(alt_wheel_and_alt_middle_drag_tilt_between_20_and_60_degrees)
+{
+	CHECK(bootOnce());
+	CameraInputFixture f;
+	GameClient *savedClient = TheGameClient;
+	TheGameClient = getTestGameClient();
+	f.global->m_windowed = TRUE;
+	f.global->m_edgeScrollInWindowedMode = FALSE;
+	f.global->m_cameraPitch = 37.5f;
+	const Real DEGREES = PI / 180.0f;
+	const auto elevation = [&f, DEGREES]() { return f.global->m_cameraPitch - f.view.getPitch() / DEGREES; };
+	const auto wheel = [&f](Real notches)
+	{
+		GameMessage *message = newInstance(GameMessage)(GameMessage::MSG_RAW_MOUSE_WHEEL);
+		const ICoord2D cursor = {320, 240};
+		message->appendPixelArgument(cursor);
+		message->appendRealArgument(notches);
+		f.camera.translateGameMessage(message);
+		message->deleteInstance();
+	};
+	const auto mouse = [&f](GameMessage::Type type, Int x, Int y)
+	{
+		GameMessage *message = newInstance(GameMessage)(type);
+		const ICoord2D pixel = {x, y};
+		message->appendPixelArgument(pixel);
+		f.camera.translateGameMessage(message);
+		message->deleteInstance();
+	};
+
+	f.view.setPitch(0.0f);
+	f.view.setHeightAboveGround(1000.0f);
+	f.keyboard.modifiers(KEY_STATE_LALT);
+	// a notch forward lays the camera 2 degrees flatter and does not zoom
+	wheel(1.0f);
+	CHECK_NEAR(elevation(), 35.5f, 0.001f);
+	CHECK_NEAR(f.view.getHeightAboveGround(), 1000.0f, 0.001f);
+	wheel(50.0f);
+	CHECK_NEAR(elevation(), 20.0f, 0.001f);
+	wheel(-50.0f);
+	CHECK_NEAR(elevation(), 60.0f, 0.001f);
+
+	// Alt+middle drag tilts instead of turning, inside the same limits
+	f.view.setPitch(0.0f);
+	const Real heading = f.view.getAngle();
+	mouse(GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_DOWN, 300, 300);
+	mouse(GameMessage::MSG_RAW_MOUSE_POSITION, 340, 310);
+	CHECK(f.camera.isMovingCamera());
+	CHECK_NEAR(elevation(), 37.5f + 0.1f / DEGREES, 0.001f);
+	CHECK_EQ(f.view.getAngle(), heading);
+	mouse(GameMessage::MSG_RAW_MOUSE_POSITION, 340, 900);
+	CHECK_NEAR(elevation(), 60.0f, 0.001f);
+	mouse(GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_UP, 340, 900);
+	CHECK(!f.camera.isMovingCamera());
+
+	// without Alt the wheel zooms again and leaves the tilt alone
+	f.keyboard.modifiers(0);
+	wheel(1.0f);
+	CHECK_NEAR(elevation(), 60.0f, 0.001f);
+	CHECK(f.view.getHeightAboveGround() < 1000.0f);
+	TheGameClient = savedClient;
+}
+
 TEST(right_drag_follows_the_scroll_speed)
 {
 	CHECK(bootOnce());

@@ -3642,6 +3642,14 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 		// a patch file's set replaces the set whole, in place, so every pointer to it stays good
 		commandSet->friend_clearCommands();
 	}
+	else if( ini->getLoadType() == INI_LOAD_OVERWRITE )
+	{
+		// two mods under -modfactions can both name a set "CommandSet GLA" once their Side names are
+		// stripped; the later one wins, as a patch file's does, instead of refusing the whole load
+		DEBUG_LOG(( "[LINE: %d in '%s'] commandset %s defined again, the later one replaces it\n",
+			ini->getLineNum(), ini->getFilename().str(), name.str() ));
+		commandSet->friend_clearCommands();
+	}
 	else if( ini->getLoadType() != INI_LOAD_CREATE_OVERRIDES )
 	{
 		//Holy crap, this sucks to debug!!!

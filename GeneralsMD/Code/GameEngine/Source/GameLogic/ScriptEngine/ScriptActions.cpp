@@ -2588,7 +2588,8 @@ void ScriptActions::doPlayerKill(const AsciiString& playerName)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doDisplayText(const AsciiString& displayText)
 {
-	TheInGameUI->message(displayText);	
+	// the map's text is the message, not a format: "HQ at 10%." read arguments nobody passed
+	TheInGameUI->message(UnicodeString(u"%ls"), TheGameText->fetch(displayText).str());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6148,6 +6149,8 @@ void ScriptActions::doC3CameraShake
 {
 	Waypoint *way = TheTerrainLogic->getWaypointByName(waypointName);
 	DEBUG_ASSERTLOG( (way != NULL), ("Camera shake with No Valid Waypoint\n") );
+	if( way == NULL )
+		return;	// the map names a waypoint it does not have; every other waypoint action skips it too
 	Coord3D pos = *way->getLocation();
 
 	TheTacticalView->Add_Camera_Shake(pos, radius, duration_seconds, amplitude);

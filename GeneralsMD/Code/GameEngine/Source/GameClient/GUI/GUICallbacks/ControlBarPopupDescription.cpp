@@ -88,6 +88,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/DisplayStringManager.h"
 #include "GameLogic/GameLogic.h"
@@ -112,6 +113,41 @@ static GameWindow *theWindow = NULL;
 static AnimateWindowManager *theAnimateWindowManager = NULL;
 static GameWindow *prevWindow = NULL;
 static Bool useAnimation = FALSE;
+
+//-------------------------------------------------------------------------------------------------
+/** " (Ctrl+Shift+I)" for the key the player's command map gives a meta event in a match, empty for
+	* one with no key.  The Idle Worker button has no letter of its own: its key is a chord in the
+	* command map, so the tooltip is the only place the button can say what it is. */
+//-------------------------------------------------------------------------------------------------
+static UnicodeString metaKeySuffix( GameMessage::Type meta )
+{
+	UnicodeString suffix;
+	for( const MetaMapRec *rec = TheMetaMap->getFirstMetaMapRec(); rec; rec = rec->m_next )
+	{
+		if( rec->m_meta != meta || rec->m_transition != DOWN || !( rec->m_usableIn & COMMANDUSABLE_GAME ) )
+			continue;
+
+		const char *keyName = NULL;
+		for( const LookupListRec *k = KeyNames; k->name; ++k )
+			if( k->value == rec->m_key )
+				keyName = k->name + 4;	// past "KEY_"
+		if( keyName == NULL || rec->m_key == MK_NONE )
+			continue;
+
+		AsciiString text( " (" );
+		if( rec->m_modState & CTRL )
+			text.concat( "Ctrl+" );
+		if( rec->m_modState & ALT )
+			text.concat( "Alt+" );
+		if( rec->m_modState & SHIFT )
+			text.concat( "Shift+" );
+		text.concat( keyName );
+		text.concat( ")" );
+		suffix.translate( text );
+		break;
+	}
+	return suffix;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** What the build tooltip says beyond retail's name, price and description, piece by piece, the
@@ -1109,6 +1145,8 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	GameWindow *win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextName"));
 	if(win)
 	{
+		if( commandButton && commandButton->getName() == "NonCommand_IdleWorker" )
+			name.concat( metaKeySuffix( GameMessage::MSG_META_SELECT_NEXT_IDLE_WORKER ) );
 		GadgetStaticTextSetText(win, name);
 	}
 

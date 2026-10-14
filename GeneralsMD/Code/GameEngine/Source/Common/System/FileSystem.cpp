@@ -465,9 +465,11 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 	}
 
 	// The last -mod that has the file wins, whether it has it loose or in an archive: a later mod's
-	// .big beats an earlier mod's loose copy.  An archive key is the -mod path itself, or that folder
-	// followed by the archive's name (loadMods).
+	// .big beats an earlier mod's loose copy.  An archive is a mod's when loadMods loaded it for that
+	// mod, not when its name merely starts with the mod's folder: a -mod naming the install folder, or
+	// a folder above another -mod's, claimed every archive under it by the text alone.
 	const AsciiString archive = TheArchiveFileSystem->getArchiveFilenameForFile(filename);
+	const AsciiString archiveLayer = TheArchiveFileSystem->modLayerOf(archive);
 	AsciiString loose;
 	Bool archived = FALSE;
 	for (size_t i = mods.size(); i-- > 0 && loose.isEmpty() && !archived; )
@@ -484,7 +486,7 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 				break;
 			}
 		}
-		archived = archive.isNotEmpty() && (isFolder ? archive.startsWithNoCase(mod.str()) : archive.compareNoCase(mod) == 0);
+		archived = archiveLayer.isNotEmpty() && archiveLayer.compareNoCase(mod) == 0;
 	}
 
 	// ...except over a file the fork ships: retail < mods < the fork.  That copy is the one the install

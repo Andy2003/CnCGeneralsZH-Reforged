@@ -630,9 +630,18 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 				disp = DESTROY_MESSAGE;
 				break;
 			}
-		} 
+		}
 
-
+		// Home puts the camera back as well as CAMERA_RESET's own key (Numpad 5 in the shipped
+		// CommandMap.ini, which keyboards without a numpad lack), unless the player gave Home to
+		// something else.
+		if( disp == KEEP_MESSAGE && key == MK_HOME && newModState == NONE &&
+				( keyState & KEY_STATE_DOWN ) && !( keyState & KEY_STATE_AUTOREPEAT ) &&
+				TheGameClient->getFrame() >= 1 && !( TheShell && TheShell->isShellActive() ) )
+		{
+			TheMessageStream->appendMessage( GameMessage::MSG_META_CAMERA_RESET );
+			disp = DESTROY_MESSAGE;
+		}
 
 		// remember, or forget, that this key is held with these modifiers
 		if( !isModifierKey && newModState != NONE && key >= 0 && key < NUM_MAPPABLE_KEYS )
