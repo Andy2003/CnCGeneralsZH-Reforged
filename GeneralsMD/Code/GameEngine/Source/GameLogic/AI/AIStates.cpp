@@ -906,8 +906,12 @@ StateReturnType AIStateMachine::updateStateMachine()
 
 			return status;
 		}
-		m_temporaryState->onExit(EXIT_NORMAL);
-		m_temporaryState = NULL;
+		// the state's own update can clear() the machine, which already exited and dropped it
+		if (m_temporaryState)
+		{
+			m_temporaryState->onExit(EXIT_NORMAL);
+			m_temporaryState = NULL;
+		}
 	}
 	StateReturnType retType = StateMachine::updateStateMachine();
 

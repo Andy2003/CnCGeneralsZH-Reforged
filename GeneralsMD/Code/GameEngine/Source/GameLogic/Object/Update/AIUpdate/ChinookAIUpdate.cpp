@@ -1071,9 +1071,14 @@ Bool ChinookAIUpdate::chooseLocomotorSet(LocomotorSetType wst)
 UpdateSleepTime ChinookAIUpdate::update()
 {
 	ParkingPlaceBehaviorInterface* pp = getPP(m_airfieldForHealing);
+	ContainModuleInterface* contain = getObject()->getContain();
+	const Bool waitingToEnterOrExit = contain && contain->hasObjectsWantingToEnterOrExit();
 	if (pp != NULL)
 	{
-		if (m_flightStatus == CHINOOK_LANDED && 
+		// Healed on the pad with infantry still walking up to board or waiting to get off: stay down
+		// for them, or it lifts off and the boarders stand under it and the leavers stay aboard.
+		if (m_flightStatus == CHINOOK_LANDED &&
+				!waitingToEnterOrExit &&
 				!m_hasPendingCommand &&
 				getObject()->getBodyModule()->getHealth() == getObject()->getBodyModule()->getMaxHealth())
 		{
@@ -1115,12 +1120,10 @@ UpdateSleepTime ChinookAIUpdate::update()
 
 	// have to call our parent's isIdle, because we override it to never return true
 	// when we have a pending command...
-	ContainModuleInterface* contain = getObject()->getContain();
 	if( contain )
 	{
 	  if (SupplyTruckAIUpdate::isIdle())
 		{
-			Bool waitingToEnterOrExit = contain->hasObjectsWantingToEnterOrExit();
 			if (m_hasPendingCommand)
 			{
 				AICommandParms parms(AICMD_MOVE_TO_POSITION, CMD_FROM_AI);	// values don't matter, will be wiped by next line
