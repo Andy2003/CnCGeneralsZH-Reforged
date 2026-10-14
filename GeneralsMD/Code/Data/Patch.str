@@ -1152,3 +1152,31 @@ END
 LAN:NoMod
 "none"
 END
+
+GUI:KickVoteStarted
+"%ls wants %ls out of the match. Type /yes or /no in chat: every other player has 30 seconds to agree."
+END
+
+GUI:KickVoteBanner
+"Kick %ls?   Yes %d of %d   /yes or /no   %d s"
+END
+
+GUI:KickVoteFailed
+"The vote to kick %ls failed."
+END
+
+GUI:KickVoteKicked
+"%ls was voted out of the match."
+END
+
+GUI:KickVoteTooFew
+"A vote kick needs at least two other players besides the one you want out."
+END
+
+GUI:KickVoteNoPlayer
+"No player called %ls is in the match."
+END
+
+GUI:KickVoteNone
+"No vote is open. Type /kick and a player's name to start one."
+END

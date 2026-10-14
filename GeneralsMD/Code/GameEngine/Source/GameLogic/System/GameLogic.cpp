@@ -242,6 +242,9 @@ GameLogic::GameLogic( void )
 	m_gameMode = GAME_NONE;
 	m_rankLevelLimit = 1000;
 	m_peaceTimeEndFrame = 0;
+	m_kickVoteTarget = -1;
+	m_kickVoteEndFrame = 0;
+	m_kickVoteYesMask = 0;
 	m_unitCap = 0;
 	m_proRules = FALSE;
 	m_incomeSharing = INCOME_SHARING_OFF;
@@ -1116,6 +1119,10 @@ void GameLogic::deleteLoadScreen( void )
 // ------------------------------------------------------------------------------------------------
 void GameLogic::startNewGame( Bool loadingSaveGame )
 {
+	// a vote is about one match; none carries into the next, or into a loaded one
+	m_kickVoteTarget = -1;
+	m_kickVoteEndFrame = 0;
+	m_kickVoteYesMask = 0;
 
 	#ifdef DUMP_PERF_STATS
 	__int64 startTime64;
@@ -4052,6 +4059,117 @@ Bool GameLogic::peaceTimeForbids( const Object *attacker, const Object *victim )
 	return attacker->getRelationship( victim ) == ENEMIES;
 }
 
+/* The vote kick.  Whoever may vote is a human side still in the match, other than the one on the
+	 block: not an observer, not a beaten player, not the computer.  All of it is asked of the player
+	 list, which is logic state, so every machine counts the same people on the same frame.  A vote
+	 needs two such voters at least, or in a one-on-one the one asking would decide alone, and the
+	 kick there is a free win. */
+static const Int KICK_VOTE_SECONDS = 30;
+static const Int MIN_KICK_VOTERS = 2;
+
+static Bool mayVoteToKick( Player *player, Int targetIndex )
+{
+	return player->getPlayerType() == PLAYER_HUMAN && player->isPlayableSide() && player->isPlayerActive()
+		&& player->getPlayerIndex() != targetIndex;
+}
+
+Int GameLogic::countKickVoters( void ) const
+{
+	Int voters = 0;
+	for( Int i = 0; i < ThePlayerList->getPlayerCount(); ++i )
+		if( mayVoteToKick( ThePlayerList->getNthPlayer( i ), m_kickVoteTarget ) )
+			++voters;
+	return voters;
+}
+
+Int GameLogic::countKickVotes( void ) const
+{
+	Int votes = 0;
+	for( Int i = 0; i < ThePlayerList->getPlayerCount(); ++i )
+		if( ( m_kickVoteYesMask & ( 1u << i ) ) && mayVoteToKick( ThePlayerList->getNthPlayer( i ), m_kickVoteTarget ) )
+			++votes;
+	return votes;
+}
+
+void GameLogic::endKickVote( const char *label )
+{
+	if( TheInGameUI && label )
+		TheInGameUI->message( label, ThePlayerList->getNthPlayer( m_kickVoteTarget )->getPlayerDisplayName().str() );
+	m_kickVoteTarget = -1;
+	m_kickVoteEndFrame = 0;
+	m_kickVoteYesMask = 0;
+}
+
+/* Kicked is beaten: his side is killed the way a player who quits to watch is, so he stays in the
+	 match as a watcher and leaves the way anybody does.  Called whenever the count may have moved,
+	 since a voter who leaves can complete a vote as surely as one who says yes. */
+static Bool kickVoteAgreed( Int votes, Int voters )
+{
+	return voters >= MIN_KICK_VOTERS && votes >= voters;
+}
+
+void GameLogic::processKickVote( Player *voter, Int targetIndex, Bool yes )
+{
+	if( !mayVoteToKick( voter, targetIndex ) )
+		return;
+
+	if( m_kickVoteTarget < 0 )
+	{
+		// a no opens nothing; a yes opens a vote about a human side still playing
+		Player *target = ThePlayerList->getNthPlayer( targetIndex );
+		if( !yes || target == NULL || target->getPlayerType() != PLAYER_HUMAN || !target->isPlayableSide() || !target->isPlayerActive() )
+			return;
+
+		m_kickVoteTarget = targetIndex;
+		if( countKickVoters() < MIN_KICK_VOTERS )
+		{
+			m_kickVoteTarget = -1;
+			if( TheInGameUI && voter == ThePlayerList->getLocalPlayer() )
+				TheInGameUI->message( "GUI:KickVoteTooFew" );
+			return;
+		}
+		m_kickVoteEndFrame = m_frame + KICK_VOTE_SECONDS * LOGICFRAMES_PER_SECOND;
+		m_kickVoteYesMask = 1u << voter->getPlayerIndex();
+		if( TheInGameUI )
+			TheInGameUI->message( "GUI:KickVoteStarted", voter->getPlayerDisplayName().str(), target->getPlayerDisplayName().str() );
+		return;
+	}
+
+	// one vote at a time, and only about the one it is about
+	if( targetIndex != m_kickVoteTarget )
+		return;
+
+	if( !yes )
+	{
+		endKickVote( "GUI:KickVoteFailed" );
+		return;
+	}
+
+	m_kickVoteYesMask |= 1u << voter->getPlayerIndex();
+	if( kickVoteAgreed( countKickVotes(), countKickVoters() ) )
+	{
+		ThePlayerList->getNthPlayer( m_kickVoteTarget )->killPlayer();
+		endKickVote( "GUI:KickVoteKicked" );
+	}
+}
+
+void GameLogic::expireKickVote( void )
+{
+	if( m_kickVoteTarget < 0 )
+		return;
+
+	// he left, or lost, before the vote was done with him
+	if( !ThePlayerList->getNthPlayer( m_kickVoteTarget )->isPlayerActive() )
+		endKickVote( NULL );
+	else if( m_frame >= m_kickVoteEndFrame )
+		endKickVote( "GUI:KickVoteFailed" );
+	else if( kickVoteAgreed( countKickVotes(), countKickVoters() ) )
+	{
+		ThePlayerList->getNthPlayer( m_kickVoteTarget )->killPlayer();
+		endKickVote( "GUI:KickVoteKicked" );
+	}
+}
+
 /* Peace time, the half of the rule that is not a refusal.  Object::getAbleToAttackSpecificObject
 	 and ActiveBody::attemptDamage between them stop anybody shooting anybody until the clock runs
 	 out; without this, the truce would just be free reconnaissance and a place to park an army one
@@ -4560,6 +4678,9 @@ void GameLogic::update( void )
 
 	// the lobby's peace time, if the host set one
 	peaceTimeTick();
+
+	// a vote kick that ran out of time
+	expireKickVote();
 
 	// and the buildings nobody repairs
 	neutralBuildingRepairTick();

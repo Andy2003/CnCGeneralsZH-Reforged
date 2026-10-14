@@ -6442,7 +6442,9 @@ void InGameUI::postDraw( void )
 			{
 				// found one - draw it
 				UnicodeString line;
-				Int framesLeft = TheScriptEngine->getCounter(timerName)->value;
+				// a map may show a counter its scripts never set; such a counter reads 0, as an unset one does in a condition
+				const TCounter *counter = TheScriptEngine->getCounter(timerName);
+				Int framesLeft = counter ? counter->value : 0;
 				UnsignedInt readyFrame = TheGameLogic->getFrame();
 				if (framesLeft > 0)
 					readyFrame += framesLeft * LOGICFRAMES_PER_RETAIL_FRAME;	// script timers count retail frames
@@ -9066,6 +9068,9 @@ void InGameUI::drawHudOverlay( void )
 	if( TheGameLogic->getFrame() == 0 )
 		return;
 
+	// on top of the battlefield like this strip, but never behind the ShowNetBox switch
+	drawKickVoteBanner();
+
 	// ShowNetBox is the player's switch for the readout.  Peace time is a rule of the match rather
 	// than a readout, so while it runs the strip stays up with only that segment in it.
 	const Bool showInfo = TheGlobalData->m_showNetBox;
@@ -9227,6 +9232,35 @@ void InGameUI::drawHudOverlay( void )
 
 	if( peace )
 		m_peaceTimeDisplayString->draw( x + textWidth + gap, y, peaceTimeColor( 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The open vote kick, a plate at the top middle of the battlefield: who is on the block, the yes
+	* votes against the number needed, the seconds left and how to answer.  The vote is the logic's
+	* (GameLogic::processKickVote); this only shows it. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::drawKickVoteBanner( void )
+{
+	const Int target = TheGameLogic->getKickVoteTarget();
+	if( target < 0 )
+		return;
+
+	const UnsignedInt secs = ControlBar_secondsFromFrames(
+									(Real)(TheGameLogic->getKickVoteEndFrame() - TheGameLogic->getFrame()) );
+	UnicodeString text;
+	text.format( TheGameText->fetch( "GUI:KickVoteBanner" ), ThePlayerList->getNthPlayer( target )->getPlayerDisplayName().str(),
+							 TheGameLogic->countKickVotes(), TheGameLogic->countKickVoters(), (Int)secs );
+	DisplayString *banner = broadcastText( "kickvote", text, m_superweaponNormalFont.str(),
+																				 TheGlobalLanguageData->adjustFontSize( HUD_OVERLAY_POINT_SIZE ), TRUE );
+
+	Int width = 0, height = 0;
+	banner->getSize( &width, &height );
+	const UIRect box = TheUIRect();
+	const Int pad = stripPixels( 3 );
+	const Int x = box.x + ( box.w - width ) / 2;
+	const Int y = box.y + stripPixels( 40 );
+	TheDisplay->drawFillRect( x - pad, y - pad, width + pad*2, height + pad*2, GameMakeColor( 0, 0, 0, 170 ) );
+	banner->draw( x, y, GameMakeColor( 255, 210, 90, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -1386,6 +1386,7 @@ protected:
 	enum { HUD_CLOCK_POINT_SIZE = 7 };		///< smaller still, and bold: the clock/rate plate is a glance, not a read
 
 	void drawHudOverlay( void );					///< the top right info strip (ShowNetBox), peace time at its end
+	void drawKickVoteBanner( void );			///< the open vote kick, top middle, while there is one
 	void drawProductionList( void );			///< the production list, lines on the left above the control bar
 
 	SignalKind									m_armedSignal;						///< the signal the next click drops; SIGNAL_KIND_COUNT for none

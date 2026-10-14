@@ -15568,3 +15568,31 @@ END
 CONTROLBAR:Demo_ToolTipGLAScienceRebelAmbush
 "Her yerde Asilerle ani bir pusu kurmanızı sağlar \n \n Seviye 1: 4 Asi \n Seviye 2: 6 Asi \n Seviye 3: 10 Asi \n \n Çağrıldığı yer: Komuta Merkezi"
 END
+
+GUI:KickVoteStarted
+"%ls, %ls oyuncusunun maçtan atılmasını istiyor. Sohbete /yes ya da /no yazın: diğer oyuncuların kabul etmek için 30 saniyesi var."
+END
+
+GUI:KickVoteBanner
+"%ls atılsın mı?   Evet %d / %d   /yes ya da /no   %d sn"
+END
+
+GUI:KickVoteFailed
+"%ls oyuncusunu atma oylaması geçmedi."
+END
+
+GUI:KickVoteKicked
+"%ls oylamayla maçtan atıldı."
+END
+
+GUI:KickVoteTooFew
+"Oylamayla atmak için atılacak oyuncu dışında en az iki oyuncu daha gerekir."
+END
+
+GUI:KickVoteNoPlayer
+"Maçta %ls adında bir oyuncu yok."
+END
+
+GUI:KickVoteNone
+"Açık bir oylama yok. Başlatmak için /kick ve oyuncunun adını yazın."
+END

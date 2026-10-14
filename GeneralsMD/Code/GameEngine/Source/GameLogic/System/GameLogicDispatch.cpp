@@ -760,6 +760,19 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, AIGroup *orderedGroup 
 		}
 
 		//---------------------------------------------------------------------------------------------
+		// A vote kick (fork): (Int player index, Bool yes) from "/kick", "/yes" or "/no" in chat.  The
+		// arguments came over the network, so their shape is checked; GameLogic::processKickVote
+		// decides the rest from logic state alone.
+		case GameMessage::MSG_VOTE_KICK:
+		{
+			if( msg->getArgumentCount() < 2 || msg->getArgumentDataType( 0 ) != ARGUMENTDATATYPE_INTEGER
+					|| msg->getArgumentDataType( 1 ) != ARGUMENTDATATYPE_BOOLEAN )
+				break;
+			processKickVote( thisPlayer, msg->getArgument( 0 )->integer, msg->getArgument( 1 )->boolean );
+			break;
+		}
+
+		//---------------------------------------------------------------------------------------------
 		// The stance key (fork): every selected unit of the sender's takes the stance.  The number came
 		// over the network, so only 0 and 1 mean anything
 		case GameMessage::MSG_SET_STANCE:
