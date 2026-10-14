@@ -1560,6 +1560,12 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	if (m_systemID != INVALID_PARTICLE_SYSTEM_ID)
 		TheParticleSystemManager->friend_addParticleSystem(this);
 
+	// DebrisTrails off: the fork's blast fragments never emit, so nothing of them, their trails or
+	// their slaves is drawn.  Destroyed rather than never built, so the FXList, the object creation
+	// list and every caller holding the pointer go on exactly as they do with the option on.
+	if (sysTemplate->m_explosionDebrisTrail && !TheGlobalData->m_explosionDebrisTrails)
+		destroy();
+
 	//DEBUG_ASSERTLOG(!(m_totalParticleSystemCount % 10 == 0), ( "TotalParticleSystemCount = %d\n", m_totalParticleSystemCount ));
 }
 
@@ -3311,6 +3317,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "SlaveSystem",						INI::parseAsciiString,												NULL,		offsetof( ParticleSystemTemplate, m_slaveSystemName ) },
 	{ "SlavePosOffset",					INI::parseCoord3D,														NULL,		offsetof( ParticleSystemTemplate, m_slavePosOffset ) },
 	{ "PerParticleAttachedSystem",		INI::parseAsciiString,								NULL,		offsetof( ParticleSystemTemplate, m_attachedSystemName ) },
+	{ "ExplosionDebrisTrail",				INI::parseBool,												NULL,		offsetof( ParticleSystemTemplate, m_explosionDebrisTrail ) },
 
 	{ "Lifetime",								parseRetailFramesRandom,	NULL,		offsetof( ParticleSystemTemplate, m_lifetime ) },
 	{ "SystemLifetime",					INI::parseRetailFramesUnsignedInt,						NULL,		offsetof( ParticleSystemTemplate, m_systemLifetime ) },
@@ -3483,6 +3490,7 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	//Initializations inserted
 	m_slaveTemplate = NULL;
 	//
+	m_explosionDebrisTrail = FALSE;
 }
 
 // ------------------------------------------------------------------------------------------------

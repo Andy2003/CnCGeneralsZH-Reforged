@@ -5328,6 +5328,60 @@ TEST(particlesys_find_answers_by_id_and_forgets_a_dead_system)
 	TheGameClient = savedClient;
 }
 
+/* The DebrisTrails option, on by default, round-trips through Options.ini.  Off, a system built from a
+	 template marked ExplosionDebrisTrail comes back already destroyed, so it never emits and the manager
+	 drops it, while every other system is untouched.  On, the marked one lives like any other. */
+TEST(particlesys_debris_trails_option_destroys_only_marked_systems)
+{
+	const OptionDef *def = findOptionDef( "DebrisTrails" );
+	CHECK( def != NULL );
+	CHECK_EQ( (Int)def->kind, (Int)OPTION_BOOL );
+	CHECK_EQ( (Int)def->apply, (Int)APPLY_LIVE );
+
+	GlobalData *savedData = TheWritableGlobalData;
+	TheWritableGlobalData = NEW GlobalData;
+	CHECK( TheGlobalData->m_explosionDebrisTrails );
+
+	UserPreferences pref;
+	TheWritableGlobalData->m_explosionDebrisTrails = FALSE;
+	saveOptionsToPreferences( pref );
+	CHECK_STR( pref[ AsciiString( "DebrisTrails" ) ].str(), "no" );
+	TheWritableGlobalData->m_explosionDebrisTrails = TRUE;
+	loadOptionsFromPreferences( pref );
+	CHECK( !TheGlobalData->m_explosionDebrisTrails );
+
+	GameClient *savedClient = TheGameClient;
+	TheGameClient = getTestGameClient();
+	ParticleSystemManager *savedManager = TheParticleSystemManager;
+
+	{
+		TestParticleSystemManager mgr;
+		TheParticleSystemManager = &mgr;
+
+		ParticleSystemTemplate *plain = mgr.newTemplate( AsciiString( "TestPlainSystem" ) );
+		ParticleSystemTemplate *debris = mgr.newTemplate( AsciiString( "TestDebrisSystem" ) );
+		debris->setExplosionDebrisTrail( TRUE );
+
+		ParticleSystem *plainOff = mgr.createParticleSystem( plain, FALSE );
+		ParticleSystem *debrisOff = mgr.createParticleSystem( debris, FALSE );
+		CHECK( !plainOff->isDestroyed() );
+		CHECK( debrisOff->isDestroyed() );
+
+		TheWritableGlobalData->m_explosionDebrisTrails = TRUE;
+		ParticleSystem *debrisOn = mgr.createParticleSystem( debris, FALSE );
+		CHECK( !debrisOn->isDestroyed() );
+
+		plainOff->deleteInstance();
+		debrisOff->deleteInstance();
+		debrisOn->deleteInstance();
+	}
+
+	TheParticleSystemManager = savedManager;
+	TheGameClient = savedClient;
+	delete TheWritableGlobalData;
+	TheWritableGlobalData = savedData;
+}
+
 /* Loading a save has to put each system back under the id it was saved with.  It used to build the
 	 system through createParticleSystem, which hands out the next id in sequence and files the system
 	 under it, and only then read the saved id over the top - so the manager's index pointed at the
