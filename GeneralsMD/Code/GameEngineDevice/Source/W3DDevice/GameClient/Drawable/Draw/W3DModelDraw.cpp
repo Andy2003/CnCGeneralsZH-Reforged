@@ -2493,7 +2493,10 @@ static Bool animLeavesBindPose(HAnimClass *anim, RenderObjClass *robj)
 	const Real MIN_FLIGHT = 200.0f;
 	const Real reach = max(robj->Get_Bounding_Sphere().Radius, MIN_FLIGHT);
 	const Int lastFrame = anim->Get_Num_Frames() - 1;
-	for (Int pivot = 1; pivot < anim->Get_Num_Pivots(); ++pivot)
+	// an animation can carry more pivots than the model it plays on: the Bomb Truck's UVBMBTRUK has 42
+	// and its damaged model UVBMBTRUK_D 41
+	const Int pivots = min(anim->Get_Num_Pivots(), tree->Num_Pivots());
+	for (Int pivot = 1; pivot < pivots; ++pivot)
 	{
 		if (tree->Get_Parent_Index(pivot) != 0 || !anim->Is_Node_Motion_Present(pivot))
 			continue;
