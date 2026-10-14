@@ -3162,6 +3162,9 @@ void InGameUI::updateFormationHints( void )
 			continue;
 		if( obj->isKindOf( KINDOF_IMMOBILE ) || obj->getAIUpdateInterface() == NULL )
 			continue;
+		// the same riders the logic leaves out of a formation move (GameLogicDispatch)
+		if( obj->isDisabledByType( DISABLED_HELD ) && !isForceAttackArmed() && !isGuardArmed() )
+			continue;
 		movers.push_back( obj );
 	}
 

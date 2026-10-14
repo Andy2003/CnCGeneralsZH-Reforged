@@ -1204,6 +1204,10 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, AIGroup *orderedGroup 
 					continue;
 				if (obj->isKindOf( KINDOF_IMMOBILE ) || obj->getAIUpdateInterface() == NULL)
 					continue;
+				// a rider cannot walk to a station; groupMoveToPosition and groupAttackMoveToPosition
+				// leave held members out too, while a garrison may still fire at or guard its own
+				if (obj->isDisabledByType( DISABLED_HELD ) && !fireAlong && !guardAlong)
+					continue;
 				movers.push_back( obj );
 			}
 
