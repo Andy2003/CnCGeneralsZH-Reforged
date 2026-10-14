@@ -3400,6 +3400,10 @@ void Object::setConstructionPercent( Real percent )
 
 		TheAI->pathfinder()->addObjectToPathfindMap( this );
 
+		// the plan looked with no range when it was placed and nothing re-looks a structure that does
+		// not move, so without this the site stayed blind until the last percent went in
+		handleShroud();
+
 		//
 		// and the building starts putting itself up.  This is the same frame the silhouette goes
 		// solid (Drawable::getEffectiveOpacity asks Object_isAwaitingBuilder, which asks this very

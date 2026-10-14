@@ -551,7 +551,7 @@ found and fixed â€” EA's own, not port damage.**
 - Cancelling a placement no longer deselects the builder.
 - The building on your cursor shows where its units will come out.
 - An ordered building stands as a see-through plan until a worker starts it.
-- A building going up lifts the fog around it the moment work starts. It used to see no further than its own walls until the last brick was in, so a base built out into the fog stood blind for the whole build and the worker on the site saw more than the site did.
+- A building going up lifts the fog around it the moment work starts. It used to see no further than its own walls until the last brick was in, so a base built out into the fog stood blind for the whole build and the worker on the site saw more than the site did. Until this version it still did, whatever this line said: the building worked out its new sight the moment work started and then never looked again until it was finished.
 - Click a plan, or press Stop, to cancel it and take the money back.
 - Cancelling a plan is silent â€” nothing was built, so nothing explodes.
 - Ground your units have walked stays buildable after they leave it.
