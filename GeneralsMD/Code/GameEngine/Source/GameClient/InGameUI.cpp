@@ -6406,7 +6406,8 @@ void InGameUI::postDraw( void )
 
 			const Int screenH = TheDisplay->getHeight();
 			const Int x = hudEdgeX( m_superweaponPosition.x );
-			Int y = REAL_TO_INT( m_superweaponPosition.y * screenH );
+			// under the info strip whenever it is up: the strip is drawn last and would cover them
+			Int y = max( REAL_TO_INT( m_superweaponPosition.y * screenH ), hudStripBottom() );
 			const Int bottom = REAL_TO_INT( screenH * 0.8f * 0.82f );	// EA's: the view above its bar
 			size_t drawn = 0;
 			for( ; drawn < listed.size() && drawn < SUPERWEAPON_LIST_LINES && y < bottom; drawn++ )
@@ -6439,7 +6440,7 @@ void InGameUI::postDraw( void )
 		Bool reverseXDir = (m_namedTimerPosition.x >= 0.5f);
 		// EA's column as far in from the right edge as EA had it, at the HUD's scale
 		Int startX = hudEdgeX( m_namedTimerPosition.x );
-		Int startY = (Int)(m_namedTimerPosition.y * TheDisplay->getHeight());
+		Int startY = max( (Int)(m_namedTimerPosition.y * TheDisplay->getHeight()), hudStripBottom() );
 		Color bgColor = GameMakeColor( 0, 0, 0, 255 );
 		for (NamedTimerMapIt mapIt = m_namedTimers.begin(); mapIt != m_namedTimers.end(); ++mapIt)
 		{
@@ -9064,6 +9065,20 @@ void InGameUI::drawDirectorIntroPlate( void )
 		return;
 	const Int underLeft = min( max( REAL_TO_INT( middle.x ) - underWidth / 2, 0 ), (Int)TheDisplay->getWidth() - underWidth );
 	drawBroadcastPlate( under, underLeft, top + nameHeight, shown );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Where the info strip ends, for the timers that start in the same corner.  The strip draws after
+	* them, on top of everything, so its height cannot be read from the last draw; it is one line of
+	* the strip's font at the strip's own offsets, which is what drawHudOverlay lays out. */
+//-------------------------------------------------------------------------------------------------
+Int InGameUI::hudStripBottom( void ) const
+{
+	if( !TheGlobalData->m_showNetBox && !TheGameLogic->isPeaceTime() )
+		return 0;
+	const GameFont *font = TheFontLibrary->getFont( m_superweaponNormalFont,
+		TheGlobalLanguageData->adjustFontSize( HUD_CLOCK_POINT_SIZE ), TRUE );
+	return TheUIRect().y + stripPixels( 2 ) + font->height + 1 + stripPixels( 4 );
 }
 
 //-------------------------------------------------------------------------------------------------
