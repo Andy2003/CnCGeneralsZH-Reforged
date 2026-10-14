@@ -7315,6 +7315,16 @@ void AIPlayer::defendHome( void )
 		homePower *= (Real)sqrt( armyAdvantage( home, army ) );
 	if( homePower < 0.5f * intruderWorth )
 		return;
+	// A gun standing still outside the base itself is not coming in: on a small map the enemy's own towers
+	// and an expansion's Patriots sit within two base radii, and idle units sent at them one or two at a
+	// time were the biggest loss to defences in 32 Hard against Medium matches.  They go only with odds
+	// that win, Easy the least careful.  A unit that can move is still met wherever it stands at home:
+	// gating those too slowed the quick wins on small maps and lost more over the longer matches.
+	static const Real OUTSIDE_BASE_ODDS[ AISKILL_COUNT ] = { 1.0f, 1.5f, 2.0f };
+	if( intruder->isKindOf( KINDOF_IMMOBILE ) &&
+			sqr( intruder->getPosition()->x - m_baseCenter.x ) + sqr( intruder->getPosition()->y - m_baseCenter.y ) > sqr( m_baseRadius ) &&
+			homePower < OUTSIDE_BASE_ODDS[ m_skillLevel ] * intruderWorth )
+		return;
 
 	Int sent = 0;
 	for( std::vector<Object *>::const_iterator o = owned.begin(); o != owned.end(); ++o )
@@ -7330,8 +7340,8 @@ void AIPlayer::defendHome( void )
 		++sent;
 	}
 	if( sent > 0 )
-		DEBUG_LOG(("AI DEFEND frame %d player %d sends %d idle units at the intruder at (%.0f,%.0f)\n", TheGameLogic->getFrame(),
-			m_player->getPlayerIndex(), sent, intruder->getPosition()->x, intruder->getPosition()->y));
+		DEBUG_LOG(("AI DEFEND frame %d player %d sends %d idle units at the intruder '%s' at (%.0f,%.0f)\n", TheGameLogic->getFrame(),
+			m_player->getPlayerIndex(), sent, intruder->getTemplate()->getName().str(), intruder->getPosition()->x, intruder->getPosition()->y));
 }
 
 /** How often the army is looked at for a part of the enemy's nothing answers, how big a part has to be
