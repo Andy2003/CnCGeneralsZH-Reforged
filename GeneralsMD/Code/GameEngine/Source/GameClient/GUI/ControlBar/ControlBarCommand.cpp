@@ -62,6 +62,7 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/Image.h"
 
 #ifdef _INTERNAL
@@ -397,8 +398,25 @@ void ControlBar::populateCommand( Object *obj )
 			windowed[ i ] = m_commandWindows[ i ] != NULL;
 		}
 		ControlBar_fitCommandSlots( types, windowed, MAX_COMMANDS_PER_SET, shown );
+
+		// with grid keys on a button on a keyless place moves to a free keyed one, so the right of the
+		// bar does not keep buttons without a key.  A passenger's way out stays where the transport
+		// code put it.  Client side only: the bar's layout reaches no logic
+		Bool keyed[ MAX_COMMANDS_PER_SET ];
+		Bool unkeyed[ MAX_COMMANDS_PER_SET ];
 		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
-			slot[ i ] = shown[ i ] >= 0 ? set[ shown[ i ] ] : set[ i ];
+		{
+			keyed[ i ] = windowed[ i ] && HotKeyManager::gridSlotKey( i ) != 0;
+			const CommandButton *button = shown[ i ] >= 0 ? set[ shown[ i ] ] : NULL;
+			unkeyed[ i ] = keyed[ i ] == FALSE && button && button->getCommandType() != GUI_COMMAND_EXIT_CONTAINER &&
+				HotKeyManager::playerButtonKey( button->getName(), 0, i, button->getCommandType() ) == 0;
+		}
+		ControlBar_packKeyedSlots( keyed, unkeyed, MAX_COMMANDS_PER_SET, shown );
+
+		// a window nothing is fitted to stays empty: its own slot is empty or script only, or its
+		// button was just packed away
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+			slot[ i ] = shown[ i ] >= 0 ? set[ shown[ i ] ] : NULL;
 	}
 
 	// populate the button with commands defined

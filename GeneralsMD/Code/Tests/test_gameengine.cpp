@@ -4132,6 +4132,41 @@ TEST(controlbar_mod_slots_past_the_bar_fit_its_windows)
 		CHECK_EQ( shown[ slot ], humvee[ slot ] != N && slot < WINDOWS ? slot : -1 );
 }
 
+/* Grid keys leave windows 11 and 13 keyless.  The USA War Factory's TOW upgrade in 11 moves to the
+   first free keyed window, leftmost first; attack move in 11 has its own A and is never unkeyed */
+TEST(controlbar_grid_packs_keyless_buttons_into_keyed_windows)
+{
+	enum { SLOTS = MAX_COMMANDS_PER_SET, WINDOWS = 14 };
+	Bool keyed[ SLOTS ];
+	Bool unkeyed[ SLOTS ];
+	Int shown[ SLOTS ];
+	for( Int slot = 0; slot < SLOTS; slot++ )
+	{
+		keyed[ slot ] = slot < WINDOWS && slot != 10 && slot != 12;
+		unkeyed[ slot ] = FALSE;
+		shown[ slot ] = -1;
+	}
+	// eight units in 1-8, TOW in 11, rally point in 13 (its own Y), sell in 14
+	for( Int slot = 0; slot < 8; slot++ )
+		shown[ slot ] = slot;
+	shown[ 10 ] = 10;
+	shown[ 12 ] = 12;
+	shown[ 13 ] = 13;
+	unkeyed[ 10 ] = TRUE;
+	ControlBar_packKeyedSlots( keyed, unkeyed, SLOTS, shown );
+	CHECK_EQ( shown[ 8 ], 10 );
+	CHECK_EQ( shown[ 10 ], -1 );
+	CHECK_EQ( shown[ 12 ], 12 );
+	CHECK_EQ( shown[ 13 ], 13 );
+
+	// a full keyed block leaves the button where it is
+	for( Int slot = 0; slot < WINDOWS; slot++ )
+		shown[ slot ] = slot;
+	ControlBar_packKeyedSlots( keyed, unkeyed, SLOTS, shown );
+	for( Int slot = 0; slot < WINDOWS; slot++ )
+		CHECK_EQ( shown[ slot ], slot );
+}
+
 TEST(controlbar_stance_key_takes_what_the_buttons_leave)
 {
 	enum { SLOTS = 14 };

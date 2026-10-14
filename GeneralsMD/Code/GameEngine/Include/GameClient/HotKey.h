@@ -119,6 +119,10 @@ public:
 	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
 																	 Int commandType );
 
+	/** The key command bar slot barSlot gives a button with grid keys on, 0 for a slot without one or
+		* with grid keys off. */
+	static WideChar gridSlotKey( Int barSlot );
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;

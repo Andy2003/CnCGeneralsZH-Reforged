@@ -451,6 +451,12 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 }
 
 //-----------------------------------------------------------------------------
+WideChar HotKeyManager::gridSlotKey( Int barSlot )
+{
+	return s_commandGrid && barSlot >= 0 && barSlot < GRID_KEY_COUNT ? GRID_KEYS[ barSlot ] : 0;
+}
+
+//-----------------------------------------------------------------------------
 /** CommandBarGrid, Enabled = Yes or No, End.  Only the player's own Hotkeys.ini carries it, and
 	* nothing in it reaches the INI CRC. */
 /*static*/ void INI::parseCommandBarGridDefinition( INI *ini )

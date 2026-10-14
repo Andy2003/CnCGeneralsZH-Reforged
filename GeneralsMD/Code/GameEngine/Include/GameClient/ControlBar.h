@@ -507,6 +507,12 @@ Bool ControlBar_commandPlaces( const Int *types, const Int *groups, const Int *p
 	* when free, anything else to the first empty one. */
 void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int count, Int *shown );
 
+/** Grid keys' second pass over ControlBar_fitCommandSlots' `shown`: a button in window w with no key
+	* there (`unkeyed[ w ]`) moves to the first empty window, leftmost first, whose place has a key
+	* (`keyed`), so a set that leaves the keyless top of the last two columns busy and a keyed window
+	* free gets a key for every button.  A button with nowhere to go stays put. */
+void ControlBar_packKeyedSlots( const Bool *keyed, const Bool *unkeyed, Int count, Int *shown );
+
 /** The page's keys past attack, hold position and move, which no command set has a button for either. */
 enum OrderKeyExtra
 {
