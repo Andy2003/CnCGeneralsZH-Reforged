@@ -10892,29 +10892,6 @@ TEST(a_factorys_queue_is_as_deep_as_its_ini_says_not_as_wide_as_the_button_strip
 	CHECK( data.m_maxQueueEntries > MAX_BUILD_QUEUE_BUTTONS );
 }
 
-/** The bar over a worker's head while it loads or unloads a box fills across the window the dock
-	 state announced.  Outside that window there is no bar at all - which is how a worker walking
-	 between the pile and the refinery reads, since nothing but the dock state ever moves the
-	 window - and the ends of the window are exclusive so a stale one cannot leave a full bar
-	 hanging over an idle worker. */
-TEST(a_dock_action_bar_fills_across_its_window_and_shows_nothing_outside_it)
-{
-	// half way through a thirty frame box
-	CHECK_NEAR( 0.5f, dockActionProgress( 115, 100, 130 ), 0.0001f );
-	CHECK_NEAR( 0.0f, dockActionProgress( 100, 100, 130 ), 0.0001f );
-
-	// the frame it lands on, and every frame after, is over: no bar
-	CHECK( dockActionProgress( 130, 100, 130 ) < 0.0f );
-	CHECK( dockActionProgress( 400, 100, 130 ) < 0.0f );
-
-	// before it starts, and a window that was never set, are both no bar
-	CHECK( dockActionProgress( 99, 100, 130 ) < 0.0f );
-	CHECK( dockActionProgress( 0, 0, 0 ) < 0.0f );
-
-	// a zero-length window is not a divide by zero
-	CHECK( dockActionProgress( 100, 100, 100 ) < 0.0f );
-}
-
 /** A docking ends on the frame the last box changes hands, not one action delay later.  Both ends
 	 can finish it: the docker filling up, or the pile running out.  Staying docked past that point
 	 cost a worker a whole extra delay per trip standing at a pile it could take nothing from. */

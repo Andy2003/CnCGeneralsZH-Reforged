@@ -36,20 +36,6 @@
 #include "GameLogic/Module/AIUpdate.h"
 
 //-------------------------------------------------------------------------------------------------
-/** How far through a dock action (fetching or handing over one box) frame 'now' is, given the
-	* window the dock state announced.  Negative outside the window - which is also what a docker
-	* that is not docked reads, since nothing but the dock state ever moves the window.  Shared by
-	* SupplyTruckAIUpdate and WorkerAIUpdate, which implement the same interface side by side. */
-//-------------------------------------------------------------------------------------------------
-inline Real dockActionProgress( UnsignedInt now, UnsignedInt start, UnsignedInt end )
-{
-	if( end <= start || now >= end || now < start )
-		return -1.0f;
-
-	return INT_TO_REAL( now - start ) / INT_TO_REAL( end - start );
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Is there another box in this for the docker after the one just handed over?  Asked the moment a
 	* box changes hands, so that a docking that is finished ends there and then: a docker that stays
 	* docked spends another whole action delay before finding out there was nothing left to take,
@@ -248,10 +234,9 @@ public:
 	virtual Int getUpgradedSupplyBoost() const = 0;
 	virtual Int getMaxBoxes() const = 0;			///< how many boxes a full load is
 
-	/** The dock state announces how long the box it is working on takes; that window is what the
-		* progress bar over the worker's head fills across.  (See AIDockProcessDockState.) */
+	/** The dock state announces how long the load it is working on takes; the end of that window
+		* times the shortest leg to the next docking.  (See AIDockProcessDockState.) */
 	virtual void noteDockActionWindow( UnsignedInt frames ) = 0;
-	virtual Real getDockActionProgress() const = 0;	///< 0..1 while loading or unloading, negative otherwise
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -293,7 +278,6 @@ public:
 	virtual Int getMaxBoxes() const { return getSupplyTruckAIUpdateModuleData()->m_maxBoxesData; }
 
 	virtual void noteDockActionWindow( UnsignedInt frames );
-	virtual Real getDockActionProgress() const;
 
 	virtual UpdateSleepTime update();
 	virtual void aiDoCommand(const AICommandParms* parms);
@@ -305,8 +289,7 @@ protected:
 	virtual void privateIdle(CommandSourceType cmdSource);						///< Enter idle state.	
 
 private:
-	UnsignedInt								m_dockActionStartFrame;	///< when the box currently being moved started
-	UnsignedInt								m_dockActionEndFrame;		///< and when it lands; equal means "not docking"
+	UnsignedInt								m_dockActionEndFrame;		///< when the load currently being moved lands
 	SupplyTruckStateMachine*	m_supplyTruckStateMachine;
 	ObjectID									m_preferredDock;			///< Instead of searching, try this one first
 	Int												m_numberBoxes;
