@@ -161,6 +161,7 @@ found and fixed â€” EA's own, not port damage.**
 - The radar's under-attack pulse throbs instead of strobing, and no longer ends early.
 - The main menu surf rolls at its proper pace, not ten times too fast.
 - And it is there at all again. The waves breaking on the main menu's beach had been worked out every frame and then drawn nowhere since v1.0.0, so the shore behind the menu was flat water.
+- Less work per picture in a big battle. Infantry and other bending models are shaped on every core at once instead of one, the shadow blobs and markers on the ground go to the graphics card in one batch instead of two uploads each, and a material or light identical to the one already set is no longer sent again. What is drawn does not change.
 
 ## The computer opponent builds a base now
 
