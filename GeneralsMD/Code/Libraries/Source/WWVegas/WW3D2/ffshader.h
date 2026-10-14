@@ -134,7 +134,8 @@ enum
 	DRAW_EFFECT_EMP = 2,		///< anything an EMP disabled: arcs crawling over it
 	DRAW_EFFECT_CLOAK = 3,		///< own stealthed unit: what is behind it, gently bent, through its muted paint
 	DRAW_EFFECT_REVEALED = 4,	///< enemy stealthed unit a detector found: seen as heat
-	DRAW_EFFECT_COUNT = 5
+	DRAW_EFFECT_CLOAK_SHADOW = 5,	///< own stealthed unit in the sun's map: casts a share of its shadow
+	DRAW_EFFECT_COUNT = 6
 };
 
 // The constant block still carries this many normal mapped light slots, unread, so the shadow and
@@ -560,16 +561,21 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
-	"/* Own stealthed unit, seen through like glass.  What is behind it shows through its body,\n" \
-	"   bent a few pixels by a slow, broad ripple that swims along it and bends a little more\n" \
-	"   towards the outline.  No tint: the scene keeps its colour, and the unit's own paint, drained\n" \
-	"   a little, sits in it at about half by the game's own stealth opacity, so the 2003 breathing\n" \
-	"   still shows; darker than that and a unit at play zoom was lost but for its shadow.  A soft\n" \
-	"   near-white fresnel edge holds the silhouette.  The ripple is measured in the world and moves\n" \
-	"   a fixed share of the screen, so a unit far out shimmers as gently as one up close and never\n" \
-	"   breaks into noise.  Detected (the strength is never below 0.6 then), the body warms and an\n" \
-	"   amber edge beats.  The alpha goes back up to the texel's own, because the shade already\n" \
-	"   holds the mix. */\n" \
+	"/* Own stealthed unit, seen through like thick bent glass, and the bend is what you find it by.\n" \
+	"   Each face leans the scene behind it the way its normal leans on the screen, so faces turned\n" \
+	"   different ways show the ground shifted by different amounts and the body's shape reads even\n" \
+	"   over plain sand; a slow, broad ripple swims over that and bends a flat wall across its face.\n" \
+	"   The reach is two and a half world units in pixels at the pixel's depth, never under 4 pixels\n" \
+	"   at 1080 so a unit at play zoom still visibly distorts, never over 4% of the screen.  The\n" \
+	"   ripple is low frequency in the world and slow, so nothing fizzes in motion.  The bend alone\n" \
+	"   was lost at play zoom, so the glass also leans a little toward a cool mid grey, 7% face on\n" \
+	"   and about half at the outline, where a soldier's round body has most of its faces and a\n" \
+	"   building's flat walls have few: a haze rather than a white edge, darkening bright ground as much\n" \
+	"   as it lifts dark ground.  A hint of the unit's own paint stays in it, breathing with the\n" \
+	"   game's own stealth opacity as it did in 2003.  Detected (the strength is never below 0.6\n" \
+	"   then), the whole body beats amber as well as its edge: a big flat building has almost no\n" \
+	"   edge facing away from the eye, and with the beat on the rim alone it only turned tan.  The\n" \
+	"   alpha goes back up to the texel's own, because the shade already holds the mix. */\n" \
 	"float4 effect_cloak(float4 current, float4 position)\n" \
 	"{\n" \
 	"    float3 world; float3 surface; float facing;\n" \
@@ -578,27 +584,38 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float detected = DrawEffectParameters.y;\n" \
 	"    float opacity = max(DrawEffectParameters.w, 0.05);\n" \
 	"    float rim = pow(1.0 - facing, 2.0);\n" \
-	"    float swim_x = effect_noise(world * 0.12 + float3(t * 0.35, t * 0.2, t * 0.45)) - 0.5;\n" \
-	"    float swim_y = effect_noise(world * 0.12 + float3(7.3 - t * 0.3, 2.1, t * 0.4)) - 0.5;\n" \
+	"    float swim_x = effect_noise(world * 0.09 + float3(t * 0.35, t * 0.2, t * 0.45)) - 0.5;\n" \
+	"    float swim_y = effect_noise(world * 0.09 + float3(7.3 - t * 0.3, 2.1, t * 0.4)) - 0.5;\n" \
 	"    float2 screen = 1.0 / ShadowViewport.xy;\n" \
-	"    float2 bend = float2(swim_x, swim_y) * (0.008 + 0.006 * rim) * screen.y;\n" \
+	"    float2 ndc = float2(position.x * ShadowViewport.x * 2.0 - 1.0, 1.0 - position.y * ShadowViewport.y * 2.0);\n" \
+	"    float4 across = mul(float4(ndc + float2(2.0 * ShadowViewport.x, 0.0), position.z, 1.0), WorldFromClip);\n" \
+	"    float4 above = mul(float4(ndc + float2(0.0, 2.0 * ShadowViewport.y), position.z, 1.0), WorldFromClip);\n" \
+	"    float3 right = across.xyz / across.w - world;\n" \
+	"    float3 up = above.xyz / above.w - world;\n" \
+	"    float world_per_pixel = max(length(up), 1e-4);\n" \
+	"    float2 lean = float2(dot(surface, right), -dot(surface, up)) / world_per_pixel;\n" \
+	"    float reach = clamp(2.5 / world_per_pixel, 0.0037 * screen.y, 0.04 * screen.y);\n" \
+	"    float2 bend = (lean * 0.8 + float2(swim_x, swim_y) * 1.2) * reach;\n" \
 	"    int2 at = int2(clamp(position.xy + bend, float2(0.0, 0.0), screen - 1.0));\n" \
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
 	"    float3 own = lerp(grey.xxx, current.rgb, 0.7);\n" \
-	"    float3 glass = lerp(behind, own, 0.3 + 0.35 * opacity) + rim * 0.4 * float3(0.92, 0.96, 1.0) + 0.04;\n" \
+	"    float3 glass = lerp(behind, own, 0.1 + 0.15 * opacity);\n" \
+	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), 0.07 + 0.45 * rim);\n" \
 	"    float found = step(0.01, detected);\n" \
 	"    float beat = 0.55 + 0.45 * sin(t * 6.0);\n" \
 	"    float3 amber = float3(1.0, 0.55, 0.15);\n" \
-	"    glass = lerp(glass, glass * amber * 1.4, found * 0.35) + found * (rim * 1.2 + 0.08) * beat * amber;\n" \
+	"    float lum = dot(glass, float3(0.299, 0.587, 0.114));\n" \
+	"    glass = lerp(glass, amber * (0.3 + lum), found * (0.25 + 0.3 * beat)) + found * (rim * 1.2 + 0.18) * beat * amber;\n" \
 	"    current.rgb = glass;\n" \
 	"    current.a = saturate(current.a / opacity);\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
 	"/* Enemy stealthed unit a detector found, seen as heat, the way the 2003 heat vision pass meant\n" \
-	"   it.  The paint's own brightness runs up a thermal ramp, dark red through orange to a pale hot\n" \
-	"   yellow, so the shape still reads, the outline burns, and one slow broad sweep climbs it.  Each\n" \
+	"   it.  The paint's own brightness runs up a thermal ramp, dark red through orange to a warm\n" \
+	"   yellow that stops short of white, so bright paint keeps its detail and the shape reads; the\n" \
+	"   outline burns, and one slow broad sweep climbs it.  Each\n" \
 	"   sweep of the detector (the strength, one at the sweep and falling after) brightens all of\n" \
 	"   it.  No fine lines: drawn a few pixels high, a zoomed out unit turned them into stripes. */\n" \
 	"float4 effect_revealed(float4 current, float4 position)\n" \
@@ -607,13 +624,26 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    effect_surface(position, world, surface, facing);\n" \
 	"    float t = DrawEffectParameters.x;\n" \
 	"    float pulse = DrawEffectParameters.y;\n" \
-	"    float heat = saturate(dot(current.rgb, float3(0.299, 0.587, 0.114)) * 1.3 + 0.1);\n" \
-	"    float3 ramp = lerp(float3(0.30, 0.04, 0.02), float3(1.0, 0.42, 0.08), smoothstep(0.0, 0.55, heat));\n" \
-	"    ramp = lerp(ramp, float3(1.0, 0.86, 0.55), smoothstep(0.55, 1.0, heat));\n" \
+	"    float heat = saturate(dot(current.rgb, float3(0.299, 0.587, 0.114)) * 1.05 + 0.06);\n" \
+	"    float3 ramp = lerp(float3(0.30, 0.04, 0.02), float3(0.95, 0.40, 0.08), smoothstep(0.0, 0.55, heat));\n" \
+	"    ramp = lerp(ramp, float3(0.95, 0.66, 0.32), smoothstep(0.55, 1.0, heat));\n" \
 	"    float rim = pow(1.0 - facing, 2.0);\n" \
 	"    float sweep = smoothstep(0.9, 1.0, sin(world.z * 0.06 - t * 1.8));\n" \
-	"    float gain = 0.6 + 0.6 * pulse;\n" \
+	"    float gain = 0.6 + 0.35 * pulse;\n" \
 	"    current.rgb = ramp * gain + float3(1.0, 0.40, 0.12) * (rim * 0.9 + sweep * 0.35) * gain;\n" \
+	"    return current;\n" \
+	"}\n" \
+	"\n" \
+	"/* Own stealthed unit drawn into the sun's map.  A depth map holds a caster or not, so the\n" \
+	"   cloaked one keeps a share of its texels, an ordered four by four pattern, and the receiving\n" \
+	"   filter, which averages a square of taps over several texels, turns that share into a shadow\n" \
+	"   that strength.  Half the stealth opacity: a quarter to a half, breathing with the body. */\n" \
+	"float4 effect_cloak_shadow(float4 current, float4 position)\n" \
+	"{\n" \
+	"    uint2 cell = uint2(position.xy) & 3u;\n" \
+	"    uint bayer = ((cell.x ^ cell.y) & 1u) * 8u + (cell.y & 1u) * 4u\n" \
+	"        + (((cell.x ^ cell.y) >> 1) & 1u) * 2u + ((cell.y >> 1) & 1u);\n" \
+	"    clip(DrawEffectParameters.w * 0.5 - ((float)bayer + 0.5) / 16.0);\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n"

@@ -70,6 +70,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx11runtime.h"
+#include "WW3D2/ffshader.h"
 #include "WW3D2/sortingrenderer.h"
 #include "GameClient/View.h"
 #include "Platform/RenderTypes.h"
@@ -4401,6 +4402,20 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 				++castersOutOfView;
 				continue;
 			}
+		}
+
+		/* An own stealthed unit casts only a share of its shadow, breathing with its fade, the way
+			 the cloak lets the ground show through its body (effect_cloak_shadow in ffshader.h).  A
+			 render object with no drawable behind it, a ghost or a prop, casts in full. */
+		sunInfo.drawEffect = DRAW_EFFECT_NONE;
+		const DrawableInfo *casterInfo = (const DrawableInfo *)robj->Get_User_Data();
+		const Drawable *caster = casterInfo ? casterInfo->m_drawable : NULL;
+		if (caster && Direct3D11_Draw_Effects()
+			&& (caster->getStealthLook() == STEALTHLOOK_VISIBLE_FRIENDLY
+				|| caster->getStealthLook() == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED))
+		{
+			sunInfo.drawEffect = DRAW_EFFECT_CLOAK_SHADOW;
+			sunInfo.drawEffectParameters[3] = caster->getEffectiveOpacity();
 		}
 
 		robj->Render( sunInfo );
