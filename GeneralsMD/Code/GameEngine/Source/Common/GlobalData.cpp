@@ -966,6 +966,7 @@ GlobalData::GlobalData()
 	m_showObjectHealth = FALSE;
 	// what this fork has always done, so nobody's game changes until they say so
 	m_healthBarMode = HEALTH_BAR_ALWAYS;
+	m_healthBarColors = 0;
 	// the game's own mouse unless the launcher passes -mouse reforged
 	m_mouseStyle = MOUSE_STYLE_CLASSIC;
 	// the lobby's own colours until somebody asks for something else

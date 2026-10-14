@@ -7737,6 +7737,33 @@ TEST(health_bar_mode_round_trips_through_options_ini)
 	TheWritableGlobalData = saved;
 }
 
+/** Health bar colours are the launcher's row, not a menu control: green-to-red by default, the
+	 owner's colour at 1, and nothing past that. */
+TEST(health_bar_colors_round_trip_through_options_ini)
+{
+	const OptionDef *def = findOptionDef( "HealthBarColors" );
+	CHECK( def != NULL );
+	CHECK_EQ( (Int)def->apply, (Int)APPLY_LIVE );
+	CHECK_EQ( def->hi, 1 );
+
+	GlobalData *saved = TheWritableGlobalData;
+	TheWritableGlobalData = NEW GlobalData;
+
+	CHECK_EQ( TheGlobalData->m_healthBarColors, 0 );
+
+	UserPreferences pref;
+	pref[ AsciiString( "HealthBarColors" ) ] = AsciiString( "1" );
+	loadOptionsFromPreferences( pref );
+	CHECK_EQ( TheGlobalData->m_healthBarColors, 1 );
+
+	pref[ AsciiString( "HealthBarColors" ) ] = AsciiString( "7" );
+	loadOptionsFromPreferences( pref );
+	CHECK_EQ( TheGlobalData->m_healthBarColors, 1 );
+
+	delete TheWritableGlobalData;
+	TheWritableGlobalData = saved;
+}
+
 TEST(player_color_scheme_round_trips_through_options_ini)
 {
 	const OptionDef *def = findOptionDef( "PlayerColors" );

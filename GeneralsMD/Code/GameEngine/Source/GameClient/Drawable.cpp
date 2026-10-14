@@ -4678,6 +4678,20 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 			outlineColor = GameMakeColor( 0, healthRatio * 128.0f, 128, 255 );//dark blue to dark cyan
 
 		}
+		else if( TheGlobalData->m_healthBarColors == 1 &&
+						 obj->getControllingPlayer() != NULL &&
+						 obj->getControllingPlayer()->getPlayerColor() != 0 )
+		{
+			// HealthBarColors 1: the bar wears its owner's colour, the one the minimap and the selection
+			// rings use, and the bar's length alone says how hurt it is.  The outline is the same colour
+			// darkened, so a light player colour still reads against light ground.  Civilians, crates
+			// and anything else with no colour to borrow keep the ramp below.
+			UnsignedByte r, g, b, a;
+			GameGetColorComponents( clientPlayerColor( obj->getControllingPlayer() ), &r, &g, &b, &a );
+
+			color = GameMakeColor( r, g, b, 255 );				// the stored colour's alpha is not ours to trust
+			outlineColor = GameDarkenColor( color, 60 );
+		}
 		else //retail's ramp for every owner: green at full health, through yellow, to red
 		{
 

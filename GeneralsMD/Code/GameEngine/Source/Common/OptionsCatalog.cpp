@@ -98,6 +98,7 @@ OPTION_BOOL_ACCESSORS( m_vsync )
 OPTION_BOOL_ACCESSORS( m_classicGraphics )
 OPTION_INT_ACCESSORS( m_lightingStyle )
 OPTION_INT_ACCESSORS( m_healthBarMode )
+OPTION_INT_ACCESSORS( m_healthBarColors )
 OPTION_INT_ACCESSORS( m_playerColorScheme )
 OPTION_INT_ACCESSORS( m_textLanguage )
 OPTION_BOOL_ACCESSORS( m_showOrderLines )
@@ -397,6 +398,13 @@ const OptionDef TheOptionCatalog[] =
 	{ "HealthBars",								OPT_WND( "ComboBoxHealthBars" ), "GUI:HealthBars",
 		OPTION_ENUM, APPLY_LIVE, 0, HEALTH_BAR_MODE_COUNT - 1,
 		get_m_healthBarMode, set_m_healthBarMode },
+
+	// What a health bar is coloured by: 0 the health, green through yellow to red as retail drew it,
+	// 1 the owner's player colour.  No control in the game's menu; the launcher writes it.  Read every
+	// frame by Drawable::drawHealthBar, and a disabled unit keeps its blue either way.
+	{ "HealthBarColors",					"", "",
+		OPTION_ENUM, APPLY_LIVE, 0, 1,
+		get_m_healthBarColors, set_m_healthBarColors },
 
 	// MenuLayout (stretch or fit), HudScale and InterfaceStyle used to sit here.  Every menu is
 	// fitted now, and there is one interface at one size.
