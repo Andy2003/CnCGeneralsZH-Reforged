@@ -615,9 +615,12 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	} else {
 		m_numCliffInfo = 1;	// cliffInfo[0] is the default info.
 	}
+	// Zero is a real count: seven retail maps (Tournament City, Tournament Desert, Fortress
+	// Avalanche among them) save no cliff info at all, and both loops below start at 1, while the
+	// patch after the parse sends every out-of-range cell index to entry 0, which is always there.
 	if (m_numBitmapTiles < 0 || m_numBitmapTiles > NUM_SOURCE_TILES
-		|| m_numBlendedTiles < 1 || m_numBlendedTiles > NUM_BLEND_TILES
-		|| m_numCliffInfo < 1 || m_numCliffInfo > NUM_CLIFF_INFO) {
+		|| m_numBlendedTiles < 0 || m_numBlendedTiles > NUM_BLEND_TILES
+		|| m_numCliffInfo < 0 || m_numCliffInfo > NUM_CLIFF_INFO) {
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	}
 // --> file loading here
