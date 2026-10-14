@@ -3738,6 +3738,13 @@ CommandSet *ControlBar::newCommandSetOverride( CommandSet *setToOverride )
 		return NULL;
 	}
 
+	/* Hang the override off the end of the chain.  findNonConstCommandSet hands back the base set (the
+		 button lookup hands back the final override), so a set map.ini and solo.ini both edit, or one
+		 file edits twice, copied the base, next-override pointer and all, and hung the copy off the
+		 base: the chain ran base, second, first, the final override was the first edit and the second
+		 never showed. */
+	setToOverride = (CommandSet *)setToOverride->friend_getFinalOverride();
+
 	// allocate a new set
 	CommandSet* set = newInstance(CommandSet)(setToOverride->getName());
 

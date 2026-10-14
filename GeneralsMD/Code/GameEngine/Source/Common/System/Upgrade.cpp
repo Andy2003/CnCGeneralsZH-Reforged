@@ -111,15 +111,21 @@ void Upgrade::loadPostProcess( void )
 // UPGRADE TEMPLATE ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// A map's rules file can set these.  A time past an Int of frames was a float-to-int conversion the
+// platforms answer differently (see ThingTemplate's BuildTimeRange), and a cost past an Int was
+// sscanf's undefined overflow.  Both are refused, the same way on every machine.
+static const INI::RealRange UpgradeBuildTimeRange = { 0.0f, 86400.0f };
+static const INI::IntRange UpgradeBuildCostRange = { 0, 1000000 };
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-const FieldParse UpgradeTemplate::m_upgradeFieldParseTable[] = 
+const FieldParse UpgradeTemplate::m_upgradeFieldParseTable[] =
 {
 
 	{ "DisplayName",				INI::parseAsciiString,		NULL, offsetof( UpgradeTemplate, m_displayNameLabel ) },
 	{ "Type",								INI::parseIndexList,			TheUpgradeTypeNames, offsetof( UpgradeTemplate, m_type ) },
-	{ "BuildTime",					INI::parseReal,						NULL, offsetof( UpgradeTemplate, m_buildTime ) },
-	{ "BuildCost",					INI::parseInt,						NULL, offsetof( UpgradeTemplate, m_cost ) },
+	{ "BuildTime",					INI::parseRealInRange,		&UpgradeBuildTimeRange, offsetof( UpgradeTemplate, m_buildTime ) },
+	{ "BuildCost",					INI::parseIntInRange,			&UpgradeBuildCostRange, offsetof( UpgradeTemplate, m_cost ) },
 	{ "ButtonImage",				INI::parseAsciiString,		NULL, offsetof( UpgradeTemplate, m_buttonImageName ) },
 	{ "ResearchSound",			INI::parseAudioEventRTS,	NULL, offsetof( UpgradeTemplate, m_researchSound ) }, 
 	{ "UnitSpecificSound",	INI::parseAudioEventRTS,	NULL, offsetof( UpgradeTemplate, m_unitSpecificSound ) }, 

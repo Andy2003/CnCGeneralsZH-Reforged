@@ -1579,9 +1579,9 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-WeaponStore::WeaponStore()
+WeaponStore::WeaponStore() : m_countBeforeMapOverrides(-1)
 {
-} 
+}
 
 //-------------------------------------------------------------------------------------------------
 WeaponStore::~WeaponStore()
@@ -1763,6 +1763,21 @@ void WeaponStore::reset()
 			pristine->m_extraBonus = NULL;	// wt owns it again
 			pristine->deleteInstance();
 		}
+	}
+
+	/* A weapon the map made from nothing goes too.  Left in the store, the next map that defined the
+		 same name edited this one, from the old map's values instead of a new weapon's defaults, and
+		 a machine that had not played the old map built a different weapon.  The templates that held
+		 it were the map's own and went with ThingFactory::reset. */
+	if (m_countBeforeMapOverrides >= 0)
+	{
+		for (size_t i = m_countBeforeMapOverrides; i < m_weaponTemplateVector.size(); ++i)
+		{
+			m_weaponTemplateHashMap.erase(m_weaponTemplateVector[i]->m_nameKey);
+			m_weaponTemplateVector[i]->deleteInstance();
+		}
+		m_weaponTemplateVector.resize(m_countBeforeMapOverrides);
+		m_countBeforeMapOverrides = -1;
 	}
 
 	deleteAllDelayedDamage();
@@ -1958,6 +1973,8 @@ void WeaponStore::postProcessLoad()
 	else
 	{
 		// no item is present, create a new one
+		if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES && TheWeaponStore->m_countBeforeMapOverrides < 0)
+			TheWeaponStore->m_countBeforeMapOverrides = (Int)TheWeaponStore->m_weaponTemplateVector.size();
 		weapon = TheWeaponStore->newWeaponTemplate(name);
 	}
 

@@ -181,6 +181,7 @@ public:
 
 	// super hack
 	void startNewGame( Bool loadSaveGame );
+	void refuseCorruptMap( void );									///< a start whose map turned out unreadable goes back to the menus
 	void loadMapINI( AsciiString mapName );
 
 	void updateLoadProgress( Int progress );

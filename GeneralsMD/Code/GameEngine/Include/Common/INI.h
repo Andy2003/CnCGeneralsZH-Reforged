@@ -364,6 +364,13 @@ public:
 	static void parseUnsignedInt( INI *ini, void *instance, void *store, const void* userData );
 	static void parseReal( INI *ini, void *instance, void *store, const void* userData );
 	static void parsePositiveNonZeroReal( INI *ini, void *instance, void *store, const void* userData );
+	/// userData is a const RealRange*; a value outside it, or NaN, is ignored in a map's rules file
+	/// (INI_LOAD_CREATE_OVERRIDES) and throws INI_INVALID_DATA anywhere else
+	struct RealRange { Real lo, hi; };
+	static void parseRealInRange( INI *ini, void *instance, void *store, const void* userData );
+	/// userData is a const IntRange*; out of range (past an Int included) is treated as parseRealInRange does
+	struct IntRange { Int lo, hi; };
+	static void parseIntInRange( INI *ini, void *instance, void *store, const void* userData );
 	static void parseBool( INI *ini, void *instance, void *store, const void* userData );
 	static void parseBitInInt32( INI *ini, void *instance, void *store, const void* userData );
 	static void parseAsciiString( INI *ini, void *instance, void *store, const void* userData );

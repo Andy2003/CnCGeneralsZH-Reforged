@@ -76,6 +76,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/LoadScreen.h"
 #include "GameClient/MapUtil.h"
+#include "GameClient/MessageBox.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/TerrainVisual.h"
@@ -429,6 +430,10 @@ void GameLogic::init( void )
 	m_rankPointsToAddAtGameStart = 0;
 }
 
+// the water table as it was before a map.ini's WaterSet blocks, put back by reset()
+static WaterSetting s_waterSettingsBeforeMapINI[ TIME_OF_DAY_COUNT ];
+static Bool s_waterSettingsSaved = FALSE;
+
 //-------------------------------------------------------------------------------------------------
 /** Reset the game logic systems */
 //-------------------------------------------------------------------------------------------------
@@ -500,6 +505,17 @@ void GameLogic::reset( void )
 	// Clean up any weather overrides that were generated for this map.
 	WeatherSetting *ws = (WeatherSetting*) TheWeatherSetting.getNonOverloadedPointer();
 	TheWeatherSetting = (WeatherSetting*) ws->deleteOverrides();
+	// the snow manager copied the map's numbers when the Weather block was read
+	if (TheSnowManager)
+		TheSnowManager->updateIniSettings();
+
+	// WaterSet has no override chain: the block writes straight into the time-of-day table
+	if (s_waterSettingsSaved)
+	{
+		for (Int i = 0; i < TIME_OF_DAY_COUNT; ++i)
+			WaterSettings[ i ] = s_waterSettingsBeforeMapINI[ i ];
+		s_waterSettingsSaved = FALSE;
+	}
 
 	m_rankPointsToAddAtGameStart = 0;
 }  // end reset
@@ -1112,6 +1128,34 @@ void GameLogic::deleteLoadScreen( void )
 	}  // end if
 
 }  // end deleteLoadScreen
+
+// ------------------------------------------------------------------------------------------------
+/** startNewGame threw ERROR_CORRUPT_FILE_FORMAT part-way through the map.  Take down what the start
+	* had put up, as a failed save load does, and say why on the menu it was started from. */
+// ------------------------------------------------------------------------------------------------
+void GameLogic::refuseCorruptMap( void )
+{
+	DEBUG_LOG(("GameLogic::refuseCorruptMap - '%s' does not load, back to the menus\n", TheGlobalData->m_mapName.str()));
+
+	UnicodeString mapName;
+	mapName.translate( TheGlobalData->m_mapName );
+
+	deleteLoadScreen();
+	TheWritableGlobalData->m_loadScreenRender = FALSE;
+	setLoadingMap( FALSE );
+	TheMouse->setVisibility( TRUE );
+
+	if( TheRecorder->getMode() == RECORDERMODETYPE_RECORD )
+		TheRecorder->stopRecording();
+
+	clearGameData( FALSE );
+	TheShell->showShell( TRUE );
+
+	UnicodeString msg;
+	msg.format( TheGameText->fetch( "GUI:MapCorrupt" ), mapName.str() );
+	MessageBoxOk( TheGameText->fetch( "GUI:Error" ), msg, NULL );
+
+}  // end refuseCorruptMap
 
 // ------------------------------------------------------------------------------------------------
 /** Entry point for starting a new game, the engine is already in clean state at this
@@ -2563,6 +2607,18 @@ void GameLogic::loadMapINI( AsciiString mapName )
 	// Keep what parsed up to the bad line and play on: every machine in a match has the same file,
 	// the map CRC sees to that, so each stops at the same line and the rules still agree.
 	//
+	//
+	// Everything below is undone when the match ends: each store a map's rules file may write to
+	// keeps what it overwrote and its reset() puts it back (INI.cpp's isMapINIBlock names them), so
+	// the next match plays the game's own rules whatever map came before, on every machine alike.
+	//
+	if (!s_waterSettingsSaved)
+	{
+		for (Int i = 0; i < TIME_OF_DAY_COUNT; ++i)
+			s_waterSettingsBeforeMapINI[ i ] = WaterSettings[ i ];
+		s_waterSettingsSaved = TRUE;
+	}
+
 	snprintf(fullFledgeFilename, _MAX_PATH, "%s\\map.ini", filename); fullFledgeFilename[_MAX_PATH-1] = 0;
 	if (TheFileSystem->doesFileExist(fullFledgeFilename)) {
 		DEBUG_LOG(("Loading map.ini\n"));
@@ -4595,7 +4651,22 @@ void GameLogic::update( void )
 #ifdef _PROFILE
     Profile::StartRange("map_load");
 #endif
-		startNewGame( FALSE );
+		/* The map cache reads only a map's size, world info and objects, so a map damaged in its
+			 sides, triggers or blend tiles is listed, picked and sent, and first fails here. Every
+			 machine in the match has the same bytes, the map CRC sees to that, so each one fails on the
+			 same chunk and each goes back to the menus the same way, instead of ending the program. */
+		try
+		{
+			startNewGame( FALSE );
+		}
+		catch (ErrorCode ec)
+		{
+			if (ec != ERROR_CORRUPT_FILE_FORMAT)
+				throw;
+			m_startNewGame = FALSE;
+			refuseCorruptMap();
+			return;
+		}
 #ifdef _PROFILE
     Profile::StopRange("map_load");
 #endif

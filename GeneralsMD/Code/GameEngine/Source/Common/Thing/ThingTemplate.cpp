@@ -113,8 +113,15 @@ AudioEventRTS ThingTemplate::s_audioEventNoSound;
 
 */
 
+/* calcTimeToBuild turns seconds into an Int frame count and multiplies it by the handicap, the
+	 faction modifier and up to 100 for low power.  A map's rules file with a BuildTime past that, or
+	 below zero, or not a number, went through a float-to-int conversion the platforms answer
+	 differently (x64 a large negative, ARM64 saturated), and Windows and Mac players built at
+	 different speeds in the same match.  A day is far past any real object and safe in the Int. */
+static const INI::RealRange BuildTimeRange = { 0.0f, 86400.0f };
+
 // NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
-const FieldParse ThingTemplate::s_objectFieldParseTable[] = 
+const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 {
 	{ "DisplayName",					INI::parseAndTranslateLabel,					NULL,								offsetof( ThingTemplate, m_displayName ) },
 	{ "RadarPriority",				INI::parseByteSizedIndexList,					RadarPriorityNames, offsetof( ThingTemplate, m_radarPriority ) },
@@ -146,7 +153,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "Prerequisites",				ThingTemplate::parsePrerequisites,	0, 0 },
 	{ "Buildable",						INI::parseByteSizedIndexList,				BuildableStatusNames, offsetof( ThingTemplate, m_buildable) },
 	{ "BuildCost",						INI::parseUnsignedShort,						NULL,		offsetof( ThingTemplate, m_buildCost ) },
-	{ "BuildTime",						INI::parseReal,											NULL,		offsetof( ThingTemplate, m_buildTime ) },
+	{ "BuildTime",						INI::parseRealInRange,							&BuildTimeRange,		offsetof( ThingTemplate, m_buildTime ) },
 	{ "RefundValue",					INI::parseUnsignedShort,						NULL,   offsetof( ThingTemplate, m_refundValue ) },
 	{ "BuildCompletion",			INI::parseByteSizedIndexList,				BuildCompletionNames,		offsetof( ThingTemplate, m_buildCompletion ) },
 	{ "EnergyProduction",			INI::parseInt,											NULL,   offsetof( ThingTemplate, m_energyProduction ) },

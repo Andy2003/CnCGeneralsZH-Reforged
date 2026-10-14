@@ -17193,3 +17193,5 @@ TEST(modfactions_prefix_the_last_part_of_a_file_path)
 #include "test_supply_center_save.inc"
 #include "test_cinema.inc"
 #include "test_game_results.inc"
+#include "test_map_ini_rollback.inc"
+#include "test_hostile_map.inc"

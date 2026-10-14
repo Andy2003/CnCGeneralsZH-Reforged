@@ -294,6 +294,18 @@ void AudioManager::postProcessLoad()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::reset()
 {
+	// Sounds, dialogue and music a map.ini redefined go back to the game's own, in place, because
+	// every AudioEventRTS that played one holds the pointer; backwards, so map.ini then solo.ini on
+	// the same event ends at the first.  A voice line's length is what a script waiting on it counts,
+	// so this is not only what the next match sounds like.  An event the map added stays: the next
+	// definition starts again from the default event, as a new one would.
+	for (Int i = (Int)m_beforeMapOverrides.size() - 1; i >= 0; --i)
+	{
+		*m_beforeMapOverrides[i].first = *m_beforeMapOverrides[i].second;
+		m_beforeMapOverrides[i].second->deleteInstance();
+	}
+	m_beforeMapOverrides.clear();
+
 	// clear out any adjusted volumes we might have set.
 	m_adjustedVolumes.clear();
 
@@ -885,6 +897,20 @@ AudioEventInfo *AudioManager::newAudioEventInfo( AsciiString audioName )
 
 	m_allAudioEventInfo[audioName] = newInstance(AudioEventInfo);
 	return m_allAudioEventInfo[audioName];
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AudioManager::rememberEventBeforeMapINI( AsciiString eventName )
+{
+	// the same lookup newAudioEventInfo makes, so this keeps the event the parse will write over
+	AudioEventInfo *live = findAudioEventInfo(eventName);
+	if (live == NULL)
+		return FALSE;
+
+	AudioEventInfo *copy = newInstance(AudioEventInfo);
+	*copy = *live;
+	m_beforeMapOverrides.push_back(std::make_pair(live, copy));
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

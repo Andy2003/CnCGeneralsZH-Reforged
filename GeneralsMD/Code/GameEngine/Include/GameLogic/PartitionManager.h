@@ -1624,7 +1624,20 @@ inline void PartitionManager::worldToCell(Real wx, Real wy, Int *cx, Int *cy)
 //-----------------------------------------------------------------------------
 inline Int PartitionManager::worldToCellDist(Real w)
 {
-	return REAL_TO_INT_CEIL(w  * m_cellSizeInv);
+	// A map object can carry any vision or shroud range, and a circle a million cells wide is a
+	// float-to-int overflow and then a loop over the square of it.  Twice the grid's width plus
+	// height reaches every cell from a centre well off the map, so a reveal that big touches
+	// exactly the cells it touched unclamped.  The threat and value falloff divides by the radius
+	// and would move, but the one retail object that sees 99999 (ChinaArtilleryCannon) has no
+	// shroud range and so never draws one.  NaN fails the first test and lands on the limit.
+	// Before init the counts are zero and so is m_cellSizeInv.
+	const Real limit = (Real)(2 * (m_cellCountX + m_cellCountY));
+	Real cells = w * m_cellSizeInv;
+	if (!(cells <= limit))
+		cells = limit;
+	else if (cells < -limit)
+		cells = -limit;
+	return REAL_TO_INT_CEIL(cells);
 }
 
 //-----------------------------------------------------------------------------

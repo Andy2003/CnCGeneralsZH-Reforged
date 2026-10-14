@@ -323,6 +323,34 @@ void INI::unPrepFile()
 }
 
 //-------------------------------------------------------------------------------------------------
+/** The blocks a map's rules file (map.ini, solo.ini, read INI_LOAD_CREATE_OVERRIDES) may hold: the
+	* ones whose stores put the map's edits back at the end of the match.  Every other block in the
+	* table either wrote over the game's own data for good (the mouse, the in-game UI, multiplayer
+	* colours, terrain types, campaigns, videos) or refused a name an earlier map had added (roads,
+	* bridges, animations, EVA events), so the same map read differently on a machine that had played
+	* another first.  No shipped map uses one; one in a custom map is skipped and the rest of the file
+	* still loads, on every machine alike.  MappedImage stays: an image is drawn, never read by
+	* the simulation, and custom maps bring their own cameos with it. */
+//-------------------------------------------------------------------------------------------------
+static Bool isMapINIBlock(const char* token)
+{
+	static const char *const MapINIBlocks[] =
+	{
+		"AIData", "Armor", "AudioEvent", "CommandButton", "CommandSet", "CrateData", "DamageFX",
+		"DialogEvent", "FXList", "GameData", "Locomotor", "MappedImage", "MusicTrack", "Object",
+		"ObjectCreationList", "ObjectReskin", "ParticleSystem", "PlayerTemplate", "Rank", "Science",
+		"SpecialPower", "Upgrade", "WaterSet", "WaterTransparency", "Weather", "Weapon",
+		NULL
+	};
+	for (const char *const *name = MapINIBlocks; *name; ++name)
+	{
+		if (strcmp(*name, token) == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 static INIBlockParse findBlockParse(const char* token)
 {
 	for (const BlockParse* parse = theTypeTable; parse->token; ++parse)
@@ -390,6 +418,31 @@ void INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer )
 			if( token )
 			{
 				INIBlockParse parse = findBlockParse(token);
+				if (parse && m_loadType == INI_LOAD_CREATE_OVERRIDES && !isMapINIBlock(token))
+				{
+					/* Read past it and go on with the file.  Nothing parses it, so its End is found by
+						 counting: an End closes, a line with no '=' opens a sub-block (Mission, SideSounds,
+						 a radius cursor), every other line is a field.  The count is the same on every
+						 machine, so is what follows.
+						 ponytail: a field written without its '=' counts as an opening and the skip runs
+						 on past the block; a real parse of each refused type if a map ever needs it. */
+					DEBUG_LOG(("[LINE: %d - FILE: '%s'] a map's rules file may not hold a '%s' block, skipped\n",
+										 getLineNum(), getFilename().str(), token));
+					Int depth = 1;
+					while( depth > 0 && m_endOfFile == FALSE )
+					{
+						readLine();
+						const Bool isField = strchr( m_buffer, '=' ) != NULL;
+						const char *word = strtok( m_buffer, m_seps );
+						if( word == NULL )
+							continue;
+						if( strcasecmp( word, m_blockEndToken ) == 0 )
+							--depth;
+						else if( !isField )
+							++depth;
+					}
+					continue;
+				}
 				if (parse)
 				{
 					#if defined(_DEBUG) || defined(_INTERNAL)
@@ -920,7 +973,18 @@ void INI::parseShort( INI* ini, void * /*instance*/, void *store, const void* /*
 void INI::parseUnsignedShort( INI* ini, void * /*instance*/, void *store, const void* /*userData*/ )
 {
 	const char *token = ini->getNextToken();
-	Int value = scanInt(token);
+	/* sscanf's %d on a number past Int is undefined, and the CRTs disagree: a map's BuildCost of
+		 99999999999 came out in range on one machine and was refused on another.  strtoll is defined
+		 there (it saturates), and reads every in-range token the way %d did. */
+	char *end;
+	long long value = strtoll(token, &end, 10);
+	if (end == token)
+		throw INI_INVALID_DATA;
+	if ((value < 0 || value > 65535) && ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+	{
+		DEBUG_LOG(("[LINE: %d in '%s'] %s does not fit 0..65535, the line is ignored\n", ini->getLineNum(), ini->getFilename().str(), token));
+		return;
+	}
 	if (value < 0 || value > 65535)
 	{
 		DEBUG_CRASH(("Bad value INI::parseUnsignedShort"));
@@ -972,6 +1036,52 @@ void INI::parsePositiveNonZeroReal( INI* ini, void * /*instance*/, void *store, 
 		throw INI_INVALID_DATA;
 	}
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A real that a map's rules file can set to something the game cannot live with: a build time
+	* that overflows the frame count, a snow box that divides by zero.  Refused before it is stored,
+	* and NaN with it, since a NaN fails both comparisons.  In a map's rules file only the line goes:
+	* the value stays what it was and the rest of the file loads.  The game's own data stops. */
+//-------------------------------------------------------------------------------------------------
+static void refuseOutOfRange( INI *ini, const char *what )
+{
+	DEBUG_LOG(("[LINE: %d in '%s'] %s is out of range, refused\n", ini->getLineNum(), ini->getFilename().str(), what));
+	if (ini->getLoadType() != INI_LOAD_CREATE_OVERRIDES)
+		throw INI_INVALID_DATA;
+}
+
+void INI::parseRealInRange( INI* ini, void * /*instance*/, void *store, const void* userData )
+{
+	const RealRange *range = (const RealRange *)userData;
+	const char *token = ini->getNextToken();
+	Real value = scanReal(token);
+	if (!(value >= range->lo && value <= range->hi))
+	{
+		refuseOutOfRange(ini, token);
+		return;
+	}
+	*(Real *)store = value;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The integer twin.  strtoll rather than sscanf's %d, whose answer for a number past Int is
+	* undefined and differs between the CRTs (see parseUnsignedShort). */
+//-------------------------------------------------------------------------------------------------
+void INI::parseIntInRange( INI* ini, void * /*instance*/, void *store, const void* userData )
+{
+	const IntRange *range = (const IntRange *)userData;
+	const char *token = ini->getNextToken();
+	char *end;
+	long long value = strtoll(token, &end, 10);
+	if (end == token)
+		throw INI_INVALID_DATA;
+	if (value < range->lo || value > range->hi)
+	{
+		refuseOutOfRange(ini, token);
+		return;
+	}
+	*(Int *)store = (Int)value;
 }
 
 //-------------------------------------------------------------------------------------------------

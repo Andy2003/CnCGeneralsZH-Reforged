@@ -15577,6 +15577,10 @@ GUI:SaveFromOlderGame
 "Bu kayıt orijinal oyunla ya da Reforged'ın eski bir sürümüyle yapılmış, yüklenemez."
 END
 
+GUI:MapCorrupt
+"%ls haritası bozuk, oynanamaz."
+END
+
 GUI:KickVoteStarted
 "%ls, %ls oyuncusunun maçtan atılmasını istiyor. Sohbete /yes ya da /no yazın: diğer oyuncuların kabul etmek için 30 saniyesi var."
 END

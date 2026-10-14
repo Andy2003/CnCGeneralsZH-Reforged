@@ -3656,7 +3656,24 @@ void ParticleSystemManager::reset( void )
 	m_uniqueSystemID = INVALID_PARTICLE_SYSTEM_ID;
 	
 	m_lastLogicFrameUpdate = -1;
-	// leave templates as-is
+
+	// Templates stay, but not as a map.ini left them: each one it wrote over gets its state from
+	// before back, backwards so map.ini and solo.ini on the same system end at the first.  A system the
+	// map made from nothing goes back to a fresh template's defaults rather than away, since an FXList
+	// that named it may hold it.  The slave is looked up again from the restored name.
+	for( Int i = (Int)m_beforeMapOverrides.size() - 1; i >= 0; --i )
+	{
+		ParticleSystemTemplate *sysTemplate = m_beforeMapOverrides[ i ].first;
+		(ParticleSystemInfo &)*sysTemplate = m_beforeMapOverrides[ i ].second;
+		sysTemplate->m_slaveTemplate = NULL;
+	}
+	m_beforeMapOverrides.clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemManager::rememberTemplateBeforeMapINI( ParticleSystemTemplate *sysTemplate )
+{
+	m_beforeMapOverrides.push_back( std::make_pair( sysTemplate, (const ParticleSystemInfo &)*sysTemplate ) );
 }
 
 // ------------------------------------------------------------------------------------------------

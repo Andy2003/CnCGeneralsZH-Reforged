@@ -78,6 +78,10 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 {
 }
 
+// A map's map.ini can carry a GameData block.  Retail is 40; a tiny cell makes the partition grid
+// millions of cells on a large map, a huge one leaves the whole map in a handful of cells.
+static const INI::RealRange PARTITION_CELL_SIZE_RANGE = { 20.0f, 400.0f };
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,7 +234,7 @@ static void parseIgnoredField( INI *, void *, void *, const void * )
 	{ "StealthFriendlyOpacity",		INI::parsePercentToReal,				NULL,				offsetof( GlobalData, m_stealthFriendlyOpacity ) },
 	{ "DefaultOcclusionDelay",				INI::parseDurationUnsignedInt,				NULL,			offsetof( GlobalData, m_defaultOcclusionDelay ) },
 	
-	{ "PartitionCellSize",				INI::parseReal,				NULL,			offsetof( GlobalData, m_partitionCellSize ) },
+	{ "PartitionCellSize",				INI::parseRealInRange,				&PARTITION_CELL_SIZE_RANGE,			offsetof( GlobalData, m_partitionCellSize ) },
 
 	{ "AmmoPipScaleFactor",				INI::parseReal,				NULL,			offsetof( GlobalData, m_ammoPipScaleFactor ) },
 	{ "ContainerPipScaleFactor",	INI::parseReal,				NULL,			offsetof( GlobalData, m_containerPipScaleFactor ) },
