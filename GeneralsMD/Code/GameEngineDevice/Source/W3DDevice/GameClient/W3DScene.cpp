@@ -74,6 +74,7 @@
 #include "WW3D2/dx11runtime.h"
 #include "WW3D2/ffshader.h"
 #include "Platform/RenderTypes.h"
+#include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 
 #include <algorithm>
 #include <vector>
@@ -431,27 +432,12 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 // posedPartsInView
 //=============================================================================
 /** A model whose animation carries it out of its bind pose (W3DModelDraw's animLeavesBindPose) is
-  * in view when any of its parts is, as they stand now.  A culled model is not drawn, and drawing
-  * is what moves its animation on, so setting its transform again (which marks the hierarchy stale)
-  * and asking for a bone poses it at the current frame first. */
+  * in view when its parts are, as they stand now. */
 //=============================================================================
 static Bool posedPartsInView(RenderObjClass *robj, CameraClass *camera)
 {
-	const DrawableInfo *drawInfo = (const DrawableInfo *)robj->Get_User_Data();
-	if (drawInfo == NULL || !drawInfo->m_animLeavesBindPose || robj->Class_ID() != RenderObjClass::CLASSID_HLOD)
-		return FALSE;
-
-	const Matrix3D transform = robj->Get_Transform();
-	robj->Set_Transform(transform);
-	robj->Get_Bone_Transform(0);
-	Bool inView = FALSE;
-	for (Int i = 0; i < robj->Get_Num_Sub_Objects() && !inView; ++i)
-	{
-		RenderObjClass *part = robj->Get_Sub_Object(i);
-		inView = !camera->Cull_Sphere(part->Get_Bounding_Sphere());
-		part->Release_Ref();
-	}
-	return inView;
+	SphereClass posed;
+	return W3DModelDraw::getPosedBoundingSphere(robj, posed) && !camera->Cull_Sphere(posed);
 }
 
 //=============================================================================

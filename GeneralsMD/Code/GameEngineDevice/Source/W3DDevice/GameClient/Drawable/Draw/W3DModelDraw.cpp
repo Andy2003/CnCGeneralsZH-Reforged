@@ -73,6 +73,7 @@
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "WW3D2/hanim.h"
 #include "WW3D2/hlod.h"
+#include "WW3D2/htree.h"
 #include "WW3D2/rendobj.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
@@ -2481,20 +2482,71 @@ Real W3DModelDraw::getCurrentAnimFraction() const
 //-------------------------------------------------------------------------------------------------
 static Bool animLeavesBindPose(HAnimClass *anim, RenderObjClass *robj)
 {
-	const Real reach = robj->Get_Bounding_Sphere().Radius;
+	// A channel's translation is the bone's offset from its bind pose, and what this is for starts
+	// there and flies hundreds of units off: a bone hung straight off the root, at its bind pose on
+	// the first frame and past the sphere and the floor later.  Infantry park the props they are not
+	// holding 2000 units away from the first frame on, and a building's doors and dishes swing a
+	// little past its sphere; neither needs anything but the bind pose
+	const HTreeClass *tree = robj->Get_HTree();
+	if (tree == NULL)
+		return FALSE;
+	const Real MIN_FLIGHT = 200.0f;
+	const Real reach = max(robj->Get_Bounding_Sphere().Radius, MIN_FLIGHT);
 	const Int lastFrame = anim->Get_Num_Frames() - 1;
 	for (Int pivot = 1; pivot < anim->Get_Num_Pivots(); ++pivot)
 	{
-		if (!anim->Is_Node_Motion_Present(pivot))
+		if (tree->Get_Parent_Index(pivot) != 0 || !anim->Is_Node_Motion_Present(pivot))
 			continue;
 		Vector3 first, middle, last;
 		anim->Get_Translation(first, pivot, 0.0f);
 		anim->Get_Translation(middle, pivot, lastFrame * 0.5f);
 		anim->Get_Translation(last, pivot, (Real)lastFrame);
-		if ((middle - first).Length() > reach || (last - first).Length() > reach)
+		if (first.Length() <= reach && (middle.Length() > reach || last.Length() > reach))
 			return TRUE;
 	}
 	return FALSE;
+}
+
+// The render objects animLeavesBindPose said yes for: a handful at most, the cinematic transports.
+// Kept per render object, since one drawable can carry several models
+static std::vector<const RenderObjClass *> s_posedCullModels;
+
+static void setPosedCull(const RenderObjClass *robj, Bool posed)
+{
+	std::vector<const RenderObjClass *>::iterator it = std::find(s_posedCullModels.begin(), s_posedCullModels.end(), robj);
+	if (posed && it == s_posedCullModels.end())
+		s_posedCullModels.push_back(robj);
+	else if (!posed && it != s_posedCullModels.end())
+		s_posedCullModels.erase(it);
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A culled model is not drawn, and drawing is what moves its animation on, so setting its transform
+	* again (which marks the hierarchy stale) and asking for a bone poses it at the current frame
+	* first. */
+//-------------------------------------------------------------------------------------------------
+Bool W3DModelDraw::getPosedBoundingSphere(RenderObjClass *robj, SphereClass &sphere)
+{
+	if (std::find(s_posedCullModels.begin(), s_posedCullModels.end(), robj) == s_posedCullModels.end())
+		return FALSE;
+
+	const Int parts = robj->Get_Num_Sub_Objects();
+	if (parts == 0)
+		return FALSE;
+
+	const Matrix3D transform = robj->Get_Transform();
+	robj->Set_Transform(transform);
+	robj->Get_Bone_Transform(0);
+	for (Int i = 0; i < parts; ++i)
+	{
+		RenderObjClass *part = robj->Get_Sub_Object(i);
+		if (i == 0)
+			sphere = part->Get_Bounding_Sphere();
+		else
+			sphere.Add_Sphere(part->Get_Bounding_Sphere());
+		part->Release_Ref();
+	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2502,6 +2554,10 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 {
 	if (!m_curState)
 		return;
+
+	// a state without an animation, or one that moves nothing far, culls by the bind pose again
+	if (m_renderObject)
+		setPosedCull(m_renderObject, FALSE);
 
 	// if the current state has m_animations associated, do the right thing
 	Int numAnims = m_curState->m_animations.size();
@@ -2562,7 +2618,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 			}
 
 			m_renderObject->Set_Animation(animHandle, startFrame, m_curState->m_mode);
-			getDrawable()->getDrawableInfo()->m_animLeavesBindPose = animLeavesBindPose(animHandle, m_renderObject);
+			setPosedCull(m_renderObject, animLeavesBindPose(animHandle, m_renderObject));
 			REF_PTR_RELEASE(animHandle);
 			animHandle = NULL;
 
@@ -3190,6 +3246,7 @@ void W3DModelDraw::nukeCurrentRender(Matrix3D* xform)
 		if (xform)
 			*xform = m_renderObject->Get_Transform();
 		W3DDisplay::m_3DScene->Remove_Render_Object(m_renderObject);
+		setPosedCull(m_renderObject, FALSE);
 		REF_PTR_RELEASE(m_renderObject);
 		m_renderObject = NULL;
 	}
