@@ -1102,7 +1102,15 @@ Object* AIUpdateInterface::checkForCrateToPickup()
 	{
 		Object* crate = TheGameLogic->findObjectByID(m_crateCreated);
 		m_crateCreated = INVALID_ID; // we have processed it, so clear it.
-		if (crate) 
+		// The crate the victim dropped is the killer's to take only while it lies within sight: the
+		// notice waits until the killer's machine next looks, which for a unit busy with something
+		// else can be long after, and an artillery piece that killed at range would otherwise drive
+		// out across the front for it.  Never under the 150 that salvageCrateTick (GameLogic.cpp)
+		// calls a busy computer unit from, or a short-sighted rebel would drop the notice it was given.
+		const Real reach = max( getObject()->getVisionRange(), 150.0f );
+		if (crate && ThePartitionManager->getDistanceSquared( getObject(), crate, FROM_CENTER_2D ) > reach * reach)
+			crate = NULL;
+		if (crate)
 		{
 			for (BehaviorModule** m = crate->getBehaviorModules(); *m; ++m)
 			{
@@ -7846,7 +7854,9 @@ void AIUpdateInterface::loadPostProcess( void )
 		chooseLocomotorSet(lst);
 	}
 
-	if (!isMoving()) {
+	// A unit waiting for its path is on its way as much as one driving: it keeps the goal it holds,
+	// or another unit takes the spot it was ordered to.
+	if (!isMoving() && !m_waitingForPath) {
 		m_pathfindGoalCell.x = -1;
 		m_pathfindGoalCell.y = -1;
 		TheAI->pathfinder()->updateGoal(getObject(), getObject()->getPosition(), getObject()->getLayer());
@@ -7863,6 +7873,12 @@ void AIUpdateInterface::loadPostProcess( void )
 			TheAI->pathfinder()->updateGoal(getObject(), &goalPos, getObject()->getLayer());
 		}
 	}
+
+	// The pathfinder's queue is not saved, so a unit that was in it when the game was saved comes
+	// back waiting for a path nobody is going to look for, and stands for the rest of the match.
+	// One waiting on the retry timer is asked for again by update() and needs nothing here.
+	if (m_waitingForPath && m_queueForPathFrame == 0)
+		queueForPathOrRetry();
 
 }  // end loadPostProcess
 

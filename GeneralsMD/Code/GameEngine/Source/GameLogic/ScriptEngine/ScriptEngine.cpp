@@ -8765,6 +8765,19 @@ void ScriptEngine::AdjustDebugVariableData(const AsciiString& variableName, Int 
 // ------------------------------------------------------------------------------------------------
 void ScriptEngine::crc( Xfer *xfer )
 {
+	// The map script's counters, timers and flags, so a script that drifted between machines is
+	// caught on the frame it drifts rather than when its effect reaches an object. Names are left
+	// out: they are fixed by the map and allocated in evaluation order. The end-game timers are
+	// left out too, since each machine starts them for its own player's victory or defeat.
+	xfer->xferInt( &m_numCounters );
+	for( Int i = 0; i < m_numCounters; ++i )
+	{
+		xfer->xferInt( &m_counters[ i ].value );
+		xfer->xferBool( &m_counters[ i ].isCountdownTimer );
+	}
+	xfer->xferInt( &m_numFlags );
+	for( Int i = 0; i < m_numFlags; ++i )
+		xfer->xferBool( &m_flags[ i ].value );
 
 }  // end crc
 

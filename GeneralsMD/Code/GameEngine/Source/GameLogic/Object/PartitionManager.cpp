@@ -1214,7 +1214,10 @@ void CellAndObjectIntersection::addCoverage(PartitionCell *cell, PartitionData *
 	}
 
 	if (m_cell == NULL)
+	{
 		cell->friend_addToCellList(this);
+		cell->addPlayerCoi(module->friend_getCountedPlayer());
+	}
 
 	m_cell = cell;
 	m_module = module;
@@ -1230,6 +1233,7 @@ void CellAndObjectIntersection::removeAllCoverage()
 	}
 
 	m_cell->friend_removeFromCellList(this);
+	m_cell->removePlayerCoi(m_module->friend_getCountedPlayer());
 	m_cell = NULL;
 	m_module = NULL;
 }
@@ -1247,6 +1251,7 @@ PartitionCell::PartitionCell()
 	//
 	m_firstCoiInCell = NULL;
 	m_coiCount = 0;
+	m_playerCoiMask = PLAYERMASK_NONE;
 #ifdef PM_CACHE_TERRAIN_HEIGHT
 	m_loTerrainZ = HUGE_DIST;		// huge positive
 	m_hiTerrainZ = -HUGE_DIST;	// huge negative
@@ -1263,6 +1268,7 @@ PartitionCell::PartitionCell()
 		m_shroudLevel[i].m_currentShroud = 1;
 		m_shroudLevel[i].m_activeShroudLevel = 0;
 		m_airLookers[i] = 0;
+		m_playerCoiCount[i] = 0;
 
 		// default cash value is 0
 		m_cashValue[i] = 0;
@@ -1543,6 +1549,25 @@ void PartitionCell::friend_removeFromCellList(CellAndObjectIntersection *coi)
 }
 
 //-----------------------------------------------------------------------------
+void PartitionCell::addPlayerCoi(Int playerIndex)
+{
+	if (playerIndex < 0)
+		return;
+	if (m_playerCoiCount[playerIndex]++ == 0)
+		m_playerCoiMask |= (PlayerMaskType)(1 << playerIndex);
+}
+
+//-----------------------------------------------------------------------------
+void PartitionCell::removePlayerCoi(Int playerIndex)
+{
+	if (playerIndex < 0)
+		return;
+	DEBUG_ASSERTCRASH(m_playerCoiCount[playerIndex] > 0, ("player coi count underflow"));
+	if (--m_playerCoiCount[playerIndex] == 0)
+		m_playerCoiMask &= (PlayerMaskType)~(1 << playerIndex);
+}
+
+//-----------------------------------------------------------------------------
 void PartitionCell::getCellCenterPos(Real& x, Real& y)
 {
 	ThePartitionManager->getCellCenterPos(m_cellX, m_cellY, x, y);
@@ -1622,6 +1647,7 @@ PartitionData::PartitionData()
 	m_coiArray = NULL;
 	m_coiInUseCount = 0;
 	m_doneFlag = 0;
+	m_countedPlayer = -1;
 	m_dirtyStatus = NOT_DIRTY;
 	m_lastCell = NULL;
 	for (int i = 0; i < MAX_PLAYER_COUNT; ++i)
@@ -2203,6 +2229,7 @@ void PartitionData::updateCellsTouched()
 	}
 
 	removeAllTouchedCells();
+	refreshCountedPlayer();
 	if (isSmall)
 	{
 		doSmallFill(pos.x, pos.y, majorRadius);
@@ -2258,7 +2285,31 @@ void PartitionData::updateCellsTouched()
 }
 
 //-----------------------------------------------------------------------------
-void PartitionData::invalidateShroudedStatusForPlayer(Int playerIndex) 
+/** Each cell counts the COIs of every player's Objects so a search for one side's units can pass
+	over cells holding none of them. The count follows this module's m_countedPlayer, never the
+	Object directly, so taking a COI out always undoes what putting it in did; a capture, a defection
+	or a team handed to another player moves the counts here before anything can search. */
+void PartitionData::refreshCountedPlayer()
+{
+	const Player *player = m_object ? m_object->getControllingPlayer() : NULL;
+	const Int newPlayer = player ? player->getPlayerIndex() : -1;
+	if (newPlayer == m_countedPlayer)
+		return;
+
+	CellAndObjectIntersection *coi = m_coiArray;
+	for (Int i = m_coiArrayCount; i > 0; --i, ++coi)
+	{
+		if (coi->getModule())
+		{
+			coi->getCell()->removePlayerCoi(m_countedPlayer);
+			coi->getCell()->addPlayerCoi(newPlayer);
+		}
+	}
+	m_countedPlayer = newPlayer;
+}
+
+//-----------------------------------------------------------------------------
+void PartitionData::invalidateShroudedStatusForPlayer(Int playerIndex)
 { 
 #ifndef DISABLE_INVALID_PREVENTION
 	if (m_shroudedness[playerIndex] != OBJECTSHROUD_INVALID && m_shroudedness[playerIndex] != OBJECTSHROUD_INVALID_BUT_PREVIOUS_VALID)
@@ -3355,7 +3406,8 @@ Object *PartitionManager::getClosestObjects(
 	PartitionFilter **filters, 
 	SimpleObjectIterator *iterArg,	// if nonnull, append ALL satisfactory objects to the iterator (not just the single closest)
 	Real *closestDistArg,
-	Coord3D *closestVecArg
+	Coord3D *closestVecArg,
+	PlayerMaskType onlyPlayers
 )
 {
 	//USE_PERF_TIMER(getClosestObjects)
@@ -3479,6 +3531,11 @@ Object *PartitionManager::getClosestObjects(
 		{
 			PartitionCell* thisCell = getCellAt(cellCenterX + it->x, cellCenterY + it->y);
 			if (thisCell == NULL)
+				continue;
+
+			// An idle guard asks this for enemies only, and most cells around it hold its own base
+			// or nothing; every Object there would fail the filters anyway, so the answer is the same.
+			if (onlyPlayers != PLAYERMASK_ALL && !thisCell->hasCoiOfPlayers(onlyPlayers))
 				continue;
 
 			for (CellAndObjectIntersection *thisCoi = thisCell->getFirstCoiInCell(); thisCoi; thisCoi = thisCoi->getNextCoi())
@@ -3652,10 +3709,11 @@ Object *PartitionManager::getClosestObject(
 	DistanceCalculationType dc, 
 	PartitionFilter **filters, 
 	Real *closestDist,
-	Coord3D *closestDistVec
+	Coord3D *closestDistVec,
+	PlayerMaskType onlyPlayers
 )
 {
-	return getClosestObjects(NULL, pos, maxDist, dc, filters, NULL, closestDist, closestDistVec);
+	return getClosestObjects(NULL, pos, maxDist, dc, filters, NULL, closestDist, closestDistVec, onlyPlayers);
 }
 
 //-----------------------------------------------------------------------------

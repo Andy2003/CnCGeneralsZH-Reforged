@@ -721,6 +721,7 @@ public:
 
 	/// get the relationship between this->that. 
 	Relationship getRelationship(const Team *that) const;
+	Bool hasTeamRelationships() const;		///< does any single team get a relationship of its own?
 
 	/// set the relationship between this->that. (note that this doesn't affect the that->this relationship.)
 	void setPlayerRelationship(const Player *that, Relationship r);

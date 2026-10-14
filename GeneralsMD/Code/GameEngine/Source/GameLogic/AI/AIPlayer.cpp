@@ -392,6 +392,7 @@ m_role(AIROLE_AGGRESSIVE)
 	m_incomeMarkFrame = 0;
 	m_bankMark = 0;
 	m_incomePerSecond = 0.0f;
+	m_startFortune = 0;
 	m_healerSeconds = 0;
 	m_healerClearSeconds = 0;
 	m_captureTimer = 1;
@@ -1865,14 +1866,16 @@ enum { SUPERWEAPON_REAIM_FRAMES = 600 * LOGICFRAMES_PER_SECOND };
 //----------------------------------------------------------------------------------------------------------
 /** What a superweapon aimed at this spot is worth to this player right now.
  *
- * The score itself is EA's - the price of everything inside the blast - and the fade on top of it
+ * The score itself is EA's - the price of everything inside the blast, with the threat weight and
+ * the rung's economy weight on top (getPlayerSuperweaponValue) - and the fade on top of it
  * is what stops the salvo. A negative score belongs to a sneak attack, which reads defended ground
  * as a cost rather than a prize; fading that would flatter exactly the ground it is avoiding.
  */
 //----------------------------------------------------------------------------------------------------------
 Int AIPlayer::superweaponScore( Coord3D *center, Int playerNdx, Real radius, Bool targetMilitaryUnits )
 {
-	const Int value = getPlayerSuperweaponValue( center, playerNdx, radius, targetMilitaryUnits, m_player->getPlayerIndex() );
+	const Int value = getPlayerSuperweaponValue( center, playerNdx, radius, targetMilitaryUnits, m_player->getPlayerIndex(),
+																							 strikeEconomyWeight() );
 	if( value <= 0 )
 		return value;
 
@@ -1892,6 +1895,14 @@ Int AIPlayer::superweaponScore( Coord3D *center, Int playerNdx, Real radius, Boo
 	}
 
 	return REAL_TO_INT( value * worth );
+}
+
+//----------------------------------------------------------------------------------------------------------
+/** A Challenge or mission opponent aims as the map script was written for: price and threat alone. */
+//----------------------------------------------------------------------------------------------------------
+Real AIPlayer::strikeEconomyWeight( void )
+{
+	return isSkirmishAI() ? getSkillProfile()->m_strikeEconomyWeight : 0.0f;
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -2111,11 +2122,27 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 /** How much an armed target is worth on top of its price, so the shot goes where the threat is. */
 const Real SUPERWEAPON_THREAT_WEIGHT = 2.0f;
 
+/** The least an economy target counts for before the rung's weight: a captured derrick's build price
+	* is next to nothing and it pays for the whole match.
+	* ponytail: one flat floor for every kind; a per-kind income estimate if derricks still go unhit. */
+const Real SUPERWEAPON_ECONOMY_FLOOR = 1000.0f;
+
+/** What pays for his army or opens his tech: a strike there is felt for the rest of the match. */
+static Bool isEconomyOrTechTarget( const Object *obj )
+{
+	return obj->isKindOf( KINDOF_CASH_GENERATOR ) || obj->isKindOf( KINDOF_FS_SUPPLY_CENTER ) ||
+				 obj->isKindOf( KINDOF_FS_BLACK_MARKET ) || obj->isKindOf( KINDOF_MONEY_HACKER ) ||
+				 obj->isKindOf( KINDOF_FS_INTERNET_CENTER ) || obj->isKindOf( KINDOF_FS_SUPPLY_DROPZONE ) ||
+				 obj->isKindOf( KINDOF_FS_STRATEGY_CENTER ) || obj->isKindOf( KINDOF_FS_ADVANCED_TECH );
+}
+
 //----------------------------------------------------------------------------------------------------------
 /**
- * Get the target value for structures in an area.
+ * Get the target value for structures in an area.  economyWeight is what an economy or tech target
+ * (isEconomyOrTechTarget) adds on top of its price, in prices.
  */
-Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits, Int observerNdx )
+Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits, Int observerNdx,
+																				Real economyWeight )
 {
 	if (radius < 4*PATHFIND_CELL_SIZE_F) 
 	{
@@ -2199,6 +2226,11 @@ Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real rad
 					//
 					if( includeMilitaryUnits )
 						value += aiCombatPower( pObj ) * SUPERWEAPON_THREAT_WEIGHT;
+
+					// ... and the threat weight alone sent every strike at the army. What pays for
+					// it, and the building that opens the next tier, is the hit felt all match.
+					if( economyWeight > 0.0f && !applyNegValue && isEconomyOrTechTarget( pObj ) )
+						value += economyWeight * max( (Real)pObj->getTemplate()->calcCostToBuild( pPlayer ), SUPERWEAPON_ECONOMY_FLOOR );
 
 					if( applyNegValue )
 					{
@@ -2303,11 +2335,14 @@ Bool AIPlayer::isPossibleToBuildTeam( TeamPrototype *proto, Bool requireIdleFact
 		const ThingTemplate *thing = TheThingFactory->findTemplate( unitInfo[i].unitThingName );
 		if (thing) {
 			Int thingCost = thing->calcCostToBuild(m_player);
-			if (NULL == findFactory(thing, true)) {
+			// One walk of the build list, not two: findFactory hands back the first idle factory
+			// when there is one and a busy one only when none is idle, so its queue says which.
+			Object *factory = findFactory(thing, true);
+			if (NULL == factory) {
 				// Couldn't find a factory.
 				return false;
 			}
-			if (NULL != findFactory(thing, false)) {
+			if (factory->getProductionUpdateInterface()->getProductionCount() == 0) {
 				// Found an idle factory.
 				anyIdle = true;
 			}
@@ -3747,6 +3782,8 @@ Object *AIPlayer::findSupplyCenter(Int minimumCash, Bool holdableOnly)
 {
 	Object *bestSupplyWarehouse = NULL;
 	Real bestDistSqr = 0;
+	Object *bestSafeWarehouse = NULL;
+	Real bestSafeDistSqr = 0;
 	Object *obj;
 	Coord3D enemyCenter;
 	enemyCenter.zero();
@@ -3825,8 +3862,19 @@ Object *AIPlayer::findSupplyCenter(Int minimumCash, Bool holdableOnly)
 					bestSupplyWarehouse = obj;
 					bestDistSqr = distSqr;
 				}
+				// The scripts ask "is the supply source safe" of this same pick and wait while it is
+				// not, putting guns down beside it: one enemy tank parked by the nearest pile held a
+				// Hard AI's expansion for ten minutes with a free pile one valley over.  A safe dock
+				// is preferred, the nearest of them, and the unsafe nearest only when none is safe.
+				// A mission's script picked its piles by hand and keeps EA's nearest.
+				if (!holdableOnly && isSkirmishAI() && (bestSafeWarehouse==NULL || bestSafeDistSqr>distSqr) &&
+						isLocationSafe(obj->getPosition(), obj->getTemplate())) {
+					bestSafeWarehouse = obj;
+					bestSafeDistSqr = distSqr;
+				}
 			}
 		}
+		if (bestSafeWarehouse) return bestSafeWarehouse;
 		if (bestSupplyWarehouse) break;
 		minimumCash /= 2;
  	} while (minimumCash > 100);
@@ -4518,6 +4566,7 @@ void AIPlayer::checkReadyTeams( void )
 					Object *obj = iter.cur();	
 					if (obj->getAI() && obj->getAI()->isIdle()) {
 						anyIdle = true;
+						break;
 					}
 				}
 			}
@@ -4637,9 +4686,10 @@ void AIPlayer::checkQueuedTeams( void )
 			}
 			Bool anyIdle = false;
 			for (DLINK_ITERATOR<Object> iter = team->m_team->iterate_TeamMemberList(); !iter.done(); iter.advance()) {
-				Object *obj = iter.cur();	
+				Object *obj = iter.cur();
 				if (obj && obj->getAI() && obj->getAI()->isIdle()) {
 					anyIdle = true;
+					break;		// one is the answer, and this runs every frame for every team in the queue
 				}
 			}
 			if (anyIdle) {
@@ -7533,9 +7583,22 @@ void AIPlayer::doSpending( void )
 	buyUpgradesForArmy( overTarget );
 	if( !overTarget )
 		return;
-	if( windowEnded )
-		addProductionForIncome( bank, bankWindowAgo, target );
-	trainSurplus( aiSurplusBudget( (Int)m_player->getMoney()->countMoney(), target, m_incomePerSecond, getSkillProfile()->m_surplusShare ) );
+	//
+	// A match that starts on 50,000 handed every AI a bank no income window ever saw coming: the
+	// surplus is a share of what it earns, and in the first minutes it earns nothing, so the fortune
+	// sat there while the build list ticked along. What is over the default starting cash, up to
+	// what the start gave over it, goes out at the rung's share a pass, and factories go up for it
+	// without waiting on a window. At the default cash the fortune is 0 and nothing here changes.
+	//
+	const Int keep = max( target, (Int)TheGlobalData->m_defaultStartingCash.countMoney() );
+	const Int fortune = aiFortuneBudget( bank, keep, m_startFortune, getSkillProfile()->m_surplusShare );
+	if( windowEnded || fortune > 0 )
+		addProductionForIncome( bank, bankWindowAgo, target );		// between windows bankWindowAgo is the bank itself
+	const Int surplus = aiSurplusBudget( (Int)m_player->getMoney()->countMoney(), target, m_incomePerSecond, getSkillProfile()->m_surplusShare );
+	if( fortune > surplus )
+		DEBUG_LOG(("AI ECONOMY frame %d player %d spends its starting fortune, %d of it this pass, %d in the bank, %d kept\n", now,
+			m_player->getPlayerIndex(), fortune, bank, keep));
+	trainSurplus( max( surplus, fortune ) );
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -13455,7 +13518,10 @@ void AIPlayer::doCapture( void )
 	if( capturer )
 		from = *capturer->getPosition();
 
-	Object *target = nearestTechBuilding( &from, FALSE );
+	// The next derrick is the one nearest home, not nearest the capturer: from where it stood each
+	// capture led to the next one further out, so the round walked into the middle of the map and the
+	// derricks behind the base waited on it for minutes, or were never taken.
+	Object *target = nearestTechBuilding( &m_baseCenter, FALSE );
 
 	if( capturer == NULL )
 	{
@@ -14197,7 +14263,7 @@ void AIPlayer::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 23;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost  21: the purchase queue's reservation  22: the measured income  23: the Ambulances bought
+	XferVersion currentVersion = 24;		// 2: scout  3: rung and role  4: scouting stamps  5: the capturer  6: parked waves  7: superweapon aims  8: the hijacker  9: tactical steps  10: the ferry and dropped riders  11: the outward placement ring  12: the pressure level  13: falling back  14: gunship Chinooks and the boarding wait  15: transport Chinooks and the lent one  16: healer and raider Helixes  17: the seen-enemy ledger  18: the fist  19: the Ambulances  20: the last Ambulance lost  21: the purchase queue's reservation  22: the measured income  23: the Ambulances bought  24: the starting fortune
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -14600,6 +14666,8 @@ void AIPlayer::xfer( Xfer *xfer )
 	}
 	if( version >= 23 )
 		xfer->xferInt( &m_ambulancesBought );
+	if( version >= 24 )
+		xfer->xferInt( &m_startFortune );
 
 	// the ladder rung and the role, which are rolled once and must come back the same way
 	if( version >= 3 )

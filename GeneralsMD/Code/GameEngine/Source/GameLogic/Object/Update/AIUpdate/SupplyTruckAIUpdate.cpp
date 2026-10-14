@@ -562,6 +562,16 @@ StateReturnType SupplyTruckWantsToPickUpOrDeliverBoxesState::update()
 		return STATE_FAILURE;
 	}
 
+	//
+	// We came here because the docking that sent us had ended and the truck stood idle.  The machine
+	// runs this update before it checks its transitions, so an order the player gave on the frame we
+	// arrived is already running, and docking now would throw it away: the truck that was told to go
+	// somewhere else as it pulled off the dock drove back to the supplies instead.  Busy is where the
+	// same order lands a frame earlier, through ownerNotDockingOrIdle.
+	//
+	if (!ownerAI->isIdle() && ownerAI->getLastCommandSource() != CMD_FROM_AI)
+		return STATE_SUCCESS;
+
 	Int numBoxes = update->getNumberBoxes();
 	if (numBoxes > 0)
 	{

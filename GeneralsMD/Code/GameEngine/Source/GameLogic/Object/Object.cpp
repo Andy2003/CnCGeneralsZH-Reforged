@@ -941,6 +941,9 @@ void Object::setOrRestoreTeam( Team* team, Bool restoring )
 		
 	// Switch //////////////////////////
 	m_team = team;
+	// the partition counts every cell's objects per player; move ours before anything searches
+	if (m_partitionData)
+		m_partitionData->refreshCountedPlayer();
 
 	// After Switch //////////////////////////
 	if (m_team)

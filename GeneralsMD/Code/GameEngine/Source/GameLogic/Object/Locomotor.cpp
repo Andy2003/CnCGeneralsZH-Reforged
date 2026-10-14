@@ -352,12 +352,20 @@ static void calcDirectionToApplyThrust(
 	}
 
 	/*
-		get our cur vel into a useful Vector3 form
+		get our cur vel into a useful Vector3 form.  The sum below adds an acceleration to a speed as
+		if they were the same thing, which only holds at the rate EA solved it at: so both go into
+		retail (30 Hz) frames first, a speed doubled and an acceleration times four.  Only the
+		direction comes out, so nothing has to go back.  Left per logic frame, gravity and the thrust
+		counted half as much against the speed as they did in 2003.
 	*/
+	const Real RETAIL_VEL = (Real)LOGICFRAMES_PER_RETAIL_FRAME;
+	const Real RETAIL_ACCEL = RETAIL_VEL * RETAIL_VEL;
 	Vector3 curVel(physics->getVelocity()->x, physics->getVelocity()->y, physics->getVelocity()->z);
+	curVel *= RETAIL_VEL;
+	maxAccel *= RETAIL_ACCEL;
 
 	// add gravity to our vel so that we account for it in our calcs
-	curVel.Z += TheGlobalData->m_gravity;
+	curVel.Z += TheGlobalData->m_gravity * RETAIL_ACCEL;
 
 	Bool foundSolution = false;
 	Real distToGoalSqr = vecToGoal.Length2();

@@ -106,7 +106,7 @@ void Money::deposit(UnsignedInt amountToDeposit, Bool playSound)
 // ------------------------------------------------------------------------------------------------
 void Money::crc( Xfer *xfer )
 {
-
+	xfer->xferUnsignedInt( &m_money );
 }  // end crc
 
 // ------------------------------------------------------------------------------------------------

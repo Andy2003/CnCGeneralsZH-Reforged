@@ -340,6 +340,8 @@ private:
 	Int														m_threatValue[MAX_PLAYER_COUNT];
 	Int														m_cashValue[MAX_PLAYER_COUNT];
 	Short													m_coiCount;					///< number of COIs in this cell.
+	UnsignedShort									m_playerCoiCount[MAX_PLAYER_COUNT];	///< COIs in this cell whose Object belongs to each player
+	PlayerMaskType								m_playerCoiMask;		///< players whose m_playerCoiCount is nonzero
 	Short													m_cellX;						///< x-coord of this cell within the Partition Mgr coords (NOT in world coords)
 	Short													m_cellY;						///< y-coord of this cell within the Partition Mgr coords (NOT in world coords)
 
@@ -360,6 +362,9 @@ public:
 	void loadPostProcess( void );
 
 	Int getCoiCount() const { return m_coiCount; }		///< return number of COIs touching this cell.
+	Bool hasCoiOfPlayers( PlayerMaskType players ) const { return (m_playerCoiMask & players) != 0; }	///< does any Object of these players touch this cell?
+	void addPlayerCoi( Int playerIndex );
+	void removePlayerCoi( Int playerIndex );
 	Int getCellX() const { return m_cellX; }
 	Int getCellY() const { return m_cellY; }
 
@@ -434,6 +439,7 @@ private:
 	Int													m_coiInUseCount;					///< number of COIs that are actually in use
 	CellAndObjectIntersection		*m_coiArray;							///< The array of COIs 
 	Int													m_doneFlag;
+	Int													m_countedPlayer;					///< player index this module's COIs are counted under in their cells, -1 for none
 	DirtyStatus									m_dirtyStatus;
 	ObjectShroudStatus					m_shroudedness[MAX_PLAYER_COUNT];						
 	ObjectShroudStatus					m_shroudednessPrevious[MAX_PLAYER_COUNT];	///<previous frames value of m_shroudedness						
@@ -598,6 +604,8 @@ public:
 	void friend_removeAllTouchedCells() { removeAllTouchedCells(); }	///< this is only for use by PartitionManager
 	void friend_updateCellsTouched()	{ updateCellsTouched(); } ///< this is only for use by PartitionManager
 	Int friend_getCoiInUseCount() { return m_coiInUseCount; } ///< this is only for use by PartitionManager
+	Int friend_getCountedPlayer() const { return m_countedPlayer; } ///< only for CellAndObjectIntersection
+	void refreshCountedPlayer();	///< move this module's per-player cell counts to its Object's current controlling player
 	Bool friend_collidesWith(const PartitionData *that, CollideLocAndNormal *cinfo) const { return collidesWith(that, cinfo); }	///< this is only for use by PartitionContactList
 
 	// these are only for use by getClosestObjects.
@@ -1323,7 +1331,8 @@ protected:
 		PartitionFilter **filters, 
 		SimpleObjectIterator *iter,	// if nonnull, append ALL satisfactory objects to the iterator (not just the single closest)
 		Real *closestDistArg,
-		Coord3D *closestVecArg
+		Coord3D *closestVecArg,
+		PlayerMaskType onlyPlayers = PLAYERMASK_ALL
 	);
 
 	void shutdown( void );
@@ -1446,13 +1455,17 @@ public:
 		Real *closestDist = NULL,
 		Coord3D *closestDistVec = NULL
 	);
+	/** onlyPlayers skips every cell no Object of those players touches. Pass it only when the filters
+		already reject every Object outside them (an ALLOW_ENEMIES relationship filter with the asker's
+		Team::getEnemyPlayerMask), so the answer is the one a full search gives. */
 	Object *getClosestObject(
-		const Coord3D *pos, 
-		Real maxDist, 
-		DistanceCalculationType dc, 
-		PartitionFilter **filters = NULL, 
+		const Coord3D *pos,
+		Real maxDist,
+		DistanceCalculationType dc,
+		PartitionFilter **filters = NULL,
 		Real *closestDist = NULL,
-		Coord3D *closestDistVec = NULL
+		Coord3D *closestDistVec = NULL,
+		PlayerMaskType onlyPlayers = PLAYERMASK_ALL
 	);
 
 	Real getRelativeAngle2D( const Object *obj, const Object *otherObj );

@@ -1278,6 +1278,9 @@ private:
 	ObjectID			m_queuedPathfindRequests[PATHFIND_QUEUE_LEN];
 	Int						m_queuePRHead;
 	Int						m_queuePRTail;
+	/* Which ids sit between head and tail, by ObjectID, so queueForPath answers "already queued"
+		 without walking up to 2048 slots on every request. Derived from the ring, never saved. */
+	std::vector<bool>	m_isQueuedForPath;
 	Int						m_cumulativeCellsAllocated;
 
 	/* diagnostics only - never read by the simulation, so it stays out of xfer().  Records

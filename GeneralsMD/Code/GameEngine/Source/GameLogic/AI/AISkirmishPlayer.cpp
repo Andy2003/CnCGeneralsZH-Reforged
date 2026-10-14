@@ -1346,6 +1346,10 @@ void AISkirmishPlayer::adjustBuildList(BuildListInfo *list)
  */
 void AISkirmishPlayer::newMap( void )
 {
+	// what the setup handed out over the default, which doSpending spends as it would a hoard
+	m_startFortune = (Int)m_player->getMoney()->countMoney() - (Int)TheGlobalData->m_defaultStartingCash.countMoney();
+	if( m_startFortune < 0 )
+		m_startFortune = 0;
 
 	/* Get our proper build list. */
 	AsciiString mySide = m_player->getSide();

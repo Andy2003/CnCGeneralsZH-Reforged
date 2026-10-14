@@ -5362,6 +5362,14 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 		CRCGEN_LOG(("CRC after AI for frame %d is 0x%8.8X\n", m_frame, xferCRC->getCRC()));
 	}
 
+	marker = "MARKER:TheScriptEngine";
+	xferCRC->xferAsciiString(&marker);
+	xferCRC->xferSnapshot( TheScriptEngine );
+	if (isInGameLogicUpdate())
+	{
+		CRCGEN_LOG(("CRC after ScriptEngine for frame %d is 0x%8.8X\n", m_frame, xferCRC->getCRC()));
+	}
+
 	if (xferCRC->getXferMode() == XFER_SAVE)
 	{
 		marker = "MARKER:GameSave";

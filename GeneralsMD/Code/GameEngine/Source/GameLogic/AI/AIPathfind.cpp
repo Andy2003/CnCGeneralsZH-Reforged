@@ -5332,6 +5332,7 @@ void Pathfinder::reset( void )
 	}
 	m_queuePRHead = 0;
 	m_queuePRTail = 0;
+	m_isQueuedForPath.clear();
 
 	m_numWallPieces = 0;
 	for (i=0; i<MAX_WALL_PIECES; ++i)
@@ -6711,6 +6712,11 @@ Bool Pathfinder::goalPosition(Object *obj, Coord3D *pos)
 }
 
  
+/* Set when checkForAdjust turns a cell down only because of groupDest (the cell is free and
+	 reachable, but a long way round from the group's goal). adjustDestination reads it to tell a
+	 group spiral that would pass without groupDest from one that would fail again cell for cell. */
+static Bool theAdjustRejectedForGroup = false;
+
 Bool Pathfinder::checkForAdjust(Object *obj, const LocomotorSet& locomotorSet, Bool isHuman,
 																Int cellX, Int cellY, PathfindLayerEnum layer, 
 																Int iRadius, Bool center, Coord3D *dest, const Coord3D *groupDest) 
@@ -6753,7 +6759,8 @@ Bool Pathfinder::checkForAdjust(Object *obj, const LocomotorSet& locomotorSet, B
 				Int dx = IABS(groupDest->x-adjustDest.x);
 				Int dy = IABS(groupDest->y-adjustDest.y);
 				if (1.4f*(dx+dy)<cost) {
-					return false; 
+					theAdjustRejectedForGroup = true;
+					return false;
 				}
 			}			
 			*dest = adjustDest;
@@ -6906,6 +6913,7 @@ Bool Pathfinder::adjustDestination(Object *obj, const LocomotorSet& locomotorSet
 	// without it the formation smears.
 	//
 	Coord3D adjustDest = *dest;
+	theAdjustRejectedForGroup = false;
 	if (checkForAdjust(obj, locomotorSet, isHuman, i,j, layer, iRadius, center, &adjustDest, groupDest)) {
 		const Bool singleUnit = obj->getGroup() && obj->getGroup()->getCount() == 1;
 		if (!(isHuman && singleUnit)) {
@@ -6949,6 +6957,13 @@ Bool Pathfinder::adjustDestination(Object *obj, const LocomotorSet& locomotorSet
 		delta++;
 	}
 	if (groupDest) {
+		/* The simple adjust walks the same 400 cells round the same cell, and without groupDest a
+			 cell passes on exactly the tests that already failed here, unless one was turned down only
+			 for groupDest or the simple adjust reads another layer. Neither: it would fail again, and
+			 in a big group order every member that found no slot paid for that second spiral. */
+		if (!theAdjustRejectedForGroup && TheTerrainLogic->getLayerForDestination(dest) == layer) {
+			return false;
+		}
 		// Didn't work, so just do simple adjust.
 		return(adjustDestination(obj, locomotorSet, dest, NULL));
 	}
@@ -7367,15 +7382,8 @@ Bool Pathfinder::queueForPath(ObjectID id)
 #endif
 	
 	/* Check & see if we are already queued. */
-	Int slot = m_queuePRHead;
-	while (slot != m_queuePRTail) {
-		if (m_queuedPathfindRequests[slot] == id) {
-			return true;
-		}
-		slot++;
-		if (slot >= PATHFIND_QUEUE_LEN) {
-			slot = 0;
-		}
+	if ((size_t)id < m_isQueuedForPath.size() && m_isQueuedForPath[id]) {
+		return true;
 	}
 
 	// Tail is the first available slot.
@@ -7389,6 +7397,10 @@ Bool Pathfinder::queueForPath(ObjectID id)
 	}
 	m_queuedPathfindRequests[m_queuePRTail] = id;
 	m_queuePRTail = nextSlot;
+	if ((size_t)id >= m_isQueuedForPath.size()) {
+		m_isQueuedForPath.resize( (size_t)id + 1024, false );
+	}
+	m_isQueuedForPath[id] = true;
 	return true;
 }
 
@@ -7658,6 +7670,7 @@ void Pathfinder::processPathfindQueue(void)
 		m_queuePRTail!=m_queuePRHead) {
 		++requestsThisFrame;
 		Object *obj = TheGameLogic->findObjectByID(m_queuedPathfindRequests[m_queuePRHead]);
+		m_isQueuedForPath[m_queuedPathfindRequests[m_queuePRHead]] = false;
 		m_queuedPathfindRequests[m_queuePRHead] = INVALID_ID;
 		if (obj) {
 			AIUpdateInterface *ai = obj->getAIUpdateInterface();
@@ -7743,6 +7756,7 @@ struct ExamineCellsStruct
 	const LocomotorSet	*theLoco;
 	Bool								centerInCell;
 	Bool								isHuman;
+	Bool								isCrusher;		///< worked out once per probe, not once per cell along it
 	Int									radius;
 	const Object				*obj;
 	PathfindCell				*goalCell;
@@ -7751,10 +7765,9 @@ struct ExamineCellsStruct
 /*static*/ Int Pathfinder::examineCellsCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
 {
 	ExamineCellsStruct* d = (ExamineCellsStruct*)userData;
-	Bool isCrusher = d->obj ? d->obj->getCrusherLevel() > 0 : false;
 	if (d->thePathfinder->m_isTunneling) return 1; // abort.
 	if (from && to) {
-			if (!d->thePathfinder->validMovementPosition( isCrusher, d->theLoco->getValidSurfaces(), to, from )) {
+			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), to, from )) {
 				return 1;
 			}
 			if ( (to->getLayer() == LAYER_GROUND) && !d->thePathfinder->m_zoneManager.isPassable(to_x, to_y) ) {
@@ -7897,6 +7910,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			info.radius = radius;
 			info.obj = obj;
 			info.isHuman = isHuman;
+			info.isCrusher = isCrusher;
 			info.goalCell = goalCell;
 			ICoord2D start, end;
 			start.x = parentCell->getXIndex();
@@ -7922,14 +7936,34 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 
 		UnsignedInt newCostSoFar;
 
-
+		/* The parent's ground height is the same for all eight neighbours, so the downhill and cliff
+			 checks below read it once per expansion rather than once per neighbour. Fetched only when
+			 one of them first asks, because most expansions never need it. */
+		Bool hasParentHeight = false;
+		Real parentHeight = 0.0f;
 
 		for( int i=0; i<numNeighbors; i++ )
 		{
 			neighborFlags[i] = false;
+			// a diagonal needs one of its two orthogonal sides open; that is known before any lookup
+			// (the orthogonals all ran first), so a closed corner costs nothing
+			if (i>=firstDiagonal) {
+				// make sure one of the adjacent sides is open.
+				if (!neighborFlags[adjacent[i-4]] && !neighborFlags[adjacent[i-3]]) {
+					continue;
+				}
+			}
 			// determine neighbor cell to try
 			newCellCoord.x = parentCell->getXIndex() + delta[i].x;
 			newCellCoord.y = parentCell->getYIndex() + delta[i].y;
+
+			if (isHuman) {
+				// check if new cell is in logical map.	(computer can move off logical map)
+				if (newCellCoord.x < m_logicalExtent.lo.x) continue;
+				if (newCellCoord.y < m_logicalExtent.lo.y) continue;
+				if (newCellCoord.x > m_logicalExtent.hi.x) continue;
+				if (newCellCoord.y > m_logicalExtent.hi.y) continue;
+			}
 
 			// get the neighboring cell
 			newCell = getCell(parentCell->getLayer(), newCellCoord.x, newCellCoord.y );
@@ -7938,25 +7972,13 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			if (newCell == NULL)
 				continue;
 
-			Bool notZonePassable = false;
-			if ((newCell->getLayer()==LAYER_GROUND) && !m_zoneManager.isPassable(newCellCoord.x, newCellCoord.y)) {
-				notZonePassable = true;
-			}
-			if (isHuman) {
-				// check if new cell is in logical map.	(computer can move off logical map)
-				if (newCellCoord.x < m_logicalExtent.lo.x) continue;
-				if (newCellCoord.y < m_logicalExtent.lo.y) continue; 
-				if (newCellCoord.x > m_logicalExtent.hi.x) continue; 
-				if (newCellCoord.y > m_logicalExtent.hi.y) continue; 
-			}
-
-			// check if this neighbor cell is already on the open (waiting to be tried) 
+			// check if this neighbor cell is already on the open (waiting to be tried)
 			// or closed (already tried) lists
 			Bool onList = false;
 			if (newCell->hasInfo()) {
 				if (newCell->getOpen() || newCell->getClosed())
 				{
-					// already on one of the lists 
+					// already on one of the lists
 					onList = true;
 				}
 			}
@@ -7964,27 +7986,22 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				// we have already examined this one, so continue.
 				continue;
 			}
-			if (i>=firstDiagonal) {
-				// make sure one of the adjacent sides is open.
-				if (!neighborFlags[adjacent[i-4]] && !neighborFlags[adjacent[i-3]]) {
-					continue;
-				}
+
+			Bool notZonePassable = false;
+			if ((newCell->getLayer()==LAYER_GROUND) && !m_zoneManager.isPassable(newCellCoord.x, newCellCoord.y)) {
+				notZonePassable = true;
 			}
 
 			// do the gravity check here
 			if ( locomotorSet.isDownhillOnly() )
 			{
-				Coord3D fromPos;
-				fromPos.x = parentCell->getXIndex() * PATHFIND_CELL_SIZE_F ;
-				fromPos.y = parentCell->getYIndex() * PATHFIND_CELL_SIZE_F ;
-				fromPos.z = TheTerrainLogic->getGroundHeight(fromPos.x , fromPos.y);
+				if (!hasParentHeight) {
+					parentHeight = TheTerrainLogic->getGroundHeight(parentCell->getXIndex() * PATHFIND_CELL_SIZE_F, parentCell->getYIndex() * PATHFIND_CELL_SIZE_F);
+					hasParentHeight = true;
+				}
+				const Real toHeight = TheTerrainLogic->getGroundHeight(newCellCoord.x * PATHFIND_CELL_SIZE_F, newCellCoord.y * PATHFIND_CELL_SIZE_F);
 
-				Coord3D toPos;
-				toPos.x = newCellCoord.x * PATHFIND_CELL_SIZE_F ;
-				toPos.y = newCellCoord.y * PATHFIND_CELL_SIZE_F ;
-				toPos.z = TheTerrainLogic->getGroundHeight(toPos.x , toPos.y);
-
-				if ( fromPos.z < toPos.z )
+				if ( parentHeight < toHeight )
 					continue;
 			}
 
@@ -8062,17 +8079,13 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				newCostSoFar += 3*COST_DIAGONAL;
 			}
 			if (newCell->getType() == PathfindCell::CELL_CLIFF && !newCell->getPinched() ) {
-				Coord3D fromPos;
-				fromPos.x = parentCell->getXIndex() * PATHFIND_CELL_SIZE_F ;
-				fromPos.y = parentCell->getYIndex() * PATHFIND_CELL_SIZE_F ;
-				fromPos.z = TheTerrainLogic->getGroundHeight(fromPos.x , fromPos.y);
+				if (!hasParentHeight) {
+					parentHeight = TheTerrainLogic->getGroundHeight(parentCell->getXIndex() * PATHFIND_CELL_SIZE_F, parentCell->getYIndex() * PATHFIND_CELL_SIZE_F);
+					hasParentHeight = true;
+				}
+				const Real toHeight = TheTerrainLogic->getGroundHeight(newCellCoord.x * PATHFIND_CELL_SIZE_F, newCellCoord.y * PATHFIND_CELL_SIZE_F);
 
-				Coord3D toPos;
-				toPos.x = newCellCoord.x * PATHFIND_CELL_SIZE_F ;
-				toPos.y = newCellCoord.y * PATHFIND_CELL_SIZE_F ;
-				toPos.z = TheTerrainLogic->getGroundHeight(toPos.x , toPos.y);
-
-				if ( fabs(fromPos.z - toPos.z)<PATHFIND_CELL_SIZE_F) {
+				if ( fabs(parentHeight - toHeight)<PATHFIND_CELL_SIZE_F) {
 					newCostSoFar += 7*COST_DIAGONAL;
 				}
 			} else if (newCell->getPinched()) {

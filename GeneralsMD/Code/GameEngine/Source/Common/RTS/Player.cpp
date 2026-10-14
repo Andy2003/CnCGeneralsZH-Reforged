@@ -649,6 +649,12 @@ Relationship Player::getRelationship(const Team *that) const
 }
 
 //=============================================================================
+Bool Player::hasTeamRelationships() const
+{
+	return !m_teamRelations->m_map.empty();
+}
+
+//=============================================================================
 void Player::setPlayerRelationship(const Player *that, Relationship r)
 {
 	if (that != NULL)
@@ -4675,6 +4681,9 @@ void Player::crc( Xfer *xfer )
 	
 	xfer->xferInt( &m_skillPoints );
 	xfer->xferInt( &m_sciencePurchasePoints );
+
+	// The bank, so an income or a refund that drifted is caught before it buys something.
+	xfer->xferSnapshot( &m_money );
 
 }  // end crc
 

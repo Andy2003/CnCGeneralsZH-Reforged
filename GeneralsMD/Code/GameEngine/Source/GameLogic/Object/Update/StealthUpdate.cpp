@@ -333,7 +333,8 @@ Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
 		return FALSE;
 	}
 	
-	if( flags & STEALTH_NOT_WHILE_TAKING_DAMAGE && self->getBodyModule()->getLastDamageTimestamp() >= now - 1 )
+	// hit this retail (30 Hz) frame or the one before, as EA's "now - 1" meant
+	if( flags & STEALTH_NOT_WHILE_TAKING_DAMAGE && self->getBodyModule()->getLastDamageTimestamp() >= now - ConvertRetailFrames( 1u ) )
 	{
 		// the healing test that used to sit here is gone: a heal no longer stamps the damage
 		// timestamp at all, so getting patched up does not keep a unit visible.

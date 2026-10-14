@@ -1516,7 +1516,7 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
         TheEva->setShouldPlay( EVA_BuildingStolen );
       }
 
-      target->defect( object->getControllingPlayer()->getDefaultTeam(), 1); // one frame of flash! 
+      target->defect( object->getControllingPlayer()->getDefaultTeam(), ConvertRetailFrames( 1u ) ); // one retail frame of flash!
 
       SpecialPowerModuleInterface *spmInterface = getMySPM();
       if (spmInterface && spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )

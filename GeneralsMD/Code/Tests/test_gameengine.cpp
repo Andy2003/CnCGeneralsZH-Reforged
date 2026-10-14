@@ -12030,6 +12030,13 @@ TEST(the_bank_target_and_the_upgrade_the_army_pays_for)
 	CHECK_EQ( 500, aiSurplusBudget( 4500, 4000, 100.0f, 1.0f ) );				// the excess, when that is less
 	CHECK_EQ( 0, aiSurplusBudget( 60000, 4000, 0.0f, 1.0f ) );					// nothing earned, nothing extra
 
+	// a rich start: what is over the default cash, up to what the start handed over it, at the rung's share
+	CHECK_EQ( 0, aiFortuneBudget( 60000, 10000, 0, 1.0f ) );						// default cash: as before
+	CHECK_EQ( 40000, aiFortuneBudget( 50000, 10000, 40000, 1.0f ) );			// Hard, on the first pass
+	CHECK_EQ( 2000, aiFortuneBudget( 50000, 10000, 40000, 0.05f ) );			// Easy
+	CHECK_EQ( 40000, aiFortuneBudget( 90000, 10000, 40000, 1.0f ) );			// never past the fortune
+	CHECK_EQ( 0, aiFortuneBudget( 9000, 10000, 40000, 1.0f ) );					// spent down to the default
+
 	// what counts toward an upgrade: a fighting unit at its fit, anything else at the rung's small weight,
 	// so a base worth 20,000 is 1,000 of reason to fortify it and a 10,000 army is 10,000 of reason to arm it
 	CHECK_NEAR( 1.5f, aiUpgradeWeight( TRUE, 1.5f, 0.05f ), 0.0001f );

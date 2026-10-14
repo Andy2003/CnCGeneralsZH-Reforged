@@ -33,6 +33,7 @@ Data/Cinema/aurorablast.txt
 Data/Cinema/aurorafog.txt
 Data/Cinema/blastcheck.txt
 Data/Cinema/demo.txt
+Data/Cinema/drawlooks.txt
 Data/Cinema/explreel.txt
 Data/Cinema/filterblur.txt
 Data/Cinema/filterbw.txt
@@ -58,6 +59,7 @@ Data/Cinema/lsv_laser.txt
 Data/Cinema/lsv_spam.txt
 Data/Cinema/lsv_spam2.txt
 Data/Cinema/minefx.txt
+Data/Cinema/minefx_blast.txt
 Data/Cinema/minefx_desert.txt
 Data/Cinema/minefx_player.txt
 Data/Cinema/minefx_scene.txt
@@ -183,6 +185,7 @@ Data/Scenarios/defencereach.txt
 Data/Scenarios/dozerloss.txt
 Data/Scenarios/dragonfirewall.txt
 Data/Scenarios/dragonflame.txt
+Data/Scenarios/drawlooks.txt
 Data/Scenarios/driveby.txt
 Data/Scenarios/empfriendly.txt
 Data/Scenarios/exitmovebuild.txt
@@ -225,6 +228,7 @@ Data/Scenarios/mass420x2.txt
 Data/Scenarios/mass840.txt
 Data/Scenarios/massmove.txt
 Data/Scenarios/minefx.txt
+Data/Scenarios/minefx_blast.txt
 Data/Scenarios/minefx_desert.txt
 Data/Scenarios/minefx_player.txt
 Data/Scenarios/minefx_scene.txt
@@ -306,6 +310,7 @@ Data/Scenarios/trailer_clash.txt
 Data/Scenarios/trailer_corridor.txt
 Data/Scenarios/trailer_fourway.txt
 Data/Scenarios/trailer_intro.txt
+Data/Scenarios/truckredirect.txt
 Data/Scenarios/tunnelattack.txt
 Data/Scenarios/tunnelfull.txt
 Data/Scenarios/tunnelgap.txt
@@ -2955,6 +2960,7 @@ Tests/test_gametext_csf.cpp
 Tests/test_global_new_alignment.cpp
 Tests/test_glyph_rasteriser.cpp
 Tests/test_harness.h
+Tests/test_hostile_map.inc
 Tests/test_install_guard.sh
 Tests/test_install_root.cpp
 Tests/test_install_textures.cpp
@@ -2962,6 +2968,7 @@ Tests/test_lan_broadcast.cpp
 Tests/test_linux_portable.sh
 Tests/test_macos_app.sh
 Tests/test_main.cpp
+Tests/test_map_ini_rollback.inc
 Tests/test_miles_miniaudio.cpp
 Tests/test_milesaudiomanager.cpp
 Tests/test_minimap_input.inc

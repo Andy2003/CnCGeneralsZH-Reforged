@@ -233,6 +233,7 @@ struct AIDifficultyProfile
 
 	// Superweapons
 	Real	m_beamSteerSeconds;							///< how often a firing Particle Cannon's beam is driven onto the richest ground near it; 0 = the retail S curve
+	Real	m_strikeEconomyWeight;					///< what a supply centre, black market, hacker or strategy centre is worth to a strike on top of its price, in prices; 0 = price alone
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -556,6 +557,11 @@ Bool aiWantsMoreProduction( Int bank, Int bankWindowAgo, Int target, Int standin
 	* AI_SURPLUS_INCOME_SECONDS, and never what takes the bank under target.  At share 1 that is three
 	* passes' income a pass, which drains a pile; a rung with a small share only tops its plan up. */
 Int aiSurplusBudget( Int bank, Int target, Real incomePerSecond, Real share );
+
+/** The same for a match that started rich: share of what the bank holds over keep (the bank target or
+	* the default starting cash, whichever is more), never more than fortune, what the start handed over
+	* the default.  0 in a match at the default cash, which then plays as it did. */
+Int aiFortuneBudget( Int bank, Int keep, Int fortune, Real share );
 const Real AI_SURPLUS_INCOME_SECONDS = 30.0f;
 
 /** What a unit counts for when an upgrade is weighed: 1 with nothing known of the enemy or no weight
