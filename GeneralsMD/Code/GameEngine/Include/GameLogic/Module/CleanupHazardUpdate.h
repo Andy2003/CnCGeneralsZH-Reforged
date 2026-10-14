@@ -108,6 +108,8 @@ protected:
 	Coord3D	m_approachPos;			///< where the hazard it is after stood when the count began; any within GIVEN_UP_RADIUS is the same ground
 	Coord3D	m_lastScanPos;			///< where it stood on the last scan that counted
 	Real		m_closestApproach;	///< the nearest it has come to a hazard on that ground
+	UnsignedInt	m_progressFrame;	///< the last frame of progress in the area: started, nearer, a hazard hosed or gone
+	ObjectID	m_lastTargetID;		///< the hazard the last scan found
 	ObjectID	m_resumeGuardObject;	///< the object it was guarding when a cleanup took it off guard, or INVALID_ID for a spot
 	Bool		m_hasGivenUp;				///< m_givenUpPos holds ground it gave up on
 	Coord3D	m_givenUpPos;				///< where the last hazard it gave up on as out of reach stood; none near it is gone for again

@@ -69,6 +69,10 @@ static const Real CLEANUP_DRIVEN = 20.0f;
 	makes the hazards of one field one target for the give-up count. */
 static const Real GIVEN_UP_RADIUS = 150.0f;
 
+/** How long an area cleaner goes with no hazard hosed or gone and no nearer to one before it gives the
+	area up, whatever the scan count says. A field takes seconds to hose down. */
+static const UnsignedInt CLEANUP_STUCK_FRAMES = 20 * LOGICFRAMES_PER_SECOND;
+
 /** One scan of an area cleaner out of reach of its hazard: whether it counts toward giving up. It does
 	when the cleaner stands no CLEANUP_PROGRESS nearer than the nearest it had come and has driven under
 	CLEANUP_DRIVEN since the last scan. One driving round a river or a cliff gets no nearer for a while
@@ -142,6 +146,8 @@ CleanupHazardUpdate::CleanupHazardUpdate( Thing *thing, const ModuleData* module
 	m_approachPos.zero();
 	m_lastScanPos.zero();
 	m_closestApproach						= 0.0f;
+	m_progressFrame							= 0;
+	m_lastTargetID							= INVALID_ID;
 	m_resumeGuardObject					= INVALID_ID;
 	m_hasGivenUp								= FALSE;
 	m_givenUpPos.zero();
@@ -242,35 +248,73 @@ UpdateSleepTime CleanupHazardUpdate::update()
 		// fireWhenReady orders the drive again whenever it stops, so a scan nearly always found it moving
 		// and the count never got anywhere. Counted for the ground, not the one hazard: the nearest of a
 		// toxin field changes as it drives, and each change started the count over
+		//
+		// And by time: in the cliff-top run (ambulancegiveup.txt on Twilight Flame) the count never reached
+		// its eight in 6,000 frames, though nothing was ever cleaned, so whatever the scans read, an area
+		// that has seen no progress for CLEANUP_STUCK_FRAMES is given up as well.  The clock starts with
+		// the area; progress is a scan that finds it CLEANUP_PROGRESS nearer, the hazard it finds hit since
+		// the last scan, or the one it was after gone (cleaned, or run out).  Driving is not: the likeliest
+		// reading of that run is a cleaner shuttling along the cliff foot, over CLEANUP_DRIVEN a scan, which
+		// the count takes for a drive round.  Each scan logs what it read, so the next run says which of the
+		// two fired and why.
 		WeaponBonus bonus;
 		bonus.clear();
 		const Real distance = (Real)sqrt( ThePartitionManager->getDistanceSquared( obj, found, FROM_CENTER_2D ) );
-		if( m_moveRange > 0.0f && distance > m_weaponTemplate->getAttackRange( bonus ) )
+		const Real reach = m_weaponTemplate->getAttackRange( bonus );
+		if( m_moveRange > 0.0f )
 		{
 			const Coord3D *at = found->getPosition();
 			const Coord3D *here = obj->getPosition();
+			const UnsignedInt now = TheGameLogic->getFrame();
+			const Real driven = (Real)sqrt( sqr( here->x - m_lastScanPos.x ) + sqr( here->y - m_lastScanPos.y ) );
+			if( !m_approaching )
+				m_progressFrame = now;		// the clock runs from the start of the area, not of each ground in it
 			if( !m_approaching || sqr( at->x - m_approachPos.x ) + sqr( at->y - m_approachPos.y ) > sqr( GIVEN_UP_RADIUS ) )
 			{
+				// fireWhenReady drives only an idle or busy cleaner, and one still on its way to the old ground
+				// (in that run, never there) passed by a field it could reach for 900 frames.  Two grounds whose
+				// nearest swaps as it drives are not ordered: only ground nearer by CLEANUP_PROGRESS than the old
+				if( m_approaching && distance > reach && distance <= m_closestApproach - CLEANUP_PROGRESS )
+				{
+					obj->getAI()->aiIdle( CMD_FROM_AI );
+					obj->getAI()->aiMoveToPosition( at, CMD_FROM_AI );
+				}
 				m_approaching = TRUE;
 				m_approachPos = *at;
 				m_closestApproach = distance;
 				m_approaches = 0;
 			}
-			else if( !CleanupHazard_stalls( distance, (Real)sqrt( sqr( here->x - m_lastScanPos.x ) + sqr( here->y - m_lastScanPos.y ) ), &m_closestApproach ) )
-				m_approaches = 0;
-			else if( ++m_approaches > MAX_CLEANUP_APPROACHES )
+			else
+			{
+				// progress for the clock: the hazard it was after gone, the one found hit since the last scan
+				// (whichever of two puddles in reach is nearest), or a CLEANUP_PROGRESS nearer.  Driving is not:
+				// one shuttling along a cliff foot drives every scan
+				const Bool targetGone = m_lastTargetID != INVALID_ID && TheGameLogic->findObjectByID( m_lastTargetID ) == NULL;
+				const Bool sameHazard = found->getID() == m_lastTargetID;
+				const Bool hosed = found->getBodyModule()->getLastDamageTimestamp() + data->m_scanFrames >= now;
+				// another hazard of the same ground being nearer is no progress: the plateau run swapped from
+				// one field to the other at frame 1219, and the nearer reading started the clock over
+				if( !sameHazard )
+					m_closestApproach = min( m_closestApproach, distance );
+				if( targetGone || hosed || distance <= m_closestApproach - CLEANUP_PROGRESS )
+					m_progressFrame = now;
+				if( distance > reach && CleanupHazard_stalls( distance, driven, &m_closestApproach ) )
+					++m_approaches;
+				else
+					m_approaches = 0;
+			}
+			DEBUG_LOG(("CLEANUP frame %d '%s' %d scan: hazard %d %.0f away, reach %.0f, drove %.0f, nearest %.0f, %d stalls, %d frames since progress, state %d\n",
+				now, obj->getTemplate()->getName().str(), obj->getID(), found->getID(), distance, reach, driven, m_closestApproach, m_approaches,
+				(Int)(now - m_progressFrame), (Int)obj->getAI()->getCurrentStateID()));
+			m_lastScanPos = *here;
+			m_lastTargetID = found->getID();
+			if( m_approaches >= MAX_CLEANUP_APPROACHES || now - m_progressFrame > CLEANUP_STUCK_FRAMES )
 			{
 				m_hasGivenUp = TRUE;
-				m_givenUpPos = *at;
-				finishArea( "gave up on a hazard it cannot reach", TRUE );
+				m_givenUpPos = m_approachPos;
+				finishArea( m_approaches >= MAX_CLEANUP_APPROACHES ? "gave up on a hazard it cannot reach" : "gave up on a hazard it cannot reach, no progress in time", TRUE );
 				return UPDATE_SLEEP_NONE;
 			}
-			m_lastScanPos = *here;
-		}
-		else
-		{
-			m_approaches = 0;
-			m_approaching = FALSE;
 		}
 		//1 frame can make a big difference so fire ASAP!
 		fireWhenReady();
@@ -549,13 +593,14 @@ void CleanupHazardUpdate::crc( Xfer *xfer )
 	* 1: Initial version
 	* 2: the guard a cleanup it started by itself gives back, the walk back, the drives toward a hazard
 	* 3: the object that guard was on, the hazard given up on
-	* 4: the ground given up on instead of the one hazard, and the ground it is after with how near it has come */
+	* 4: the ground given up on instead of the one hazard, and the ground it is after with how near it has come
+	* 5: the frame it last made progress in the area, and the hazard it was after at the last scan */
 // ------------------------------------------------------------------------------------------------
 void CleanupHazardUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 4;
+	XferVersion currentVersion = 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -606,6 +651,13 @@ void CleanupHazardUpdate::xfer( Xfer *xfer )
 		xfer->xferCoord3D( &m_lastScanPos );
 		xfer->xferReal( &m_closestApproach );
 	}
+	if( version >= 5 )
+	{
+		xfer->xferUnsignedInt( &m_progressFrame );
+		xfer->xferObjectID( &m_lastTargetID );
+	}
+	else
+		m_progressFrame = TheGameLogic->getFrame();
 
 }  // end xfer
 

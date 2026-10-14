@@ -2873,6 +2873,13 @@ void AIPlayer::onUnitLost( const Object *obj )
 			team ? team->getName().str() : "", obj->getAI() ? (Int)obj->getAI()->getCurrentStateID() : -1,
 			obj->getAI() ? (Int)obj->getAI()->getLastCommandSource() : -1,
 			(Real)sqrt( sqr( obj->getPosition()->x - m_baseCenter.x ) + sqr( obj->getPosition()->y - m_baseCenter.y ) )));
+	// what killed a duty Ambulance, from how far, and whether this AI knew of it
+	if( isSkirmishAI() && isDutyAmbulance( obj ) )
+		DEBUG_LOG(("AI AMBULANCE frame %d player %d %d killed by '%s' %.0f away, %s, %s\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
+			obj->getID(), killer ? killer->getTemplate()->getName().str() : "nothing known",
+			killer ? (Real)sqrt( sqr( killer->getPosition()->x - obj->getPosition()->x ) + sqr( killer->getPosition()->y - obj->getPosition()->y ) ) : -1.0f,
+			killer && observerKnowsAbout( killer, m_player->getPlayerIndex() ) ? "known" : "unseen",
+			killer && killer->isKindOf( KINDOF_AIRCRAFT ) ? "aircraft" : killer && killer->isKindOf( KINDOF_STRUCTURE ) ? "building" : "ground"));
 	if( isSkirmishAI() && obj->isKindOf( KINDOF_STRUCTURE ) && aiCombatPower( obj ) > 0.0f )
 		DEBUG_LOG(("AI DEFDEAD frame %d player %d '%s' worth %.0f\n", TheGameLogic->getFrame(), m_player->getPlayerIndex(),
 			obj->getTemplate()->getName().str(), aiCombatPower( obj )));
