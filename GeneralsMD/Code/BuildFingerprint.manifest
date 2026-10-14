@@ -33,6 +33,8 @@ Data/Cinema/aurorablast.txt
 Data/Cinema/aurorafog.txt
 Data/Cinema/blastcheck.txt
 Data/Cinema/debristrails.txt
+Data/Cinema/debristrails3.txt
+Data/Cinema/debristrails3_nuke.txt
 Data/Cinema/demo.txt
 Data/Cinema/drawlooks.txt
 Data/Cinema/explreel.txt
@@ -183,6 +185,7 @@ Data/Scenarios/comanchepods.txt
 Data/Scenarios/comturret.txt
 Data/Scenarios/crowdbattle.txt
 Data/Scenarios/debristrails.txt
+Data/Scenarios/debristrails3.txt
 Data/Scenarios/defencereach.txt
 Data/Scenarios/dozerloss.txt
 Data/Scenarios/dragonfirewall.txt
