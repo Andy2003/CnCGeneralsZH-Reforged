@@ -140,6 +140,10 @@ void INI::parseWeatherDefinition( INI *ini )
 		WeatherSetting* ws = (WeatherSetting*) (TheWeatherSetting.getNonOverloadedPointer());
 		WeatherSetting* wsOverride = newInstance(WeatherSetting);
 		*wsOverride = *ws;
+		// the copy took the base's next-override pointer too; hung off the end of a chain that already
+		// has one (map.ini and solo.ini both with a Weather block) it pointed back into the chain, and
+		// every walk of it spun for ever
+		wsOverride->setNextOverride(NULL);
 
 		// Mark that it is an override.
 		wsOverride->markAsOverride();
