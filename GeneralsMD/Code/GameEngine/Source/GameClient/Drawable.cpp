@@ -5817,8 +5817,8 @@ Bool Drawable::isSelectable( void ) const
 //-------------------------------------------------------------------------------------------------
 Bool Drawable::isMassSelectable( void ) const
 {
-	// the game as shipped, where a structure was only ever selected on its own
-	return getObject() && getObject()->isMassSelectable() && !getObject()->isKindOf( KINDOF_STRUCTURE );
+	// structures group too; SelectionXlat keeps them out of a selection of units
+	return getObject() && getObject()->isMassSelectable();
 }
 
 //-------------------------------------------------------------------------------------------------

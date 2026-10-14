@@ -580,9 +580,9 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 						// buildings and units stay in separate selections, and a double click that
 						// gathers everything of a kind may only gather what a box would - things
 						// you can click one at a time but never sweep up used to come along.  Classic keeps
-						// 1.04's rule, which put back everything that was selected
-						const Bool keep = TheGlobalData->isClassicMouse() ? (draw && draw->isSelectable())
-							: (draw && draw->isMassSelectable() && draw->isKindOf( KINDOF_STRUCTURE ) == picked->isKindOf( KINDOF_STRUCTURE ));
+						// 1.04's rule, which put back everything that was selected of the same kind
+						const Bool keep = draw && draw->isKindOf( KINDOF_STRUCTURE ) == picked->isKindOf( KINDOF_STRUCTURE )
+							&& ( TheGlobalData->isClassicMouse() ? draw->isSelectable() : draw->isMassSelectable() );
 						if (keep) {
 							TheInGameUI->selectDrawable(draw);
 							selectMore->appendObjectIDArgument(draw->getObject()->getID());
@@ -816,55 +816,16 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			
 			Bool addToGroup = TheInGameUI->isInPreferSelectionMode();
 
-			const Bool classic = TheGlobalData->isClassicMouse();
 			if (si.currentCountEnemies > 0 ||
 					si.currentCountCivilians > 0 ||
-					si.currentCountFriends > 0 ||
-					(classic && si.currentCountMineBuildings > 0))
+					si.currentCountFriends > 0)
 			{
 				// force a new group creation
 				addToGroup = FALSE;
 			}
 
-			// Classic is the game as shipped: a structure is only ever selected on its own, when it is the
-			// one thing clicked or the only selectable thing in the box (EA's Firebase case)
-			if (si.newCountMine > 0 && classic)
-			{
-				si.selectMine = TRUE;
-				if ( si.newCountMineBuildings == 1 && si.newCountMine == 1 )
-				{
-					addToGroup = FALSE;
-					si.selectMineBuildings = TRUE;
-				}
-				else if ( si.newCountMineBuildings > 0 )
-				{
-					Bool onlyTheOneBuildingIsSelectableAnyway = TRUE;
-					DrawableID buildingID = INVALID_DRAWABLE_ID;
-					for (DrawableListIt it = drawablesThatWillSelect.begin(); it != drawablesThatWillSelect.end(); ++it)
-					{
-						const Drawable *d = *it;
-						if ( d->isKindOf( KINDOF_STRUCTURE ) )
-						{
-							if ( buildingID == INVALID_DRAWABLE_ID )
-								buildingID = d->getID();
-							else if ( buildingID != d->getID() )
-								onlyTheOneBuildingIsSelectableAnyway = FALSE;
-						}
-						else if ( d->isSelectable() )
-							onlyTheOneBuildingIsSelectableAnyway = FALSE;
-
-						if ( ! onlyTheOneBuildingIsSelectableAnyway )
-							break;
-					}
-					if ( onlyTheOneBuildingIsSelectableAnyway )
-					{
-						addToGroup = FALSE;
-						si.selectMineBuildings = TRUE;
-					}
-				}
-			}
 			// If there are any of my units, then select those.
-			else if (si.newCountMine > 0)
+			if (si.newCountMine > 0)
 			{
 				si.selectMine = TRUE;
 
