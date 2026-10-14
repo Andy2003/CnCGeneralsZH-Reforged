@@ -379,6 +379,20 @@ void ControlBar::populateCommand( Object *obj )
 
 	}  // end if
 
+	// with grid keys on, the fixed letters this bar has no order for key its two keyless places
+	{
+		AsciiString names[ MAX_COMMANDS_PER_SET ];
+		Int types[ MAX_COMMANDS_PER_SET ];
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+		{
+			const CommandButton *button = commandSet->getCommandButton( i );
+			const Bool shows = button && !BitTest( button->getOptions(), SCRIPT_ONLY );
+			names[ i ] = shows ? button->getName() : AsciiString::TheEmptyString;
+			types[ i ] = shows ? button->getCommandType() : GUI_COMMAND_NONE;
+		}
+		HotKeyManager::lendFixedKeys( names, types, MAX_COMMANDS_PER_SET );
+	}
+
 	// transports do extra special things with the user interface buttons
 	if( obj->getContain()  &&  obj->getContain()->isDisplayedOnControlBar() )
 		doTransportInventoryUI( obj, commandSet );

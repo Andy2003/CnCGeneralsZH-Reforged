@@ -4167,6 +4167,43 @@ TEST(controlbar_grid_packs_keyless_buttons_into_keyed_windows)
 		CHECK_EQ( shown[ slot ], slot );
 }
 
+/* A bar without attack move, guard or rally point lends their letters to the keyless places 11 and
+   13; a unit's bar, which has them, keeps A and G on its own orders */
+TEST(grid_keyless_places_borrow_the_fixed_letters_a_bar_has_no_order_for)
+{
+	enum { SLOTS = MAX_COMMANDS_PER_SET, PLACES = 14 };
+	AsciiString names[ SLOTS ];
+	Int types[ SLOTS ];
+	WideChar lent[ PLACES ];
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		types[ slot ] = GUI_COMMAND_NONE;
+
+	// War Factory: units, TOW, rally point, sell
+	names[ 0 ] = "Command_ConstructAmericaTankCrusader";	types[ 0 ] = GUI_COMMAND_UNIT_BUILD;
+	names[ 10 ] = "Command_UpgradeAmericaTOWMissile";			types[ 10 ] = GUI_COMMAND_OBJECT_UPGRADE;
+	names[ 12 ] = "Command_SetRallyPoint";								types[ 12 ] = GUI_COMMAND_SET_RALLY_POINT;
+	names[ 13 ] = "Command_Sell";													types[ 13 ] = GUI_COMMAND_SELL;
+	HotKeyManager::gridLentKeys( names, types, SLOTS, lent );
+	CHECK_EQ( (Int)lent[ 10 ], (Int)'A' );
+	CHECK_EQ( (Int)lent[ 12 ], (Int)'G' );
+	for( Int slot = 0; slot < PLACES; slot++ )
+		if( slot != 10 && slot != 12 )
+			CHECK_EQ( (Int)lent[ slot ], 0 );
+
+	// a unit with attack move, guard and stop: A and G are its own, the places borrow what is left
+	for( Int slot = 0; slot < SLOTS; slot++ )
+	{
+		names[ slot ].clear();
+		types[ slot ] = GUI_COMMAND_NONE;
+	}
+	names[ 10 ] = "Command_AttackMove";	types[ 10 ] = GUI_COMMAND_ATTACK_MOVE;
+	names[ 12 ] = "Command_Guard";			types[ 12 ] = GUI_COMMAND_GUARD;
+	names[ 13 ] = "Command_Stop";				types[ 13 ] = GUI_COMMAND_STOP;
+	HotKeyManager::gridLentKeys( names, types, SLOTS, lent );
+	CHECK_EQ( (Int)lent[ 12 ], (Int)'Y' );
+	CHECK_EQ( (Int)lent[ 10 ], (Int)'V' );
+}
+
 TEST(controlbar_stance_key_takes_what_the_buttons_leave)
 {
 	enum { SLOTS = 14 };
