@@ -4295,8 +4295,8 @@ void Player::processCreateTeamGameMessage(Int hotkeyNum, GameMessage *msg) {
 
 	m_squads[hotkeyNum]->clearSquad();
 
-	UnsignedByte numArgs = msg->getArgumentCount();
-	for (UnsignedByte i = 0; i < numArgs; ++i) {
+	Int numArgs = msg->getArgumentCount();
+	for (Int i = 0; i < numArgs; ++i) {
 		ObjectID objID = msg->getArgument(i)->objectID;
 		Object *obj = TheGameLogic->findObjectByID(objID);
 		if (obj != NULL) {

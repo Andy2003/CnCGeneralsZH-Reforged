@@ -732,6 +732,19 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 
 	AsciiString realFileName = msg->getRealFilename();
 
+	// Only the host sends map files, and only after announcing each one to the players who need it
+	// (FileTransfer.cpp).  A file nobody announced, under another name, or for somebody else, is a
+	// peer writing to our disk on its own say-so.
+	FileCommandMap::iterator announced = s_fileCommandMap.find(msg->getID());
+	FileMaskMap::iterator recipients = s_fileRecipientMaskMap.find(msg->getID());
+	if (msg->getPlayerID() != 0 || announced == s_fileCommandMap.end() || announced->second != realFileName ||
+			recipients == s_fileRecipientMaskMap.end() || (recipients->second & (1 << m_localSlot)) == 0)
+	{
+		DEBUG_LOG(("ConnectionManager::processFile - '%s' from player %d was never announced to us, dropped\n",
+			realFileName.str(), msg->getPlayerID()));
+		return;
+	}
+
 	if (!IsSafeTransferPath(msg->getPortableFilename()) || !IsSafeTransferPath(realFileName))
 	{
 		DEBUG_LOG(("ConnectionManager::processFile - refused '%s'\n", realFileName.str()));
@@ -832,6 +845,12 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 void ConnectionManager::processFileAnnounce(NetFileAnnounceCommandMsg *msg) 
 {
 	DEBUG_LOG(("ConnectionManager::processFileAnnounce() - expecting '%s' (%s) in command %d\n", msg->getPortableFilename().str(), msg->getRealFilename().str(), msg->getFileID()));
+	// the host (slot 0) is the one who transfers maps; an announce from anyone else would let
+	// processFile accept a file the host never sent
+	if (msg->getPlayerID() != 0) {
+		DEBUG_LOG(("ConnectionManager::processFileAnnounce() - player %d is not the host, ignored\n", msg->getPlayerID()));
+		return;
+	}
 	s_fileCommandMap[msg->getFileID()] = msg->getRealFilename();
 	s_fileRecipientMaskMap[msg->getFileID()] = msg->getPlayerMask();
 	for (Int i=0; i<MAX_SLOTS; ++i)

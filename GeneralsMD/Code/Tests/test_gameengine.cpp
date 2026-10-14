@@ -249,7 +249,12 @@ public:
 	virtual Bool createDirectory( AsciiString ) { return FALSE; }
 	virtual Bool copyFile( const Char *, const Char *, Bool ) { return FALSE; }
 	virtual Bool deleteFile( const Char * ) { return FALSE; }
-	virtual Bool moveFileReplacing( const Char *, const Char * ) { return FALSE; }
+	// XferSave::close writes "<name>.tmp" and puts it in place through this
+	virtual Bool moveFileReplacing( const Char *from, const Char *to )
+	{
+		remove( to );
+		return rename( from, to ) == 0;
+	}
 	virtual void getFilesInDirectory( const AsciiString&, const AsciiString&, std::vector<AsciiString>& ) const {}
 	virtual AsciiString getCurrentDirectory() const { return AsciiString::TheEmptyString; }
 };
@@ -6238,8 +6243,6 @@ TEST(netcommand_list_orders_a_burst_of_acks_by_acknowledged_command)
 	 over the whole name, so everything after it in the message is still read from the right place. */
 struct NetPacketFileReader : public NetPacket
 {
-	using NetPacket::readFileMessage;
-	using NetPacket::readFileAnnounceMessage;
 	using NetPacket::GetBufferSizeNeededForCommand;
 	using NetPacket::FillBufferWithCommand;
 };
@@ -6315,8 +6318,11 @@ TEST(sizing_a_null_command_asks_for_no_bytes)
 TEST(an_overlong_transfer_filename_is_truncated_instead_of_overflowing)
 {
 	static const Int NAME_LEN = 400;					// _MAX_PATH is 260
-	UnsignedByte buf[NAME_LEN + 1 + sizeof(UnsignedInt) + 4];
+	UnsignedByte buf[3 + NAME_LEN + 1 + sizeof(UnsignedInt) + 4];
 	Int at = 0;
+	buf[at++] = 'T';
+	buf[at++] = NETCOMMANDTYPE_FILE;
+	buf[at++] = 'D';
 	Int k;
 	for( k = 0; k < NAME_LEN; ++k )
 		buf[at++] = (UnsignedByte)('a' + (k % 26));
@@ -6327,27 +6333,29 @@ TEST(an_overlong_transfer_filename_is_truncated_instead_of_overflowing)
 	at += sizeof(dataLength);
 	buf[at++] = 0xDE; buf[at++] = 0xAD; buf[at++] = 0xBE; buf[at++] = 0xEF;
 
-	Int i = 0;
-	NetCommandMsg *msg = NetPacketFileReader::readFileMessage( buf, i );
-	NetFileCommandMsg *fileMsg = (NetFileCommandMsg *)msg;
+	// through the entry point, which tells the readers how far the data reaches
+	NetCommandRef *ref = NetPacket::ConstructNetCommandMsgFromRawData( buf, (UnsignedInt)at );
+	NetFileCommandMsg *fileMsg = (NetFileCommandMsg *)ref->getCommand();
 
 	// the name is cut to the buffer rather than written past it
 	CHECK_EQ( fileMsg->getPortableFilename().getLength(), _MAX_PATH - 1 );
 
 	// ...but the offset walked the whole name, so what follows it still parses
-	CHECK_EQ( i, at );
 	CHECK_EQ( (Int)fileMsg->getFileLength(), 4 );
 	CHECK_EQ( (Int)fileMsg->getFileData()[0], 0xDE );
 	CHECK_EQ( (Int)fileMsg->getFileData()[3], 0xEF );
 
-	msg->detach();
+	ref->deleteInstance();
 }
 
 TEST(an_overlong_announced_filename_is_truncated_instead_of_overflowing)
 {
 	static const Int NAME_LEN = 400;
-	UnsignedByte buf[NAME_LEN + 1 + sizeof(UnsignedShort) + sizeof(UnsignedByte)];
+	UnsignedByte buf[3 + NAME_LEN + 1 + sizeof(UnsignedShort) + sizeof(UnsignedByte)];
 	Int at = 0;
+	buf[at++] = 'T';
+	buf[at++] = NETCOMMANDTYPE_FILEANNOUNCE;
+	buf[at++] = 'D';
 	Int k;
 	for( k = 0; k < NAME_LEN; ++k )
 		buf[at++] = (UnsignedByte)('a' + (k % 26));
@@ -6358,16 +6366,14 @@ TEST(an_overlong_announced_filename_is_truncated_instead_of_overflowing)
 	at += sizeof(fileID);
 	buf[at++] = 0x5A;									// player mask
 
-	Int i = 0;
-	NetCommandMsg *msg = NetPacketFileReader::readFileAnnounceMessage( buf, i );
-	NetFileAnnounceCommandMsg *announce = (NetFileAnnounceCommandMsg *)msg;
+	NetCommandRef *ref = NetPacket::ConstructNetCommandMsgFromRawData( buf, (UnsignedInt)at );
+	NetFileAnnounceCommandMsg *announce = (NetFileAnnounceCommandMsg *)ref->getCommand();
 
 	CHECK_EQ( announce->getPortableFilename().getLength(), _MAX_PATH - 1 );
-	CHECK_EQ( i, at );
 	CHECK_EQ( (Int)announce->getFileID(), 0x1234 );
 	CHECK_EQ( (Int)announce->getPlayerMask(), 0x5A );
 
-	msg->detach();
+	ref->deleteInstance();
 }
 
 /* A map transfer arrives as a filename and a block of bytes, both chosen by the other machine, and
