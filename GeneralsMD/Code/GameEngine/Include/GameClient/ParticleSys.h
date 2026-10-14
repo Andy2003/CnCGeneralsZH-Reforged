@@ -793,6 +793,9 @@ public:
 	/// TRUE if this system is the kind of big soft cloud that should shade the ground under it
 	Bool shouldCastGroundShadow( void ) const;
 
+	/// How much of this system the local player sees, for the stealth of what it is attached to.
+	Real getStealthFade( void ) const;
+
 protected:
 
 	// snapshot methods

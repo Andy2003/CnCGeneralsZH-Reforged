@@ -3940,10 +3940,15 @@ static void fillSmokeMap( const Matrix3D &sunTransform, const Vector3 &focus, Re
 			if (*((UnsignedInt *)sys->getParticleTypeName().str()) == 0x44554D53)
 				continue;
 
+			// a stealthed thing's smoke shades the ground only as much as it is drawn
+			const Real fade = sys->getStealthFade();
+			if (fade <= 0.0f)
+				continue;
+
 			const UnsignedInt layers = sys->getVolumeParticleDepth();
 			for (Particle *p = sys->getFirstParticle(); p; p = p->m_systemNext)
 			{
-				const Real opticalDepth = particleSunMapOpticalDepth( p->getAlpha(), layers );
+				const Real opticalDepth = particleSunMapOpticalDepth( p->getAlpha() * fade, layers );
 				if (opticalDepth <= 0.0f)
 					continue;
 				const Coord3D *pos = p->getPosition();

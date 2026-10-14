@@ -2691,7 +2691,54 @@ Bool ParticleSystem::shouldCastGroundShadow( void ) const
 	if (m_isGroundAligned)
 		return FALSE;
 
-	return TRUE;
+	return getStealthFade() > 0.0f;
+}
+
+// ------------------------------------------------------------------------------------------------
+/** The smoke and fire on a stealthed unit or building go with it.  An enemy's that the local player
+ * cannot see draw nothing: retail stopped only the model's own bone systems, and a hidden base still
+ * burned and smoked in plain view.  The player's own stealthed one breathes with its stealth
+ * opacity, a third of it for smoke and a little over half for fire, beside the glass the cloak draws.
+ * Detected by the enemy, or not stealthed at all, it draws whole.  A slave follows its master, which
+ * carries the attachment.  Client drawing only; nothing goes back into the logic. */
+// ------------------------------------------------------------------------------------------------
+Real ParticleSystem::getStealthFade( void ) const
+{
+	const ParticleSystem *sys = this;
+	while (sys->m_masterSystem)
+		sys = sys->m_masterSystem;
+
+	const Drawable *draw = NULL;
+	if (sys->m_attachedToDrawableID != INVALID_DRAWABLE_ID)
+		draw = TheGameClient->findDrawableByID( sys->m_attachedToDrawableID );
+	else if (sys->m_attachedToObjectID != INVALID_ID)
+	{
+		// gone since the last particle update, which then destroys the system
+		const Object *obj = TheGameLogic->findObjectByID( sys->m_attachedToObjectID );
+		if (obj)
+			draw = obj->getDrawable();
+	}
+	if (draw == NULL)
+		return 1.0f;
+
+	switch (draw->getStealthLook())
+	{
+		case STEALTHLOOK_INVISIBLE:
+			return 0.0f;
+		case STEALTHLOOK_VISIBLE_FRIENDLY:
+		case STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED:
+			// Alpha tested particles take no fade (less alpha only cuts holes in them), and a
+			// multiplying one half faded is a grey smear, so those draw whole and not at all.
+			switch (m_shaderType)
+			{
+				case ADDITIVE:		return draw->getEffectiveOpacity() * 0.55f;
+				case ALPHA_TEST:	return 1.0f;
+				case MULTIPLY:		return 0.0f;
+				default:					return draw->getEffectiveOpacity() * 0.35f;
+			}
+		default:
+			return 1.0f;
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2735,7 +2782,7 @@ void ParticleSystem::updateGroundShadow( const ParticleShadowBlob *blob )
 	m_groundShadow->setSize( sizeX, sizeY );
 	m_groundShadow->setPosition( centerX, centerY,
 															 TheTerrainLogic ? TheTerrainLogic->getGroundHeight( centerX, centerY ) : 0.0f );
-	m_groundShadow->setOpacity( opacity );
+	m_groundShadow->setOpacity( REAL_TO_INT( opacity * getStealthFade() ) );
 }
 
 // ------------------------------------------------------------------------------------------------
