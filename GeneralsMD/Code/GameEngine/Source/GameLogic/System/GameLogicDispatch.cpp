@@ -2499,39 +2499,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, AIGroup *orderedGroup 
 		// --------------------------------------------------------------------------------------------
 		case GameMessage::MSG_SELF_DESTRUCT:
 		{
-			if (msg->getArgument(0)->boolean)
-			{
-				// transfer control to any living ally
-				// i is used after the loop; VC6 for-scope let it escape.
-				Int i;
-				for (i =0; i<ThePlayerList->getPlayerCount(); ++i)
-				{
-					if (i != msg->getPlayerIndex())
-					{
-						Player *otherPlayer = ThePlayerList->getNthPlayer(i);
-						if (thisPlayer->getRelationship(otherPlayer->getDefaultTeam()) == ALLIES &&
-							otherPlayer->getRelationship(thisPlayer->getDefaultTeam()) == ALLIES)
-						{
-							if (TheVictoryConditions->hasSinglePlayerBeenDefeated(otherPlayer))
-								continue;
-
-							// a living ally!  hooray!
-							otherPlayer->transferAssetsFromThat(thisPlayer);
-							thisPlayer->killPlayer(); // just to be safe (and to kill beacons etc that don't transfer)
-							break;
-						}
-					}
-				}
-				if (i == ThePlayerList->getPlayerCount())
-				{
-					// didn't find any allies.  die, loner!
-					thisPlayer->killPlayer();
-				}
-			}
-			else
-			{
-				thisPlayer->killPlayer();
-			}
+			thisPlayer->surrender(msg->getArgument(0)->boolean);
 			// There is no reason to do any notification here, it now takes place in the victory conditions.
 			// bonehead.
 			break;

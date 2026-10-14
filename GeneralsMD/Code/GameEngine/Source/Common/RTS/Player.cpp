@@ -2169,6 +2169,31 @@ void Player::setUnitsShouldHunt(Bool unitsShouldHunt, CommandSourceType source)
 }
 
 //=============================================================================
+void Player::surrender(Bool giveToAlly)
+{
+	if (giveToAlly)
+	{
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			Player *otherPlayer = ThePlayerList->getNthPlayer(i);
+			if (otherPlayer == this)
+				continue;
+			if (getRelationship(otherPlayer->getDefaultTeam()) != ALLIES ||
+				otherPlayer->getRelationship(getDefaultTeam()) != ALLIES)
+				continue;
+			if (TheVictoryConditions->hasSinglePlayerBeenDefeated(otherPlayer))
+				continue;
+
+			// a living ally!  hooray!
+			otherPlayer->transferAssetsFromThat(this);
+			break;
+		}
+	}
+	// Kills whatever did not transfer (beacons and the like), or everything when nobody took it.
+	killPlayer();
+}
+
+//=============================================================================
 void Player::killPlayer(void)
 {
 	for (PlayerTeamList::iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it) {
