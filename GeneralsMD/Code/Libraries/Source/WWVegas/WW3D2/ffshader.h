@@ -132,8 +132,8 @@ enum
 	DRAW_EFFECT_NONE = 0,
 	DRAW_EFFECT_OUTAGE = 1,		///< a building out of power: drained, cold, lights out, sparks
 	DRAW_EFFECT_EMP = 2,		///< anything an EMP disabled: arcs crawling over it
-	DRAW_EFFECT_CLOAK = 3,		///< own stealthed unit: what is behind it bent through it, a rim
-	DRAW_EFFECT_REVEALED = 4,	///< enemy stealthed unit a detector found: hot edges, scan lines
+	DRAW_EFFECT_CLOAK = 3,		///< own stealthed unit: what is behind it, gently bent, through its muted paint
+	DRAW_EFFECT_REVEALED = 4,	///< enemy stealthed unit a detector found: seen as heat
 	DRAW_EFFECT_COUNT = 5
 };
 
@@ -560,49 +560,60 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
-	"/* Own stealthed unit.  What is behind it shows through, bent by a slow ripple that swims over\n" \
-	"   the body and bends harder towards the outline, with a little of the unit itself left in so\n" \
-	"   its owner can still read what it is, and a cold rim.  Detected, the rim pulses amber.  The\n" \
-	"   alpha goes back up to the texel's own, because the shade already holds the mix. */\n" \
+	"/* Own stealthed unit, seen through like glass.  What is behind it shows through its body,\n" \
+	"   bent a few pixels by a slow, broad ripple that swims along it and bends a little more\n" \
+	"   towards the outline.  No tint: the scene keeps its colour, and the unit's own paint, drained\n" \
+	"   a little, sits in it at about half by the game's own stealth opacity, so the 2003 breathing\n" \
+	"   still shows; darker than that and a unit at play zoom was lost but for its shadow.  A soft\n" \
+	"   near-white fresnel edge holds the silhouette.  The ripple is measured in the world and moves\n" \
+	"   a fixed share of the screen, so a unit far out shimmers as gently as one up close and never\n" \
+	"   breaks into noise.  Detected (the strength is never below 0.6 then), the body warms and an\n" \
+	"   amber edge beats.  The alpha goes back up to the texel's own, because the shade already\n" \
+	"   holds the mix. */\n" \
 	"float4 effect_cloak(float4 current, float4 position)\n" \
 	"{\n" \
 	"    float3 world; float3 surface; float facing;\n" \
 	"    effect_surface(position, world, surface, facing);\n" \
 	"    float t = DrawEffectParameters.x;\n" \
+	"    float detected = DrawEffectParameters.y;\n" \
 	"    float opacity = max(DrawEffectParameters.w, 0.05);\n" \
-	"    float rim = pow(1.0 - facing, 1.5);\n" \
-	"    float swim_x = effect_noise(world * 0.6 + float3(t * 0.9, t * 0.5, t * 1.3)) - 0.5;\n" \
-	"    float swim_y = effect_noise(world * 0.6 + float3(5.2 - t * 0.7, 1.3, t * 1.1)) - 0.5;\n" \
+	"    float rim = pow(1.0 - facing, 2.0);\n" \
+	"    float swim_x = effect_noise(world * 0.12 + float3(t * 0.35, t * 0.2, t * 0.45)) - 0.5;\n" \
+	"    float swim_y = effect_noise(world * 0.12 + float3(7.3 - t * 0.3, 2.1, t * 0.4)) - 0.5;\n" \
 	"    float2 screen = 1.0 / ShadowViewport.xy;\n" \
-	"    float2 bend = float2(swim_x, swim_y) * (0.016 + 0.03 * rim) * screen.y + surface.xy * rim * 0.008 * screen.y;\n" \
+	"    float2 bend = float2(swim_x, swim_y) * (0.008 + 0.006 * rim) * screen.y;\n" \
 	"    int2 at = int2(clamp(position.xy + bend, float2(0.0, 0.0), screen - 1.0));\n" \
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
-	"    float band = smoothstep(0.85, 1.0, sin(world.z * 0.5 - t * 4.0)) * 0.35;\n" \
-	"    float own = 0.4;\n" \
-	"    float3 edge = lerp(float3(0.45, 0.85, 1.0), float3(1.0, 0.55, 0.15), DrawEffectParameters.y);\n" \
-	"    float edge_gain = 0.9 + 0.6 * DrawEffectParameters.y * (0.5 + 0.5 * sin(t * 9.0));\n" \
-	"    current.rgb = lerp(behind * float3(0.85, 0.95, 1.15), current.rgb, own)\n" \
-	"        + (rim * edge_gain + band + 0.08) * edge;\n" \
+	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
+	"    float3 own = lerp(grey.xxx, current.rgb, 0.7);\n" \
+	"    float3 glass = lerp(behind, own, 0.3 + 0.35 * opacity) + rim * 0.4 * float3(0.92, 0.96, 1.0) + 0.04;\n" \
+	"    float found = step(0.01, detected);\n" \
+	"    float beat = 0.55 + 0.45 * sin(t * 6.0);\n" \
+	"    float3 amber = float3(1.0, 0.55, 0.15);\n" \
+	"    glass = lerp(glass, glass * amber * 1.4, found * 0.35) + found * (rim * 1.2 + 0.08) * beat * amber;\n" \
+	"    current.rgb = glass;\n" \
 	"    current.a = saturate(current.a / opacity);\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
-	"/* Enemy stealthed unit a detector found.  The paint drains to a dull warm grey, the outline\n" \
-	"   burns red-orange, scan lines run up it in world height, and each sweep of the detector\n" \
-	"   (the strength, one at the sweep and falling after) brightens all of it. */\n" \
+	"/* Enemy stealthed unit a detector found, seen as heat, the way the 2003 heat vision pass meant\n" \
+	"   it.  The paint's own brightness runs up a thermal ramp, dark red through orange to a pale hot\n" \
+	"   yellow, so the shape still reads, the outline burns, and one slow broad sweep climbs it.  Each\n" \
+	"   sweep of the detector (the strength, one at the sweep and falling after) brightens all of\n" \
+	"   it.  No fine lines: drawn a few pixels high, a zoomed out unit turned them into stripes. */\n" \
 	"float4 effect_revealed(float4 current, float4 position)\n" \
 	"{\n" \
 	"    float3 world; float3 surface; float facing;\n" \
 	"    effect_surface(position, world, surface, facing);\n" \
 	"    float t = DrawEffectParameters.x;\n" \
 	"    float pulse = DrawEffectParameters.y;\n" \
-	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
-	"    float3 heat = float3(1.0, 0.36, 0.10);\n" \
+	"    float heat = saturate(dot(current.rgb, float3(0.299, 0.587, 0.114)) * 1.3 + 0.1);\n" \
+	"    float3 ramp = lerp(float3(0.30, 0.04, 0.02), float3(1.0, 0.42, 0.08), smoothstep(0.0, 0.55, heat));\n" \
+	"    ramp = lerp(ramp, float3(1.0, 0.86, 0.55), smoothstep(0.55, 1.0, heat));\n" \
 	"    float rim = pow(1.0 - facing, 2.0);\n" \
-	"    float scan = smoothstep(0.80, 1.0, frac(world.z * 0.4 - t * 1.5));\n" \
-	"    float sweep = smoothstep(0.96, 1.0, sin(world.z * 0.08 - t * 2.2));\n" \
-	"    float glow = (rim * 1.7 + scan * 0.35 + sweep * 0.6 + 0.12) * (0.55 + 0.75 * pulse);\n" \
-	"    current.rgb = grey * float3(0.85, 0.62, 0.52) * 0.85 + heat * glow;\n" \
+	"    float sweep = smoothstep(0.9, 1.0, sin(world.z * 0.06 - t * 1.8));\n" \
+	"    float gain = 0.6 + 0.6 * pulse;\n" \
+	"    current.rgb = ramp * gain + float3(1.0, 0.40, 0.12) * (rim * 0.9 + sweep * 0.35) * gain;\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n"
