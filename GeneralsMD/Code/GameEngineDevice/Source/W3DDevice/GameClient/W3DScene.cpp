@@ -428,6 +428,33 @@ Bool RTS3DScene::castRay(RayCollisionTestClass & raytest, Bool testAll, Int coll
 }
 
 //=============================================================================
+// posedPartsInView
+//=============================================================================
+/** A model whose animation carries it out of its bind pose (W3DModelDraw's animLeavesBindPose) is
+  * in view when any of its parts is, as they stand now.  A culled model is not drawn, and drawing
+  * is what moves its animation on, so setting its transform again (which marks the hierarchy stale)
+  * and asking for a bone poses it at the current frame first. */
+//=============================================================================
+static Bool posedPartsInView(RenderObjClass *robj, CameraClass *camera)
+{
+	const DrawableInfo *drawInfo = (const DrawableInfo *)robj->Get_User_Data();
+	if (drawInfo == NULL || !drawInfo->m_animLeavesBindPose || robj->Class_ID() != RenderObjClass::CLASSID_HLOD)
+		return FALSE;
+
+	const Matrix3D transform = robj->Get_Transform();
+	robj->Set_Transform(transform);
+	robj->Get_Bone_Transform(0);
+	Bool inView = FALSE;
+	for (Int i = 0; i < robj->Get_Num_Sub_Objects() && !inView; ++i)
+	{
+		RenderObjClass *part = robj->Get_Sub_Object(i);
+		inView = !camera->Cull_Sphere(part->Get_Bounding_Sphere());
+		part->Release_Ref();
+	}
+	return inView;
+}
+
+//=============================================================================
 // RTS3DScene::Visibility_Check
 //=============================================================================
 /** Custom visibility check method for the RTS3DScene, we can put optimized
@@ -482,7 +509,7 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 					// The same test the main pass hides a drawable by, or a unit under the fog of war,
 					// or a building standing in for its own ghost, shows up in the water and nowhere else.
 					Bool hidden = robj->Is_Hidden() || draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud();
-					robj->Set_Visible(!hidden && draw->getDrawsInMirror() && !camera->Cull_Sphere(robj->Get_Bounding_Sphere()));
+					robj->Set_Visible(!hidden && draw->getDrawsInMirror() && (!camera->Cull_Sphere(robj->Get_Bounding_Sphere()) || posedPartsInView(robj, camera)));
 				}
 			}
 			else
@@ -510,7 +537,7 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 				robj->Set_Visible(false);
 			} else {
 
-				bool isVisible=!camera->Cull_Sphere(robj->Get_Bounding_Sphere());
+				bool isVisible=!camera->Cull_Sphere(robj->Get_Bounding_Sphere()) || posedPartsInView(robj, camera);
 
 				if (isVisible)
 				{	//need to keep track of occluders and ocludees for subsequent code.

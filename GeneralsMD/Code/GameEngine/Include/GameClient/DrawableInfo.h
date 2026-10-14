@@ -48,12 +48,13 @@ struct DrawableInfo
 		ERF_DELAYED_RENDER = ERF_IS_TRANSLUCENT|ERF_POTENTIAL_OCCLUDEE, 
 	};
 
-	DrawableInfo(void) : m_shroudStatusObjectID(INVALID_ID), m_drawable(NULL), m_ghostObject(NULL), m_flags(ERF_IS_NORMAL) {}
+	DrawableInfo(void) : m_shroudStatusObjectID(INVALID_ID), m_drawable(NULL), m_ghostObject(NULL), m_flags(ERF_IS_NORMAL), m_animLeavesBindPose(FALSE) {}
 
 	ObjectID m_shroudStatusObjectID;	///<since we sometimes have drawables without objects, this points to a parent object from which we pull shroud status.
 	Drawable *m_drawable;	///<pointer back to drawable containing this DrawableInfo
 	GhostObject *m_ghostObject;	///<pointer to ghostObject for this drawable used for fogged versions.
 	Int m_flags;	///<extra render settings flags that are tied to render objects with drawables.
+	Bool m_animLeavesBindPose;	///<the model's animation carries it out of its bind-pose bounds, so culling tests the posed parts too
 };
 
 #endif // _DRAWABLEINFO_H_

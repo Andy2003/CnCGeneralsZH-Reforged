@@ -2474,6 +2474,30 @@ Real W3DModelDraw::getCurrentAnimFraction() const
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Whether an animation moves a bone further than the model's bind pose reaches.  W3D culls a model
+	* by its bind pose, and the cinematic transports fly their whole route in their bones: the plane
+	* GLA01 ends on (CINE_CPlane) climbs 1400 units away from the runway spot it stands on, and dropped
+	* out of the picture mid-air the moment the camera stopped looking at that spot. */
+//-------------------------------------------------------------------------------------------------
+static Bool animLeavesBindPose(HAnimClass *anim, RenderObjClass *robj)
+{
+	const Real reach = robj->Get_Bounding_Sphere().Radius;
+	const Int lastFrame = anim->Get_Num_Frames() - 1;
+	for (Int pivot = 1; pivot < anim->Get_Num_Pivots(); ++pivot)
+	{
+		if (!anim->Is_Node_Motion_Present(pivot))
+			continue;
+		Vector3 first, middle, last;
+		anim->Get_Translation(first, pivot, 0.0f);
+		anim->Get_Translation(middle, pivot, lastFrame * 0.5f);
+		anim->Get_Translation(last, pivot, (Real)lastFrame);
+		if ((middle - first).Length() > reach || (last - first).Length() > reach)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction)
 {
 	if (!m_curState)
@@ -2538,6 +2562,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 			}
 
 			m_renderObject->Set_Animation(animHandle, startFrame, m_curState->m_mode);
+			getDrawable()->getDrawableInfo()->m_animLeavesBindPose = animLeavesBindPose(animHandle, m_renderObject);
 			REF_PTR_RELEASE(animHandle);
 			animHandle = NULL;
 
