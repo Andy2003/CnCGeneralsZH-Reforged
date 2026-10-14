@@ -1620,6 +1620,7 @@ struct SpectatorStats
 	Int team;
 	Int networth;		///< cash plus the build cost of everything standing
 	Int cash;
+	Bool unlimited;	///< Unlimited starting cash: cash is the fixed purse, shown as the word and kept out of networth
 	Int income;			///< money earned per minute of match, averaged over the whole of it
 	Int army;				///< the build cost of everything standing that is not a structure
 	Int kills;			///< units and buildings destroyed
@@ -1680,7 +1681,8 @@ static std::vector< SpectatorStats > gatherSpectatorStats( const SpectatorStat &
 		stats.player = player;
 		stats.team = -1;
 		stats.cash = player->getMoney()->countMoney();
-		stats.networth = stats.cash;
+		stats.unlimited = player->getMoney()->isUnlimited();
+		stats.networth = stats.unlimited ? 0 : stats.cash;
 		stats.income = frame > 0 ? (Int)( (Int64)score->getTotalMoneyEarned() * FRAMES_PER_MINUTE / frame ) : 0;
 		stats.army = 0;
 		stats.kills = score->getTotalUnitsDestroyed() + score->getTotalBuildingsDestroyed();
@@ -2504,11 +2506,17 @@ void InGameUI::update( void )
 		moneyPlayer = ThePlayerList->getLocalPlayer();
 	if( moneyPlayer)
 	{
-		Int currentMoney = moneyPlayer->getMoney()->countMoney();
+		// -2 stands for Unlimited, apart from the -1 that a reset leaves, so switching the observed
+		// player between an unlimited purse and a counted one still rewrites the gadget
+		const Bool unlimited = moneyPlayer->getMoney()->isUnlimited();
+		Int currentMoney = unlimited ? -2 : (Int)moneyPlayer->getMoney()->countMoney();
 		if( m_lastMoneyDisplayed != currentMoney )
 		{
 			UnicodeString buffer;
-			buffer.format( TheGameText->fetch( "GUI:ControlBarMoneyDisplay" ), currentMoney );
+			if( unlimited )
+				buffer = TheGameText->fetch( "GUI:StartingMoneyUnlimited" );
+			else
+				buffer.format( TheGameText->fetch( "GUI:ControlBarMoneyDisplay" ), currentMoney );
 			GadgetStaticTextSetText( moneyWin, buffer );
 			m_lastMoneyDisplayed = currentMoney;
 
@@ -8330,7 +8338,7 @@ void InGameUI::layOutBroadcast( const std::vector< SpectatorStats > &players, co
 			row.color = clientPlayerColor( stats.player );
 			row.name = broadcastNameText( "name" + seat, stats.player, BROADCAST_CARD_NAME_POINTS[ step ], BROADCAST_CARD_NAME_WIDEST );
 			row.side = broadcastText( "side" + seat, broadcastSide( stats.player ), BROADCAST_WORDS, detailPoints, FALSE );
-			row.cash = broadcastText( "cash" + seat, broadcastNumber( "$", stats.cash ), BROADCAST_NUMBERS, detailPoints, TRUE );
+			row.cash = broadcastText( "cash" + seat, stats.unlimited ? TheGameText->fetch( "GUI:StartingMoneyUnlimited" ) : broadcastNumber( "$", stats.cash ), BROADCAST_NUMBERS, detailPoints, TRUE );
 			row.army = broadcastText( "army" + seat, broadcastNumber( "$", stats.army ), BROADCAST_NUMBERS, detailPoints, TRUE );
 			row.name->getSize( &width, &height );
 			if( l.compact )

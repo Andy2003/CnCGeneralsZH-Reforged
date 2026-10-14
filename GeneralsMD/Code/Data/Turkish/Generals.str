@@ -15513,6 +15513,10 @@ GUI:CheatPower
 "Sınırsız elektrik"
 END
 
+GUI:StartingMoneyUnlimited
+"Sınırsız"
+END
+
 GUI:CheatNoCooldown
 "Bekleme yok"
 END

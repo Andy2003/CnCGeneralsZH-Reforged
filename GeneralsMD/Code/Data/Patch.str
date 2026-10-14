@@ -1066,6 +1066,10 @@ GUI:CheatPower
 "Unlimited power"
 END
 
+GUI:StartingMoneyUnlimited
+"Unlimited"
+END
+
 GUI:CheatNoCooldown
 "No cooldowns"
 END

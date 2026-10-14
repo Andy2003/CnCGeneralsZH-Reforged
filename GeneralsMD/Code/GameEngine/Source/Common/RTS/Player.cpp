@@ -495,7 +495,6 @@ void Player::init(const PlayerTemplate* pt)
 		m_nightColor = m_color;
 
 		m_money = *pt->getMoney();
-		m_money.setPlayerIndex(getPlayerIndex());
 
 		m_handicap = *pt->getHandicap();
 
@@ -504,12 +503,15 @@ void Player::init(const PlayerTemplate* pt)
       if ( TheGameInfo )
       {
         m_money = TheGameInfo->getStartingCash();
+        m_money.applyUnlimited();
       }
       else
       {
   			m_money = TheGlobalData->m_defaultStartingCash;
       }
 		}
+		// after the starting cash, whose copy would put every purse back on player 0's sounds and stats
+		m_money.setPlayerIndex(getPlayerIndex());
 
 		m_playerDisplayName.clear();
 		m_playerName.clear();

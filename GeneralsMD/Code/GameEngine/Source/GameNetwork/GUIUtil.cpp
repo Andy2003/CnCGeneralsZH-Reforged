@@ -405,6 +405,8 @@ void PopulateTeamComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGa
 // -----------------------------------------------------------------------------
 static UnicodeString formatMoneyForStartingCashComboBox( const Money & moneyAmount )
 {
+  if ( moneyAmount.countMoney() == Money::UNLIMITED )
+    return TheGameText->fetch( "GUI:StartingMoneyUnlimited" );
   UnicodeString rtn;
   rtn.format( TheGameText->fetch( "GUI:StartingMoneyFormat" ), moneyAmount.countMoney() );
   return rtn;
