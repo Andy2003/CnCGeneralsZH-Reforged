@@ -140,9 +140,18 @@ void ArchiveFileSystem::addToTree(ArchivedDirectoryInfo &root, const ArchiveFile
 
 	archiveFile->getFileListInDirectory(AsciiString(""), AsciiString(""), AsciiString("*"), filenameList, TRUE);
 
+	// a mod's maps never go in, merged or kept apart: the maps are ours (FileSystem::isMapPath)
+	const Bool modArchive = modLayerOf(archiveFilename).isNotEmpty();
+	Int mapsIgnored = 0;
+
 	FilenameListIter it = filenameList.begin();
 
 	while (it != filenameList.end()) {
+		if (modArchive && FileSystem::isMapPath(*it)) {
+			++mapsIgnored;
+			it++;
+			continue;
+		}
 		// add this filename to the directory tree.
 		AsciiString path = *it;
 		path.toLower();
@@ -179,6 +188,8 @@ void ArchiveFileSystem::addToTree(ArchivedDirectoryInfo &root, const ArchiveFile
 
 		it++;
 	}
+	if (mapsIgnored > 0)
+		DEBUG_LOG(("ArchiveFileSystem - %d map files in %s are ignored, the maps are ours\n", mapsIgnored, archiveFilename.str()));
 }
 
 /// the fork's upscaled art goes by its file name, ReforgedTextures.big and the like
@@ -508,8 +519,18 @@ void ArchiveFileSystem::getFileListInDirectory(const AsciiString& currentDirecto
 {
 	ArchiveFileMap::const_iterator it = m_archiveFileMap.begin();
 	while (it != m_archiveFileMap.end()) {
-		if (inFocus(it->first))
+		if (inFocus(it->first) && modLayerOf(it->first).isEmpty())
 			it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
+		else if (inFocus(it->first))
+		{
+			FilenameList modded;
+			it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, modded, searchSubdirectories);
+			for (FilenameListIter name = modded.begin(); name != modded.end(); ++name)
+			{
+				if (!FileSystem::isMapPath(*name))
+					filenameList.insert(*name);
+			}
+		}
 		it++;
 	}
 }

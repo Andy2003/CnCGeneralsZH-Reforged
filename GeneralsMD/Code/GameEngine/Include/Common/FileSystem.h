@@ -150,6 +150,10 @@ public:
 	/// .wnd layouts ...); see the definition for how the set is decided.
 	static Bool isForkOwnedPath(const AsciiString& filename);
 
+	/// TRUE for a game path under "Maps\": the maps are always ours, a mod's own maps are never listed or
+	/// loaded, so every machine in a match reads the same map whatever mods it runs
+	static Bool isMapPath(const AsciiString& filename);
+
 	/// -modfactions: FILE_FOCUS_RETAIL or a -mod index makes every read see that set of files alone,
 	/// so retail and each mod load their factions one after another; FILE_FOCUS_ALL is the merged view.
 	void setFocus(Int focus);

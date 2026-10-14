@@ -437,7 +437,9 @@ void FileSystem::getFileListInDirectory(const AsciiString& directory, const Asci
 		TheLocalFileSystem->getFileListInDirectory(AsciiString(""), modDirectory, searchName, modded, searchSubdirectories);
 		for (FilenameListIter it = modded.begin(); it != modded.end(); ++it)
 		{
-			filenameList.insert(AsciiString(it->str() + modDir.getLength()));
+			AsciiString gamePath = it->str() + modDir.getLength();
+			if (!isMapPath(gamePath))
+				filenameList.insert(gamePath);
 		}
 	}
 }
@@ -454,7 +456,7 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 	// a folder is not a file: "" or "Maps\" would otherwise find the mod folder itself, which exists
 	// -modfactions reaches a mod's files only by its focus or its "M<n>~" names, so here only the
 	// patches given before any -mod go over retail's
-	if (TheGlobalData == NULL || isAbsolutePath(filename) || filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/"))
+	if (TheGlobalData == NULL || isAbsolutePath(filename) || filename.isEmpty() || filename.endsWith("\\") || filename.endsWith("/") || isMapPath(filename))
 	{
 		return AsciiString();
 	}
@@ -507,6 +509,16 @@ AsciiString FileSystem::modLooseFile(const AsciiString& filename, Bool *inModArc
 		*inModArchive = archived;
 	}
 	return loose;
+}
+
+//============================================================================
+// FileSystem::isMapPath
+//============================================================================
+Bool FileSystem::isMapPath(const AsciiString& filename)
+{
+	// A mod's Maps.big carries its own edits of the stock maps under the same names (Contra's Twilight
+	// Flame is not ours), and a lobby has to agree on one file: retail's and the fork's maps win always.
+	return strncasecmp(filename.str(), "maps", 4) == 0 && (filename.str()[4] == '\\' || filename.str()[4] == '/');
 }
 
 //============================================================================
