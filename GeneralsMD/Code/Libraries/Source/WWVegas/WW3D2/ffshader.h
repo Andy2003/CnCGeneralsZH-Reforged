@@ -572,8 +572,9 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"   about three quarters at the outline, where a soldier's round body has most of its faces and\n" \
 	"   a building's flat walls have few: a haze rather than a white edge, darkening bright ground as\n" \
 	"   much as it lifts dark ground.  The unit's own paint is mixed in by the game's stealth opacity,\n" \
-	"   so the 2003 breath goes solid at the top of the pulse and back to glass at the bottom.  Glass\n" \
-	"   is the bent scene with alpha 1: dropping alpha showed the unbent ground through a ghost, and\n" \
+	"   so the 2003 breath goes solid at the top of the pulse and back to glass at the bottom.  At\n" \
+	"   the solid end the output is that paint, no bend and no mute, so going invisible matches the\n" \
+	"   frame before.  Glass is the bent scene with alpha 1: dropping alpha showed the unbent ground through a ghost, and\n" \
 	"   meshes this program does not dress (additive glows, a refused scene copy) keep the stealth\n" \
 	"   opacity.  The bend eases off as the paint comes back, full at the glass end of the pulse.  Detected (the strength is never below 0.6\n" \
 	"   then), the whole body beats amber as well as its edge: a big flat building has almost no\n" \
@@ -602,8 +603,9 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    int2 at = int2(clamp(position.xy + bend, float2(0.0, 0.0), screen - 1.0));\n" \
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
-	"    float3 own = lerp(grey.xxx, current.rgb, 0.7);\n" \
-	"    float3 glass = lerp(behind, own, solid);\n" \
+	"    float3 muted = lerp(grey.xxx, current.rgb, 0.7);\n" \
+	"    float3 painted = lerp(muted, current.rgb, solid);\n" \
+	"    float3 glass = lerp(behind, painted, solid);\n" \
 	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), haze * (0.12 + 0.65 * rim));\n" \
 	"    float found = step(0.01, detected);\n" \
 	"    float beat = 0.55 + 0.45 * sin(t * 6.0);\n" \

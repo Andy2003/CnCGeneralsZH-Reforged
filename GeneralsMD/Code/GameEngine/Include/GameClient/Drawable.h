@@ -399,16 +399,18 @@ public:
 	StealthLookType getStealthLook() const { return m_stealthLook; }
 	StealthLookType getStealthDrawnLook() const { return m_stealthDrawnLook; }
 	Real getStealthFade() const { return m_stealthFade; }
-	// 1 is own paint with no bend, the breath (about a half to one) is glass.  Fade 0 of a
-	// cloak-in is solid; fade 0 of a decloak is solid too.  The shader keeps coverage: this is
-	// the mix, not alpha.
+	// 1 is own paint with no bend, the stealth floor (about a half) is glass.  Cloak-in fade 0
+	// is solid.  The mix goes to that floor so the first frames still have travel while the
+	// pulse has not left 1.0; once faded, the 2003 breath owns it.  Decloak: fade 1 is the
+	// pulse, fade 0 is solid.  The shader keeps coverage: this is the mix, not alpha.
 	Real getStealthSolid() const
 	{
 		const Real breath = getEffectiveOpacity();
 		const Real fade = getStealthFade();
 		if( getStealthLook() == STEALTHLOOK_NONE )
 			return breath + ( 1.0f - breath ) * ( 1.0f - fade );
-		return 1.0f - fade * ( 1.0f - breath );
+		const Real dest = m_stealthOpacity + ( breath - m_stealthOpacity ) * fade;
+		return 1.0f - fade * ( 1.0f - dest );
 	}
 
 	void updateDrawableClipStatus( UnsignedInt shotsRemaining, UnsignedInt maxShots, WeaponSlotType slot ); ///< This will do the show/hide work if ProjectileBoneFeedbackEnabled is set.
