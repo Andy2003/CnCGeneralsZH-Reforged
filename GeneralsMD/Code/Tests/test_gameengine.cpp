@@ -4181,8 +4181,8 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 	CHECK_EQ( shown[ 12 ], 16 );
 	CHECK_EQ( shown[ 13 ], 17 );
 
-	/* Force Attack is Ctrl: slot 12's grid H and the English label's F both stay off the button */
-	CHECK_EQ( HotKeyManager::playerButtonKey( AsciiString( "Command_ForceAttack" ), 'F', 11,
+	/* Force Attack is Ctrl: the English label's F stays off the button */
+	CHECK_EQ( HotKeyManager::playerButtonKey( AsciiString( "Command_ForceAttack" ), 'F',
 		GUI_COMMAND_FORCE_ATTACK ), 0 );
 }
 
@@ -4194,78 +4194,6 @@ TEST(metamap_format_chord_names_the_hold)
 	CHECK( MetaMap_formatChord( MK_NONE, ALT, COMMANDUSABLE_GAME ) == UnicodeString( u"Alt" ) );
 	CHECK( MetaMap_formatChord( MK_NONE, CTRL, COMMANDUSABLE_NONE ).isEmpty() );
 	CHECK( MetaMap_chordLabel( GameMessage::MSG_META_BEGIN_FORCEATTACK ) == UnicodeString( u"Ctrl" ) );
-}
-
-/* Grid keys leave windows 11 and 13 keyless.  The USA War Factory's TOW upgrade in 11 moves to the
-   first free keyed window, leftmost first; attack move in 11 has its own A and is never unkeyed */
-TEST(controlbar_grid_packs_keyless_buttons_into_keyed_windows)
-{
-	enum { SLOTS = MAX_COMMANDS_PER_SET, WINDOWS = 14 };
-	Bool keyed[ SLOTS ];
-	Bool unkeyed[ SLOTS ];
-	Int shown[ SLOTS ];
-	for( Int slot = 0; slot < SLOTS; slot++ )
-	{
-		keyed[ slot ] = slot < WINDOWS && slot != 10 && slot != 12;
-		unkeyed[ slot ] = FALSE;
-		shown[ slot ] = -1;
-	}
-	// eight units in 1-8, TOW in 11, rally point in 13 (its own Y), sell in 14
-	for( Int slot = 0; slot < 8; slot++ )
-		shown[ slot ] = slot;
-	shown[ 10 ] = 10;
-	shown[ 12 ] = 12;
-	shown[ 13 ] = 13;
-	unkeyed[ 10 ] = TRUE;
-	ControlBar_packKeyedSlots( keyed, unkeyed, SLOTS, shown );
-	CHECK_EQ( shown[ 8 ], 10 );
-	CHECK_EQ( shown[ 10 ], -1 );
-	CHECK_EQ( shown[ 12 ], 12 );
-	CHECK_EQ( shown[ 13 ], 13 );
-
-	// a full keyed block leaves the button where it is
-	for( Int slot = 0; slot < WINDOWS; slot++ )
-		shown[ slot ] = slot;
-	ControlBar_packKeyedSlots( keyed, unkeyed, SLOTS, shown );
-	for( Int slot = 0; slot < WINDOWS; slot++ )
-		CHECK_EQ( shown[ slot ], slot );
-}
-
-/* A bar without attack move, guard or rally point lends their letters to the keyless places 11 and
-   13; a unit's bar, which has them, keeps A and G on its own orders */
-TEST(grid_keyless_places_borrow_the_fixed_letters_a_bar_has_no_order_for)
-{
-	enum { SLOTS = MAX_COMMANDS_PER_SET, PLACES = 14 };
-	AsciiString names[ SLOTS ];
-	Int types[ SLOTS ];
-	WideChar lent[ PLACES ];
-	for( Int slot = 0; slot < SLOTS; slot++ )
-		types[ slot ] = GUI_COMMAND_NONE;
-
-	// War Factory: units, TOW, rally point, sell
-	names[ 0 ] = "Command_ConstructAmericaTankCrusader";	types[ 0 ] = GUI_COMMAND_UNIT_BUILD;
-	names[ 10 ] = "Command_UpgradeAmericaTOWMissile";			types[ 10 ] = GUI_COMMAND_OBJECT_UPGRADE;
-	names[ 12 ] = "Command_SetRallyPoint";								types[ 12 ] = GUI_COMMAND_SET_RALLY_POINT;
-	names[ 13 ] = "Command_Sell";													types[ 13 ] = GUI_COMMAND_SELL;
-	HotKeyManager::gridLentKeys( names, types, SLOTS, lent );
-	CHECK_EQ( (Int)lent[ 10 ], (Int)'A' );
-	CHECK_EQ( (Int)lent[ 12 ], (Int)'G' );
-	for( Int slot = 0; slot < PLACES; slot++ )
-		if( slot != 10 && slot != 12 )
-			CHECK_EQ( (Int)lent[ slot ], 0 );
-
-	// a unit with attack move, guard and stop: A and G are its own, the places borrow what is left
-	for( Int slot = 0; slot < SLOTS; slot++ )
-	{
-		names[ slot ].clear();
-		types[ slot ] = GUI_COMMAND_NONE;
-	}
-	names[ 10 ] = "Command_AttackMove";	types[ 10 ] = GUI_COMMAND_ATTACK_MOVE;
-	names[ 12 ] = "Command_Guard";			types[ 12 ] = GUI_COMMAND_GUARD;
-	names[ 13 ] = "Command_Stop";				types[ 13 ] = GUI_COMMAND_STOP;
-	HotKeyManager::gridLentKeys( names, types, SLOTS, lent );
-	CHECK_EQ( (Int)lent[ 12 ], (Int)'Y' );
-	CHECK_EQ( (Int)lent[ 10 ], (Int)'V' );
 }
 
 TEST(controlbar_stance_key_takes_what_the_buttons_leave)

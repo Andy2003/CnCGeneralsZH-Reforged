@@ -441,25 +441,6 @@ Bool ControlBar_forceFires( const Object *obj )
 }
 
 //-------------------------------------------------------------------------------------------------
-void ControlBar_packKeyedSlots( const Bool *keyed, const Bool *unkeyed, Int count, Int *shown )
-{
-	for( Int from = 0; from < count; from++ )
-	{
-		if( !unkeyed[ from ] || shown[ from ] < 0 )
-			continue;
-		for( Int to = 0; to < count; to++ )
-		{
-			if( keyed[ to ] && shown[ to ] < 0 )
-			{
-				shown[ to ] = shown[ from ];
-				shown[ from ] = -1;
-				break;
-			}
-		}
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
 void ControlBar_orderKeyPlaces( const Int *places, Int count, Bool fights, Int *keys )
 {
 	for( Int key = 0; key < ORDER_KEY_EXTRAS; key++ )
@@ -4622,20 +4603,16 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	// the key is the one the player gave the button on the launcher's Hotkeys page, or else the
 	// game's own, the letter after the '&' in the button's label - the English label's in every
 	// language, so a Turkish or German player presses what an English one does - and the button
-	// wears it in its top left corner.  With grid keys on, a command bar button's key is its place.
+	// wears it in its top left corner.
 	if( TheHotKeyManager )
 	{
-		Int barSlot = -1;
-		for( Int slot = 0; slot < MAX_COMMANDS_PER_SET; slot++ )
-			if( m_commandWindows[ slot ] == button )
-				barSlot = slot;
 		// Force Attack wears the BEGIN_FORCEATTACK hold from MetaMap (Ctrl until the player
 		// rebinds it on the launcher's Command bar tab).  Showing H or F on the cameo would
 		// steal that letter and lie about the key.  Do not addHotKey it: the hold is already
 		// MSG_META_BEGIN_FORCEATTACK, and binding the button to that key would toggle on every press.
 		const Bool forceAttack = commandButton->getCommandType() == GUI_COMMAND_FORCE_ATTACK;
 		const WideChar letter = forceAttack ? 0 : HotKeyManager::playerButtonKey( commandButton->getName(),
-			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0, barSlot,
+			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0,
 			commandButton->getCommandType() );
 		if( forceAttack )
 		{

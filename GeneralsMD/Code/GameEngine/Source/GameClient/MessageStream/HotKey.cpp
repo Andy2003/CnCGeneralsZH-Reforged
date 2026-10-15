@@ -185,7 +185,6 @@ void HotKeyManager::init( void )
 void HotKeyManager::reset( void )
 {
 	m_hotKeyMap.clear();
-	lendFixedKeys( NULL, NULL, 0 );
 }
 
 static Bool ownsFixedKey( GameWindow *win, const AsciiString& key );
@@ -330,29 +329,13 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 	* kept for the whole run, so it lives outside the manager, which every game client rebuilds. */
 static std::map< std::string, WideChar > s_playerButtonKeys;
 
-/** Grid keys (Hotkeys.ini's CommandBarGrid), by command bar slot: ControlBar.wnd's ButtonCommand01
-	* to 14 stand two rows of seven read down the columns, and take the twelve letters of the Q W E R T
-	* Y / A S D F G H / Z X C V B N block that are no GRID_FIXED_KEYS.  Q W E R T top the first five
-	* columns, Z X D F B under them, each under its own column where the fixed A, S and G leave a gap;
-	* the sixth column is H under attack move's place (slot 11) and the seventh N, sell's key, under
-	* the rally point's (slot 13).  Those two places have no key of their own: a fixed order standing
-	* there shows its own letter, and on a bar without such an order the place borrows the free fixed
-	* letter (HotKeyManager::lendFixedKeys).  The launcher's Hotkeys page draws the same table
-	* (hotkeys.js, GRID_KEYS). */
-static const WideChar GRID_KEYS[] = { 'Q', 'Z', 'W', 'X', 'E', 'D', 'R', 'F', 'T', 'B', 0, 'H', 0, 'N' };
-static const Int GRID_KEY_COUNT = sizeof( GRID_KEYS ) / sizeof( GRID_KEYS[ 0 ] );
-static Bool s_commandGrid = FALSE;
-
 /** The owner's fixed keys, 2026-10-12, on every bar: A attack move, S stop, G guard, Y rally
 	* point, V evacuate, N sell, C combat drop, and H for land mines, camo netting and the GLA's fake
 	* and real switches, which go by button name.  No button keeps one of these letters from its
 	* label; the player may give one to any button on the launcher's Hotkeys page, and on a bar where
-	* the fixed order stands too, the order gets the key (addHotKey).
-	* With grid keys on only GRID_FIXED_KEYS hold, on any bar and slot; sell and the H buttons take
-	* their place's key.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS and
-	* GRID_FIXED_LETTERS). */
+	* the fixed order stands too, the order gets the key (addHotKey).  The launcher holds the same
+	* table (hotkeys.js, FIXED_KEYS). */
 static const WideChar FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'N', 'C', 'H' };
-static const WideChar GRID_FIXED_KEYS[] = { 'A', 'S', 'G', 'Y', 'V', 'C' };
 static const char *const FIXED_H_BUTTONS[] =
 {
 	"command_upgradechinamines", "command_upgradeempmines", "command_upgradecamonetting", "command_upgradeglacamonetting",
@@ -461,11 +444,9 @@ static Bool isOneOf( WideChar letter, const WideChar *letters, Int count )
 }
 
 //-----------------------------------------------------------------------------
-WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
-																				 Int commandType )
+WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int commandType )
 {
-	// Force Attack is Ctrl.  Slot 12's grid letter is H, the English label's is F; neither is
-	// the key, and neither may bind the button.
+	// Force Attack is Ctrl.  The English label's F is not the key and may not bind the button.
 	if( commandType == GUI_COMMAND_FORCE_ATTACK )
 		return 0;
 	AsciiString lower = button;
@@ -473,12 +454,6 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 	Int ownMod = -1;
 	const std::string bare = withoutModPrefix( lower.str(), &ownMod );
 	const WideChar fixed = fixedButtonKey( AsciiString( bare.c_str() ), commandType );
-	if( s_commandGrid && barSlot >= 0 )
-	{
-		if( fixed != 0 && isOneOf( fixed, GRID_FIXED_KEYS, (Int)( sizeof( GRID_FIXED_KEYS ) / sizeof( GRID_FIXED_KEYS[ 0 ] ) ) ) )
-			return fixed;
-		return gridSlotKey( barSlot );
-	}
 	if( fixed != 0 )
 		return fixed;
 
@@ -490,76 +465,12 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 	// still takes it first (addHotKey)
 	if( !chosen && isOneOf( letter, FIXED_KEYS, (Int)( sizeof( FIXED_KEYS ) / sizeof( FIXED_KEYS[ 0 ] ) ) ) )
 		return 0;
-	// a button off the bar gives a grid letter up to the bar
-	if( s_commandGrid && isOneOf( letter, GRID_KEYS, GRID_KEY_COUNT ) )
-		return 0;
 	return letter;
 }
 
 //-----------------------------------------------------------------------------
-/** What the bar on show lends the two keyless places, see lendFixedKeys. */
-static WideChar s_lentKeys[ GRID_KEY_COUNT ] = { 0 };
-
-WideChar HotKeyManager::gridSlotKey( Int barSlot )
-{
-	if( !s_commandGrid || barSlot < 0 || barSlot >= GRID_KEY_COUNT )
-		return 0;
-	return GRID_KEYS[ barSlot ] != 0 ? GRID_KEYS[ barSlot ] : s_lentKeys[ barSlot ];
-}
-
-//-----------------------------------------------------------------------------
-void HotKeyManager::gridLentKeys( const AsciiString *buttons, const Int *types, Int count, WideChar *lent )
-{
-	const Int fixedCount = (Int)( sizeof( GRID_FIXED_KEYS ) / sizeof( GRID_FIXED_KEYS[ 0 ] ) );
-	WideChar used[ MAX_COMMANDS_PER_SET + GRID_KEY_COUNT ];
-	Int usedCount = 0;
-	for( Int each = 0; each < count; each++ )
-	{
-		if( buttons[ each ].isEmpty() )
-			continue;
-		AsciiString lower = buttons[ each ];
-		lower.toLower();
-		Int mod = -1;
-		const WideChar fixed = fixedButtonKey( AsciiString( withoutModPrefix( lower.str(), &mod ).c_str() ), types[ each ] );
-		if( isOneOf( fixed, GRID_FIXED_KEYS, fixedCount ) )
-			used[ usedCount++ ] = fixed;
-	}
-
-	for( Int slot = 0; slot < GRID_KEY_COUNT; slot++ )
-		lent[ slot ] = 0;
-	// a place takes the order's letter that usually stands there first: attack move's A, then guard's
-	// G or the rally point's Y; then any fixed letter still free, in GRID_FIXED_KEYS' order
-	static const struct { Int slot; WideChar letter; } OWN[] = { { 10, 'A' }, { 12, 'G' }, { 12, 'Y' } };
-	for( Int pass = 0; pass < 2; pass++ )
-	{
-		const Int choices = pass == 0 ? (Int)( sizeof( OWN ) / sizeof( OWN[ 0 ] ) ) : GRID_KEY_COUNT * fixedCount;
-		for( Int each = 0; each < choices; each++ )
-		{
-			const Int slot = pass == 0 ? OWN[ each ].slot : each / fixedCount;
-			const WideChar letter = pass == 0 ? OWN[ each ].letter : GRID_FIXED_KEYS[ each % fixedCount ];
-			if( GRID_KEYS[ slot ] != 0 || lent[ slot ] != 0 || isOneOf( letter, used, usedCount ) )
-				continue;
-			lent[ slot ] = letter;
-			used[ usedCount++ ] = letter;
-		}
-	}
-}
-
-//-----------------------------------------------------------------------------
-void HotKeyManager::lendFixedKeys( const AsciiString *buttons, const Int *types, Int count )
-{
-	if( buttons == NULL )
-	{
-		for( Int slot = 0; slot < GRID_KEY_COUNT; slot++ )
-			s_lentKeys[ slot ] = 0;
-		return;
-	}
-	gridLentKeys( buttons, types, count, s_lentKeys );
-}
-
-//-----------------------------------------------------------------------------
-/** CommandBarGrid, Enabled = Yes or No, End.  Only the player's own Hotkeys.ini carries it, and
-	* nothing in it reaches the INI CRC. */
+/** CommandBarGrid, Enabled = Yes or No, End: the grid keys a launcher before 2026-10-15 wrote into
+	* Hotkeys.ini.  Grid keys are gone, so the block is read and ignored. */
 /*static*/ void INI::parseCommandBarGridDefinition( INI *ini )
 {
 	static const FieldParse fields[] =
@@ -567,8 +478,8 @@ void HotKeyManager::lendFixedKeys( const AsciiString *buttons, const Int *types,
 		{ "Enabled", INI::parseBool, NULL, 0 },
 		{ NULL, NULL, NULL, 0 }
 	};
-	ini->initFromINI( &s_commandGrid, fields );
-	DEBUG_LOG(( "HOTKEYS: grid keys %s\n", s_commandGrid ? "on" : "off" ));
+	Bool ignored = FALSE;
+	ini->initFromINI( &ignored, fields );
 }
 
 //-----------------------------------------------------------------------------

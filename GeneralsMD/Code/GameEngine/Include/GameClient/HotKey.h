@@ -115,24 +115,8 @@ public:
 		* button alone; upper case.  Attack move, stop, guard, rally point, evacuate and sell have their
 		* fixed letters; another button gets one only from the player, and loses it to the fixed order
 		* on a bar holding both (addHotKey).  Force Attack is 0: it is Ctrl, painted on the
-		* cameo, never a letter.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
-		* barSlot its ButtonCommand number less one, gets its place's key instead, except attack move, stop, guard, rally point, evacuate and combat drop, and any other button
-		* (barSlot -1) loses a letter the grid uses. */
-	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
-																	 Int commandType );
-
-	/** The key command bar slot barSlot gives a button with grid keys on, 0 for a slot without one or
-		* with grid keys off.  The two keyless places take what lendFixedKeys lent them. */
-	static WideChar gridSlotKey( Int barSlot );
-
-	/** The bar about to show these `count` buttons (an empty name for none) lends the keyless places
-		* the fixed letters it has no order for: 11 attack move's A, 13 guard's G or the rally point's Y,
-		* then any of A S G Y V C still free, so a building's bar keys those places too.  NULL buttons,
-		* which reset() passes, takes them back. */
-	static void lendFixedKeys( const AsciiString *buttons, const Int *types, Int count );
-
-	/** lendFixedKeys' choice into lent, one letter or 0 per grid place. */
-	static void gridLentKeys( const AsciiString *buttons, const Int *types, Int count, WideChar *lent );
+		* cameo, never a letter. */
+	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int commandType );
 
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
