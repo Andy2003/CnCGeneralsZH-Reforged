@@ -245,7 +245,7 @@ WindowLayout *OptionsLayout = NULL;
 // this is the two arrays that name them and the one function that decides which one you are
 // looking at.  Shell::optionsLayoutFile names the file, OptionsMenuClassic.wnd.
 //-------------------------------------------------------------------------------------------------
-enum { OPTIONS_PAGE_COUNT = 7 };
+enum { OPTIONS_PAGE_COUNT = 8 };
 
 static const char *TheOptionsPageNames[ OPTIONS_PAGE_COUNT ] =
 {
@@ -256,6 +256,7 @@ static const char *TheOptionsPageNames[ OPTIONS_PAGE_COUNT ] =
 	"OptionsMenu.wnd:PageControls",
 	"OptionsMenu.wnd:PageInterface",
 	"OptionsMenu.wnd:PageNetwork",
+	"OptionsMenu.wnd:PageHotkeys",
 };
 
 static const char *TheOptionsTabNames[ OPTIONS_PAGE_COUNT ] =
@@ -267,6 +268,7 @@ static const char *TheOptionsTabNames[ OPTIONS_PAGE_COUNT ] =
 	"OptionsMenu.wnd:TabControls",
 	"OptionsMenu.wnd:TabInterface",
 	"OptionsMenu.wnd:TabNetwork",
+	"OptionsMenu.wnd:TabHotkeys",
 };
 
 static GameWindow *		optionsPage[ OPTIONS_PAGE_COUNT ]	= { NULL };
@@ -274,8 +276,15 @@ static GameWindow *		optionsTab[ OPTIONS_PAGE_COUNT ]	= { NULL };
 static NameKeyType		optionsTabID[ OPTIONS_PAGE_COUNT ] =
 {
 	NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID,
-	NAMEKEY_INVALID
+	NAMEKEY_INVALID, NAMEKEY_INVALID
 };
+
+// The Hotkeys page, OptionsMenuHotkeys.cpp.  Its keys are written on Accept like the rest.
+void OptionsHotkeysInit( void );
+Bool OptionsHotkeysSystem( UnsignedInt msg, GameWindow *control, WindowMsgData row );
+Bool OptionsHotkeysKey( UnsignedByte key, Int state );
+void OptionsHotkeysSave( void );
+void OptionsHotkeysClose( void );
 
 //-------------------------------------------------------------------------------------------------
 /** Show one page and hide the rest.
@@ -2670,6 +2679,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	fillCatalogWidgets();
 	updateSliderReadouts();
 	updateDetailNote();
+	OptionsHotkeysInit();
 	showOptionsPage( 0 );
 
 	// show menu
@@ -2769,6 +2779,10 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 			UnsignedByte key = mData1;
 			UnsignedByte state = mData2;
 
+			// the Hotkeys page waiting for a key takes every key, Esc included
+			if( OptionsHotkeysKey( key, (Int)mData2 ) )
+				return MSG_HANDLED;
+
 			switch( key )
 			{
 
@@ -2860,7 +2874,9 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
-		
+				if( OptionsHotkeysSystem( msg, control, mData2 ) )
+					break;
+
 				if (controlID == comboBoxDetailID)
 				{
 					Int index = CUSTOMDETAIL;
@@ -2886,6 +2902,15 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				// picking borderless greys the resolution list out, the other two hand it back
 				updateResolutionEnabled();
 				updateResolutionNote();
+			break;
+		}
+
+		//---------------------------------------------------------------------------------------------
+		case GLM_SELECTED:
+		case GLM_DOUBLE_CLICKED:
+		{
+			if( ignoreSelected || !OptionsHotkeysSystem( msg, (GameWindow *)mData1, mData2 ) )
+				return MSG_IGNORED;
 			break;
 		}
 
@@ -2916,9 +2941,12 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 					showOptionsPage( page );
 					return MSG_HANDLED;
 				}
+			if( OptionsHotkeysSystem( msg, control, mData2 ) )
+				return MSG_HANDLED;
 
 			if( controlID == buttonBack )
 			{
+				OptionsHotkeysClose();
 				// go back one screen
 				//TheShell->pop();
 				if (pref)
@@ -2941,6 +2969,8 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if (controlID == buttonAccept )
 			{
 				saveOptions();
+				// Hotkeys.ini, and every key read again from it
+				OptionsHotkeysSave();
 
 				// the command bar rebuilds its grid letters on its next update
 				if( TheControlBar )

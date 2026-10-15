@@ -382,6 +382,8 @@ public:
 	void update() { }
 
 	static void parseMetaMap(INI* ini);
+	void clear();		///< every record gone, for CommandMap.ini and Hotkeys.ini to be read again
+
 
 	const MetaMapRec *getFirstMetaMapRec() const { return m_metaMaps; }
 };

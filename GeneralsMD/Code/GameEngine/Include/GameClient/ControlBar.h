@@ -522,6 +522,8 @@ Int ControlBar_forceAttackSlot( const Int *types, Int count, Bool forceFires );
 	* plain Chinook lacks CAN_ATTACK). A Speaker Tower is none of them. The launcher's Hotkeys page
 	* reads KindOf the same way. */
 Bool ControlBar_forceFires( const Object *obj );
+/// The same asked of a template, for the options menu's Hotkeys page, which has no object to ask.
+Bool ControlBar_forceFires( const ThingTemplate *thing );
 
 
 /** The page's keys past attack, hold position and move, which no command set has a button for either. */

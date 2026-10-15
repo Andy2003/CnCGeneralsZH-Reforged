@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Rebuild OptionsMenu.wnd as seven tabbed pages on one grid.
+"""Rebuild OptionsMenu.wnd as eight tabbed pages on one grid.
 
 EA's options screen is one 800x600 panel with everything on it at once, and it was already full
 when it shipped: the language filter, the keyboard button and the four camera checkboxes are all
 still in the file, parked off the right edge with HIDDEN set, because there was nowhere left to put
 them.  Seventeen settings later there is no version of "find room" that works.
 
-So the screen becomes seven pages behind seven buttons: Display, Graphics, Effects, Audio, Controls,
-Interface and Network.  Every graphics setting is on Graphics or Effects, including the ones EA hid in
+So the screen becomes eight pages behind eight buttons: Display, Graphics, Effects, Audio, Controls,
+Interface, Network and Hotkeys, the last two lists rather than settings (build_hotkeys_page).  Every graphics setting is on Graphics or Effects, including the ones EA hid in
 a popup that only opened when Custom was picked from a combo box on another page.  Each page is a list
 of titled groups, sorted by what a setting does, flowed into three columns on one grid, so a heading,
 a label and a box start in the same place whichever tab is open, and every slider has a readout
@@ -48,8 +48,8 @@ from wndlayout import clone
 # and the version line all start and stop.  The frame is as tall as the tallest group column needs -
 # Effects' Shadows column and Graphics' Quality column both end 312 pixels below their heading, on the
 # page's last pixel - plus the title, the tabs and the buttons, and it is centred on the 600 line: 58
-# above it, 58 below.  A column that runs past the page is refused when the layout is built.  Seven tabs
-# still fit the inner width at 100 pixels each.
+# above it, 58 below.  A column that runs past the page is refused when the layout is built.  Eight tabs
+# still fit the inner width at 87 pixels each.
 PANEL = (20, 58, 760, 484)          # left, top, width, height
 INNER_LEFT, INNER_WIDTH = 36, 728
 TITLE = (INNER_LEFT, 64, 400, 32)
@@ -67,7 +67,36 @@ TABS = [
     ("PageControls", "TabControls", "GUI:OptionsTabControls"),
     ("PageInterface", "TabInterface", "GUI:OptionsTabInterface"),
     ("PageNetwork",  "TabNetwork",  "GUI:OptionsTabNetwork"),
+    ("PageHotkeys",  "TabHotkeys",  "GUI:OptionsTabHotkeys"),
 ]
+
+# The Hotkeys page is two lists rather than groups of settings: every command on the left, and on the
+# right the command bar of one building or unit, picked by general and object.  Its lists are cloned
+# from the LAN lobby's chat list, the one scrolling list box with EA's art that is two layouts away,
+# and its buttons from the Network page's Refresh.  OptionsMenuHotkeys.cpp fills all of it in.
+#   (name, left, top, width, height)
+HOTKEY_LIST_SOURCE = "ListboxChatWindowLanGame"
+HOTKEY_COMMANDS = ("ListboxHotkeyCommands", 40, 182, 344, 220)
+HOTKEY_FACTION = ("ComboBoxHotkeyFaction", 408, 182, 352, 24)
+HOTKEY_OBJECT = ("ComboBoxHotkeyObject", 408, 214, 352, 24)
+HOTKEY_BUTTONS = ("ListboxHotkeyButtons", 408, 246, 352, 156)
+# four lines of the notes' 10 point lettering: a clash names every button on the letter
+HOTKEY_NOTE = ("HotkeyNote", 34, 408, 398, 54)
+HOTKEY_HEADINGS = [("GUI:HotkeysCommands", 40), ("GUI:HotkeysCommandBar", 408)]
+#   (name, caption key, left)
+HOTKEY_BUTTON_ROW = [("ButtonHotkeyChange", "GUI:HotkeysChange", 440),
+                     ("ButtonHotkeyClear", "GUI:HotkeysClear", 548),
+                     ("ButtonHotkeyDefault", "GUI:HotkeysDefault", 656)]
+HOTKEY_BUTTON_TOP, HOTKEY_BUTTON_WIDTH = 412, 104
+# the share of each list's width a column takes: name and key, and on the bar a cameo first
+HOTKEY_COMMAND_COLUMNS = (68, 32)
+HOTKEY_BUTTON_COLUMNS = (12, 66, 22)
+# strings OptionsMenuHotkeys.cpp shows besides the captions above
+HOTKEY_STRINGS = ["GUI:HotkeysNone", "GUI:HotkeysPressKey", "GUI:HotkeysPressLetter", "GUI:HotkeysPressForceAttack",
+                  "GUI:HotkeysClash", "GUI:HotkeysAlsoOn", "GUI:HotkeysFixed", "GUI:HotkeysGameKey",
+                  "GUI:HotkeysMoved", "GUI:HotkeysForceAttack", "GUI:HotkeysPick", "GUI:HotkeysOnFixedKey",
+                  "GUI:HotkeysButtonMoved", "TOOLTIP:HotkeyChange", "TOOLTIP:HotkeyClear",
+                  "TOOLTIP:HotkeyDefault"]
 
 # EA's four group panels.  Each drew a framed box of its own inside the page, sized for a heading
 # and a row that are gone, so no two pages had their first control in the same place.  The panels
@@ -553,10 +582,63 @@ def drop_by_text(root, texts):
                          if drawn_text(child) not in wanted]
 
 
+def make_heading(templates, name, key):
+    """A group's heading: a label in the buttons' lettering and the heading green."""
+    heading = clone(templates[LABEL], _named(name))
+    heading.children = []
+    heading.put_prop("TEXT", '"%s"' % key)
+    drop_prop(heading, "TOOLTIPTEXT")
+    restyle(heading, templates["ButtonDefaults"], keys=("FONT", "HEADERTEMPLATE"))
+    heading.set_prop("TEXTCOLOR", GROUP_HEADING_COLOR)
+    heading.put_prop("STATICTEXTDATA", "CENTERED: 0")
+    return heading
+
+
+def make_list(templates, spec, columns):
+    """A scrolling list cloned from the LAN lobby's chat, which takes the focus so the arrow keys
+    walk it, and keeps no more rows than it is given."""
+    name, left, top, width, height = spec
+    listbox = clone(templates[HOTKEY_LIST_SOURCE], _named(name))
+    listbox.place(left, top, width, height)
+    listbox.set_prop("STATUS", "ENABLED")
+    widths = "".join("COLUMNSWIDTH: %d, " % share for share in columns)
+    listbox.set_prop("LISTBOXDATA", "LENGTH: 300, AUTOSCROLL: 0, SCROLLIFATEND: 0, AUTOPURGE: 0, SCROLLBAR: 1, "
+                     "MULTISELECT: 0, COLUMNS: %d, %sFORCESELECT: 0" % (len(columns), widths))
+    return listbox
+
+
+def build_hotkeys_page(page, templates):
+    for index, (key, left) in enumerate(HOTKEY_HEADINGS):
+        heading = make_heading(templates, "GroupHeadingHotkeys%d" % index, key)
+        heading.place(left - TEXT_NUDGE, HEADING_TOP, 344, ROW_HEIGHT)
+        page.children.append(heading)
+    page.children.append(make_list(templates, HOTKEY_COMMANDS, HOTKEY_COMMAND_COLUMNS))
+    for name, left, top, width, height in (HOTKEY_FACTION, HOTKEY_OBJECT):
+        combo = clone(templates[COMBO], _named(name))
+        combo.place(left, top, width, height)
+        drop_prop(combo, "TOOLTIPTEXT")
+        combo.set_prop("COMBOBOXDATA", "ISEDITABLE: 0, MAXCHARS: 64, MAXDISPLAY: 12, ASCIIONLY: 0, LETTERSANDNUMBERS: 0")
+        page.children.append(combo)
+    page.children.append(make_list(templates, HOTKEY_BUTTONS, HOTKEY_BUTTON_COLUMNS))
+    name, left, top, width, height = HOTKEY_NOTE
+    note = make_note(templates[LABEL], name)
+    note.place(left, top, width, height)
+    page.children.append(note)
+    for name, key, left in HOTKEY_BUTTON_ROW:
+        button = clone(templates["ButtonFirewallRefresh"], _named(name))
+        button.children = []
+        button.place(left, HOTKEY_BUTTON_TOP, HOTKEY_BUTTON_WIDTH, ROW_HEIGHT)
+        button.put_prop("TEXT", '"%s"' % key)
+        button.put_prop("TOOLTIPTEXT", '"TOOLTIP:%s"' % name[len("Button"):])
+        page.children.append(button)
+
+
 def build(layout):
     old = layout.find("OptionsMenuParentOld")
     templates = dict((name, layout.find(name))
-                     for name in (CHECK, LABEL, COMBO, SLIDER, "VideoParent", "ButtonDefaults"))
+                     for name in (CHECK, LABEL, COMBO, SLIDER, "VideoParent", "ButtonDefaults",
+                                  "ButtonFirewallRefresh"))
+    templates[HOTKEY_LIST_SOURCE] = wndlayout.load(LAN_LAYOUT).find(HOTKEY_LIST_SOURCE)
 
     for text, name in NAME_THE_UNNAMED:
         for node in layout.root.walk():
@@ -617,14 +699,7 @@ def build(layout):
             for heading_key, items in stack:
                 heading_name = "GroupHeading%s%d" % (page_name[len("Page"):], index)
                 index += 1
-                heading = clone(templates[LABEL], _named(heading_name))
-                heading.children = []
-                heading.put_prop("TEXT", '"%s"' % heading_key)
-                drop_prop(heading, "TOOLTIPTEXT")
-                restyle(heading, templates["ButtonDefaults"], keys=("FONT", "HEADERTEMPLATE"))
-                heading.set_prop("TEXTCOLOR", GROUP_HEADING_COLOR)
-                heading.put_prop("STATICTEXTDATA", "CENTERED: 0")
-                waiting[heading_name] = heading
+                waiting[heading_name] = make_heading(templates, heading_name, heading_key)
                 put(page_name, heading_name, left - TEXT_NUDGE, heading_top, COLUMN_WIDTH, ROW_HEIGHT)
 
                 top = heading_top + HEADING_PITCH
@@ -650,6 +725,7 @@ def build(layout):
                 heading_top = top + GROUP_GAP
     for page_name, name, column, top in HIDDEN_PARKED:
         put(page_name, name, COLUMNS[column], top, COLUMN_WIDTH, ROW_HEIGHT)
+    build_hotkeys_page(pages["PageHotkeys"], templates)
     if waiting:
         raise KeyError("given no place on a page: %s" % ", ".join(sorted(waiting)))
 
@@ -690,6 +766,7 @@ _CODE = os.path.dirname(_HERE)
 CATALOG = os.path.join(_CODE, "GameEngine", "Source", "Common", "OptionsCatalog.cpp")
 STRINGS = os.path.join(_CODE, "Data", "Patch.str")
 LAYOUT = os.path.join(_CODE, "Data", "Window", "Menus", "OptionsMenuClassic.wnd")
+LAN_LAYOUT = os.path.join(_CODE, "Data", "Window", "Menus", "LanGameOptionsMenu.wnd")
 INCLUDE = os.path.join(_CODE, "GameEngine", "Include")
 
 _ROW = re.compile(
@@ -814,6 +891,13 @@ def selfcheck():
     for group in [g for _page, groups in GROUP_LAYOUT for g in groups]:
         if group[0] not in keys:
             problems.append("group heading %s is not in Patch.str" % group[0])
+    hotkey_controls = [spec[0] for spec in (HOTKEY_COMMANDS, HOTKEY_FACTION, HOTKEY_OBJECT, HOTKEY_BUTTONS, HOTKEY_NOTE)]
+    for name in hotkey_controls + [name for name, _key, _left in HOTKEY_BUTTON_ROW]:
+        if name not in controls:
+            problems.append("%s has no %s, which OptionsMenuHotkeys.cpp fills in" % (os.path.basename(LAYOUT), name))
+    for key in [key for key, _left in HOTKEY_HEADINGS] + [key for _n, key, _l in HOTKEY_BUTTON_ROW] + HOTKEY_STRINGS:
+        if key not in keys:
+            problems.append("the Hotkeys page needs %s in Patch.str" % key)
     for name, key, count in NOTES:
         for entry in range(count):
             if "%s%d" % (key, entry) not in keys:

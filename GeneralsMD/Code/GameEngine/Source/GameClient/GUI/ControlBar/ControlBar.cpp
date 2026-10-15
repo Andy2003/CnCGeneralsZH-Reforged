@@ -441,6 +441,15 @@ Bool ControlBar_forceFires( const Object *obj )
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool ControlBar_forceFires( const ThingTemplate *thing )
+{
+	if( thing->isKindOf( KINDOF_FS_BASE_DEFENSE ) )
+		return thing->isKindOf( KINDOF_CAN_ATTACK ) || thing->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS )
+			|| thing->isKindOf( KINDOF_GARRISONABLE_UNTIL_DESTROYED );
+	return thing->isKindOf( KINDOF_TRANSPORT ) && thing->isKindOf( KINDOF_CAN_ATTACK );
+}
+
+//-------------------------------------------------------------------------------------------------
 void ControlBar_orderKeyPlaces( const Int *places, Int count, Bool fights, Int *keys )
 {
 	for( Int key = 0; key < ORDER_KEY_EXTRAS; key++ )

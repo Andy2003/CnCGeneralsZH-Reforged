@@ -1661,6 +1661,222 @@ TEST(hotkey_names_fold_turkish_letters_and_case)
 	CHECK( HotKeyManager::nameOf( 0x015E ) != HotKeyManager::nameOf( L'^' ) );	// not its low byte
 }
 
+/* HotKey.cpp, Hotkeys_*: the options menu's Hotkeys page writes Hotkeys.ini the way the launcher does.
+   HOTKEYS_FROM_LAUNCHER is what launcher/hotkeys.js formatOverrides wrote on 2026-10-15 for these keys
+   over the shipped game (its launcher part cut to three blocks), and HOTKEYS_COMMAND_MAP the shipped
+   CommandMap.ini's entries for the commands it names. */
+static const char HOTKEYS_COMMAND_MAP[] =
+	"; comments go\r\n"
+	"CommandMap DEMO_INSTANT_QUIT\r\n  Key = KEY_BACKSPACE\r\n  Modifiers = SHIFT_CTRL\r\n  UseableIn = GAME SHELL\r\nEnd\r\n"
+	"CommandMap SELECT_TEAM1\r\n  Key = KEY_1\r\n  Transition = DOWN\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\n"
+	"  Category = TEAM\r\n  DisplayName = GUI:SelectTeam1\r\nEnd\r\n"
+	"CommandMap VIEW_COMMAND_CENTER\r\n  Key = KEY_H\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\n  Category = SELECTION\r\nEnd\r\n"
+	"CommandMap VIEW_LAST_RADAR_EVENT\r\n  Key = KEY_SPACE\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\nEnd\r\n"
+	"CommandMap TAKE_SCREENSHOT\r\n  Key = KEY_F12\r\n  Modifiers = NONE\r\n  UseableIn = GAME SHELL\r\nEnd\r\n"
+	"CommandMap BEGIN_CAMERA_ROTATE_LEFT\r\n  Key = KEY_KP4\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\nEnd\r\n"
+	"CommandMap END_CAMERA_ROTATE_LEFT\r\n  Key = KEY_KP4\r\n  Transition = UP\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\nEnd\r\n"
+	"CommandMap BEGIN_FORCEATTACK\r\n  Key = KEY_NONE\r\n  Modifiers = CTRL\r\n  UseableIn = GAME\r\nEnd\r\n";
+
+static const char HOTKEYS_FROM_LAUNCHER[] =
+	"; Zero Hour Reforged hotkeys, written by the launcher's Hotkeys page. Only what differs from the\r\n"
+	"; game is here. The game reads it at start; it is not part of the multiplayer checksum.\r\n"
+	"\r\n"
+	"CommandMap BEGIN_CAMERA_ROTATE_LEFT\r\n"
+	"  Key = KEY_LBRACKET\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = NONE\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap END_CAMERA_ROTATE_LEFT\r\n"
+	"  Key = KEY_LBRACKET\r\n"
+	"  Transition = UP\r\n"
+	"  Modifiers = NONE\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap BEGIN_FORCEATTACK\r\n"
+	"  Key = KEY_NONE\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = ALT\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap END_FORCEATTACK\r\n"
+	"  Key = KEY_NONE\r\n"
+	"  Transition = UP\r\n"
+	"  Modifiers = ALT\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap SELECT_ALL_MILITARY\r\n"
+	"  Key = KEY_Q\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = CTRL\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap SELECT_TEAM1\r\n"
+	"  Key = KEY_KP1\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = SHIFT_ALT_CTRL\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap TAKE_SCREENSHOT\r\n"
+	"  Key = KEY_F11\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = CTRL\r\n"
+	"  UseableIn = GAME SHELL\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap VIEW_LAST_RADAR_EVENT\r\n"
+	"  Key = KEY_NONE\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = NONE\r\n"
+	"  UseableIn = NONE\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey Command_ConstructAmericaBarracks\r\n"
+	"  Key = B\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey command_lowercase\r\n"
+	"  Key = NONE\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey Command_Sell\r\n"
+	"  Key = S\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey Command_UpgradeChinaMines\r\n"
+	"  Key = Q\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey mymod:Command_Sell\r\n"
+	"  Key = K\r\n"
+	"End\r\n"
+	"\r\n"
+	"; the launcher's own keys from here on\r\n"
+	"\r\n"
+	"CommandMap SELECT_NEXT_IDLE_WORKER\r\n"
+	"  Key = KEY_I\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = NONE\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandMap VIEW_COMMAND_CENTER\r\n"
+	"  Key = KEY_P\r\n"
+	"  Transition = DOWN\r\n"
+	"  Modifiers = NONE\r\n"
+	"  UseableIn = GAME\r\n"
+	"End\r\n"
+	"\r\n"
+	"CommandButtonHotKey AirF_Command_A10ThunderboltMissileStrike\r\n"
+	"  Key = M\r\n"
+	"End\r\n";
+
+TEST(hotkeys_file_reads_the_launchers_rows_and_leaves_its_defaults_out)
+{
+	const std::vector< HotkeyCommandRow > rows = Hotkeys_commandRows( HOTKEYS_COMMAND_MAP );
+	const HotkeyCommandRow *team = NULL, *hold = NULL, *idle = NULL;
+	Bool demo = FALSE, endHalf = FALSE;
+	for( size_t each = 0; each < rows.size(); each++ )
+	{
+		team = rows[ each ].id == "SELECT_TEAM1" ? &rows[ each ] : team;
+		hold = rows[ each ].id == "BEGIN_FORCEATTACK" ? &rows[ each ] : hold;
+		idle = rows[ each ].id == "SELECT_NEXT_IDLE_WORKER" ? &rows[ each ] : idle;
+		demo = demo || rows[ each ].id == "DEMO_INSTANT_QUIT";
+		endHalf = endHalf || rows[ each ].id == "END_CAMERA_ROTATE_LEFT";
+	}
+	CHECK( !demo );
+	CHECK( !endHalf );
+	CHECK( team != NULL && team->binding == HotkeyBinding( "KEY_1", "NONE" ) && team->category == "TEAM" && team->label == "GUI:SelectTeam1" );
+	// KEY_NONE is not a key the launcher shows, so the shipped hold comes back as its own bar-only row
+	CHECK( hold != NULL && hold->barOnly && hold->binding == HotkeyBinding( "", "CTRL" ) && hold->pair == "END_FORCEATTACK" );
+	CHECK( idle != NULL && idle->launcherDefault && idle->binding.key == "KEY_I" );
+
+	// the launcher's own defaults in the player's part are no change of his
+	const HotkeysFile mine = Hotkeys_parse(
+		"CommandMap SELECT_NEXT_IDLE_WORKER\r\n  Key = KEY_I\r\n  Modifiers = NONE\r\n  UseableIn = GAME\r\nEnd\r\n"
+		"CommandMap BEGIN_FORCEATTACK\r\n  Key = KEY_NONE\r\n  Modifiers = CTRL\r\n  UseableIn = GAME\r\nEnd\r\n"
+		"CommandMap SCATTER\r\n  Key = KEY_NOTAKEY\r\n  Modifiers = CTRL\r\n  UseableIn = GAME\r\nEnd\r\n", rows );
+	CHECK_EQ( (Int)mine.commands.size(), 1 );
+	CHECK( mine.commands.find( "SCATTER" )->second == HotkeyBinding( "", "NONE" ) );
+	CHECK( mine.launcherPart.empty() );
+}
+
+TEST(hotkeys_file_the_launcher_wrote_comes_back_byte_for_byte)
+{
+	const std::vector< HotkeyCommandRow > rows = Hotkeys_commandRows( HOTKEYS_COMMAND_MAP );
+	const HotkeysFile file = Hotkeys_parse( HOTKEYS_FROM_LAUNCHER, rows );
+	CHECK_EQ( (Int)file.commands.size(), 6 );
+	CHECK( file.commands.find( "BEGIN_FORCEATTACK" )->second == HotkeyBinding( "", "ALT" ) );
+	CHECK( file.commands.find( "VIEW_LAST_RADAR_EVENT" )->second == HotkeyBinding( "", "NONE" ) );
+	CHECK( file.commands.find( "SELECT_TEAM1" )->second == HotkeyBinding( "KEY_KP1", "SHIFT_ALT_CTRL" ) );
+	CHECK( file.commands.find( "VIEW_COMMAND_CENTER" ) == file.commands.end() );	// the launcher's, not his
+	CHECK_EQ( (Int)file.buttons.size(), 5 );
+	CHECK_STR( file.buttons.find( "mymod:Command_Sell" )->second.c_str(), "K" );
+	CHECK_STR( file.buttons.find( "command_lowercase" )->second.c_str(), "" );
+	CHECK( Hotkeys_format( file, rows ) == std::string( HOTKEYS_FROM_LAUNCHER ) );
+
+	std::map< std::string, HotkeyBinding > launcherCommands;
+	std::map< std::string, std::string > launcherButtons;
+	Hotkeys_launcherKeys( file.launcherPart, &launcherCommands, &launcherButtons );
+	CHECK( launcherCommands.find( "VIEW_COMMAND_CENTER" )->second == HotkeyBinding( "KEY_P", "NONE" ) );
+	CHECK_STR( launcherButtons.find( "AirF_Command_A10ThunderboltMissileStrike" )->second.c_str(), "M" );
+}
+
+TEST(hotkeys_file_drops_the_launchers_block_for_what_the_player_set)
+{
+	const std::vector< HotkeyCommandRow > rows = Hotkeys_commandRows( HOTKEYS_COMMAND_MAP );
+	HotkeysFile file = Hotkeys_parse( HOTKEYS_FROM_LAUNCHER, rows );
+	// a later block beats an earlier one in the game, so the launcher's move would undo these
+	file.buttons[ "AirF_Command_A10ThunderboltMissileStrike" ] = "Z";
+	file.commands[ "VIEW_COMMAND_CENTER" ] = HotkeyBinding( "KEY_H", "CTRL" );
+	const std::string text = Hotkeys_format( file, rows );
+	const size_t part = text.find( HOTKEYS_LAUNCHER_PART );
+	CHECK( part != std::string::npos );
+	const std::string launcher = text.substr( part );
+	CHECK( launcher.find( "AirF_Command_A10ThunderboltMissileStrike" ) == std::string::npos );
+	CHECK( launcher.find( "VIEW_COMMAND_CENTER" ) == std::string::npos );
+	CHECK( launcher.find( "SELECT_NEXT_IDLE_WORKER" ) != std::string::npos );
+	// the launcher's part still ends the way the launcher ends it, on End and one line break
+	CHECK( launcher.size() > 7 && launcher.compare( launcher.size() - 7, 7, "\r\nEnd\r\n" ) == 0 );
+	CHECK( launcher.find( "End\r\n\r\n\r\n" ) == std::string::npos );
+
+	const HotkeysFile back = Hotkeys_parse( text, rows );
+	CHECK_STR( back.buttons.find( "AirF_Command_A10ThunderboltMissileStrike" )->second.c_str(), "Z" );
+	CHECK( back.commands.find( "VIEW_COMMAND_CENTER" )->second == HotkeyBinding( "KEY_H", "CTRL" ) );
+
+	// a file nobody wrote gets the launcher's line and nothing after it
+	HotkeysFile fresh = Hotkeys_parse( "", rows );
+	fresh.buttons[ "Command_Sell" ] = "";
+	const std::string first = Hotkeys_format( fresh, rows );
+	CHECK( first.compare( first.size() - strlen( HOTKEYS_LAUNCHER_PART ) - 2, std::string::npos,
+		std::string( HOTKEYS_LAUNCHER_PART ) + "\r\n" ) == 0 );
+	CHECK( first.find( "CommandButtonHotKey Command_Sell\r\n  Key = NONE\r\nEnd\r\n\r\n" ) != std::string::npos );
+}
+
+TEST(hotkeys_names_sort_and_chords_read_as_the_launcher_has_them)
+{
+	// String.localeCompare: case aside, '_' before the letters, then lower case first
+	CHECK( Hotkeys_nameLess( "command_lowercase", "Command_Sell" ) );
+	CHECK( Hotkeys_nameLess( "Command_Sell", "Command_UpgradeChinaMines" ) );
+	CHECK( Hotkeys_nameLess( "Command_UpgradeChinaMines", "mymod:Command_Sell" ) );
+	CHECK( Hotkeys_nameLess( "SELECT_ALL", "SELECT_ALL_MILITARY" ) );
+	CHECK( Hotkeys_nameLess( "SELECT_ALL_MILITARY", "SELECT_TEAM1" ) );
+	CHECK( Hotkeys_nameLess( "command_sell", "Command_Sell" ) );
+	CHECK( !Hotkeys_nameLess( "Command_Sell", "Command_Sell" ) );
+
+	CHECK_STR( Hotkeys_chordText( HotkeyBinding( "KEY_KP1", "SHIFT_ALT_CTRL" ) ).c_str(), "Ctrl + Alt + Shift + Num 1" );
+	CHECK_STR( Hotkeys_chordText( HotkeyBinding( "", "ALT" ) ).c_str(), "Alt" );
+	CHECK_STR( Hotkeys_chordText( HotkeyBinding( "KEY_LBRACKET", "NONE" ) ).c_str(), "[" );
+	CHECK_STR( Hotkeys_chordText( HotkeyBinding( "", "NONE" ) ).c_str(), "" );
+	CHECK( Hotkeys_isKeyName( "KEY_PGDN" ) && !Hotkeys_isKeyName( "KEY_NONE" ) && !Hotkeys_isKeyName( "KEY_LCTRL" ) );
+}
+
 /* GlobalData.h: which button orders.  The classic mouse is 1.04's left button, or the right under EA's
    Alternate Mouse Setup (UseAlternateMouse, off out of the box); Reforged is the right whatever Options.ini says. */
 TEST(alternate_mouse_moves_the_order_button_in_classic_only)

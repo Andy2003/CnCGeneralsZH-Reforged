@@ -15748,3 +15748,259 @@ END
 TOOLTIP:MoveScrollAnchor
 "Kaydırma işareti imleci en fazla yarım ekran geriden izler, böylece uzun bir sürükleme durmadan hızlanmaz."
 END
+
+GUI:OptionsTabHotkeys
+"Kısayollar"
+END
+
+GUI:HotkeysCommands
+"Komutlar"
+END
+
+GUI:HotkeysCommandBar
+"Komut çubuğu"
+END
+
+GUI:HotkeysChange
+"Değiştir"
+END
+
+GUI:HotkeysClear
+"Tuş yok"
+END
+
+GUI:HotkeysDefault
+"Oyunun tuşu"
+END
+
+TOOLTIP:HotkeyChange
+"Seçili komut ya da düğme için yeni bir tuş bekler. Üzerine çift tıklamak ya da Enter da aynısını yapar."
+END
+
+TOOLTIP:HotkeyClear
+"Seçili komutun ya da düğmenin tuşunu kaldırır."
+END
+
+TOOLTIP:HotkeyDefault
+"Oyunun kendi tuşunu geri koyar. Tuşlar Kabul Et'e bastığınızda yazılır."
+END
+
+GUI:HotkeysNone
+"yok"
+END
+
+GUI:HotkeysPressKey
+"Bir tuşa basın, vazgeçmek için Esc"
+END
+
+GUI:HotkeysPressLetter
+"Bir harfe basın, vazgeçmek için Esc"
+END
+
+GUI:HotkeysPressForceAttack
+"Bir tuşa ya da tek başına Ctrl veya Alt tuşuna basın. Shift basılı tutma tuşu olamaz. Esc vazgeçer."
+END
+
+GUI:HotkeysClash
+"%s: %s aynı tuşu kullanıyor. Oyunda tuş yalnızca birinde çalışır, sabit emir kendi tuşunu korur."
+END
+
+GUI:HotkeysAlsoOn
+"Şununla aynı tuş: %s."
+END
+
+GUI:HotkeysFixed
+"Her çubukta sabit tuş: A saldırarak ilerle, S dur, G koru, Y toplanma noktası, V boşalt, C çatışma inişi, N sat, H mayın, kamuflaj ağı ve sahte bina geçişi."
+END
+
+GUI:HotkeysGameKey
+"Oyunun kendi tuşu %s."
+END
+
+GUI:HotkeysMoved
+"Komut çubuğunun tuşlarından taşındı; oyunun tuşu %s."
+END
+
+GUI:HotkeysButtonMoved
+"Oyun ona sabit bir tuşun harfini vermişti, başlatıcı taşıdı."
+END
+
+GUI:HotkeysForceAttack
+"Basılı tutunca imlecin altındakine ateş eder. Bu tuşla Shift, birlik kutusu çizer. Varsayılan Ctrl."
+END
+
+GUI:HotkeysPick
+"Bir komut ya da düğme seçin, sonra çift tıklayın ya da Değiştir'e basın."
+END
+
+GUI:HotkeysOnFixedKey
+"Bu bir komut çubuğu tuşu da: o tuşu taşıyan düğmeyle birlikte çalışır."
+END
+
+GUI:HotkeysCategorySELECTION
+"Seçim"
+END
+
+GUI:HotkeysCategoryTEAM
+"Takımlar"
+END
+
+GUI:HotkeysCategoryINFORMATION
+"İşaretler ve fişekler"
+END
+
+GUI:HotkeysCategoryCONTROL
+"Emirler"
+END
+
+GUI:HotkeysCategoryINTERFACE
+"Arayüz"
+END
+
+GUI:HotkeysCategorySHORTCUTS
+"General güçleri"
+END
+
+GUI:HotkeysCategoryGRID
+"Yerine göre komut çubuğu"
+END
+
+GUI:HotkeysCategoryMISC
+"Kamera ve sohbet"
+END
+
+GUI:HotkeysFamilySaveView
+"%d. yer imini kaydet"
+END
+
+GUI:HotkeysFamilyViewView
+"%d. yer imine git"
+END
+
+GUI:HotkeysFamilyAddTeam
+"Seçimi %d. takıma ekle"
+END
+
+GUI:HotkeysFamilyShortcut
+"%d. general gücü"
+END
+
+GUI:HotkeysFamilySlot
+"Komut çubuğunda %d. yer"
+END
+
+GUI:HotkeysCommandSELECT_HERO
+"Kahramanı seç"
+END
+
+GUI:HotkeysCommandSELECT_NEXT_WORKER
+"Sıradaki işçi"
+END
+
+GUI:HotkeysCommandSELECT_PREV_WORKER
+"Önceki işçi"
+END
+
+GUI:HotkeysCommandCHAT_ALLIES
+"Müttefiklere yaz"
+END
+
+GUI:HotkeysCommandCHAT_EVERYONE
+"Herkese yaz"
+END
+
+GUI:HotkeysCommandDIPLOMACY
+"Diplomasi"
+END
+
+GUI:HotkeysCommandPLACE_BEACON
+"İşaret fişeği koy"
+END
+
+GUI:HotkeysCommandDELETE_BEACON
+"İşaret fişeğini sil"
+END
+
+GUI:HotkeysCommandBEGIN_CAMERA_ROTATE_LEFT
+"Kamerayı sola döndür"
+END
+
+GUI:HotkeysCommandBEGIN_CAMERA_ROTATE_RIGHT
+"Kamerayı sağa döndür"
+END
+
+GUI:HotkeysCommandBEGIN_CAMERA_ZOOM_IN
+"Yakınlaştır"
+END
+
+GUI:HotkeysCommandBEGIN_CAMERA_ZOOM_OUT
+"Uzaklaştır"
+END
+
+GUI:HotkeysCommandCAMERA_RESET
+"Kamerayı sıfırla"
+END
+
+GUI:HotkeysCommandTOGGLE_CAMERA_TRACKING_DRAWABLE
+"Kamera seçimi izlesin"
+END
+
+GUI:HotkeysCommandTOGGLE_FAST_FORWARD_REPLAY
+"Tekrarı hızlı oynat"
+END
+
+GUI:HotkeysCommandSELECT_ALL
+"Bütün birlikleri seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_MILITARY
+"Bütün savaşan birlikleri seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_VEHICLES
+"Bütün araçları seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_AIRCRAFT
+"Bütün hava araçlarını seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_BARRACKS
+"Bütün kışlaları seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_WARFACTORIES
+"Bütün savaş fabrikalarını seç"
+END
+
+GUI:HotkeysCommandSELECT_ALL_AIRFIELDS
+"Bütün hava üslerini seç"
+END
+
+GUI:HotkeysCommandSELECT_NEXT_IDLE_WORKER
+"Sıradaki boştaki işçi"
+END
+
+GUI:HotkeysCommandSELECT_NEXT_IDLE_UNIT
+"Sıradaki boştaki birlik"
+END
+
+GUI:HotkeysCommandTOGGLE_PAUSE
+"Duraklat (tek oyunculu ve tekrarlar)"
+END
+
+GUI:HotkeysCommandTOGGLE_PURCHASE_SCIENCE
+"General terfileri"
+END
+
+GUI:HotkeysCommandSIGNAL_ATTACK
+"İşaret: buraya saldır"
+END
+
+GUI:HotkeysCommandSIGNAL_DEFEND
+"İşaret: burayı savun"
+END
+
+GUI:HotkeysCommandSIGNAL_ATTENTION
+"İşaret: buraya bak"
+END
