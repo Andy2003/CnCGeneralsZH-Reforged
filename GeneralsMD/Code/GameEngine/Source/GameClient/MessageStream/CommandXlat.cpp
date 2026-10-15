@@ -178,10 +178,6 @@ SignalKind Command_signalKindForMeta( GameMessage::Type meta )
 
 static Bool isFormationDragArmed( void )
 {
-	// the Classic mouse's left drag is the selection box it always was
-	if( TheGlobalData->isClassicMouse() )
-		return FALSE;
-
 	return Command_formationDragArmed( TheGlobalData->m_formationDrag,
 																		 TheInGameUI->getSelectCount() > 0
 																			&& TheInGameUI->areSelectedObjectsControllable(),
