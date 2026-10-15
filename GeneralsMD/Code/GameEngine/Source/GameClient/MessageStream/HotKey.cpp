@@ -188,15 +188,19 @@ void HotKeyManager::reset( void )
 	lendFixedKeys( NULL, NULL, 0 );
 }
 
+static Bool ownsFixedKey( GameWindow *win, const AsciiString& key );
+
 //-----------------------------------------------------------------------------
 void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
 {
 	AsciiString key = keyIn;
 	key.toLower();
 	HotKeyMap::iterator it = m_hotKeyMap.find(key);
-	if( it != m_hotKeyMap.end() )
+	// two buttons on one letter is the player's choice on the Hotkeys page, which marks it: the
+	// first keeps the key, except that a fixed order takes its own letter back
+	if( it != m_hotKeyMap.end() && !ownsFixedKey( win, key ) )
 	{
-		DEBUG_ASSERTCRASH(FALSE,("Hotkey %s is already mapped to window %s, current window is %s", key.str(), it->second.m_win->winGetInstanceData()->m_decoratedNameString.str(), win->winGetInstanceData()->m_decoratedNameString.str()));
+		DEBUG_LOG(( "HOTKEYS: %s already on %s, not on %s\n", key.str(), it->second.m_win->winGetInstanceData()->m_decoratedNameString.str(), win->winGetInstanceData()->m_decoratedNameString.str() ));
 		return;
 	}
 	HotKey newHK;
@@ -341,7 +345,9 @@ static Bool s_commandGrid = FALSE;
 
 /** The owner's fixed keys, 2026-10-12, on every bar: A attack move, S stop, G guard, Y rally
 	* point, V evacuate, N sell, C combat drop, and H for land mines, camo netting and the GLA's fake
-	* and real switches, which go by button name.  No other button may have one of these letters.
+	* and real switches, which go by button name.  No button keeps one of these letters from its
+	* label; the player may give one to any button on the launcher's Hotkeys page, and on a bar where
+	* the fixed order stands too, the order gets the key (addHotKey).
 	* With grid keys on only GRID_FIXED_KEYS hold, on any bar and slot; sell and the H buttons take
 	* their place's key.  The launcher holds the same tables (hotkeys.js, FIXED_KEYS and
 	* GRID_FIXED_LETTERS). */
@@ -406,6 +412,18 @@ static std::string withoutModPrefix( const char *lowerName, Int *mod )
 	return tilde + 1;
 }
 
+/** Whether win is a command button whose fixed letter (fixedButtonKey) is key, the map's lower
+	* case name. */
+static Bool ownsFixedKey( GameWindow *win, const AsciiString& key )
+{
+	const CommandButton *command = (const CommandButton *)GadgetButtonGetData( win );
+	AsciiString lower = command->getName();
+	lower.toLower();
+	Int mod = -1;
+	const WideChar fixed = fixedButtonKey( AsciiString( withoutModPrefix( lower.str(), &mod ).c_str() ), command->getCommandType() );
+	return fixed != 0 && HotKeyManager::nameOf( fixed ) == key;
+}
+
 /** The player's key for a button, into *letter; FALSE leaves it alone.  A mod's own button (ownMod,
 	* under -modfactions) takes only its mod's "<scope>:<button>" entry.  A plain name, which under a
 	* plain -mod may be any loaded mod's, takes the last loaded mod's scoped entry that exists, then
@@ -465,10 +483,12 @@ WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar lab
 		return fixed;
 
 	WideChar letter = labelKey;
-	findPlayerKey( bare, ownMod, &letter );
+	const Bool chosen = findPlayerKey( bare, ownMod, &letter );
 	if( letter >= 'a' && letter <= 'z' )
 		letter -= 'a' - 'A';
-	if( isOneOf( letter, FIXED_KEYS, (Int)( sizeof( FIXED_KEYS ) / sizeof( FIXED_KEYS[ 0 ] ) ) ) )
+	// a label's own fixed letter gives way; one the player chose stays, and the bar's fixed order
+	// still takes it first (addHotKey)
+	if( !chosen && isOneOf( letter, FIXED_KEYS, (Int)( sizeof( FIXED_KEYS ) / sizeof( FIXED_KEYS[ 0 ] ) ) ) )
 		return 0;
 	// a button off the bar gives a grid letter up to the bar
 	if( s_commandGrid && isOneOf( letter, GRID_KEYS, GRID_KEY_COUNT ) )
