@@ -1083,12 +1083,14 @@ static void fillCatalogWidgets( void )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The controls -> GlobalData, for every catalog row that has one.
+/** The controls -> GlobalData and Options.ini, for every catalog row whose control the player moved.
 	*
-	* Runs before saveOptionsToPreferences, which writes GlobalData out; a row with no control keeps
-	* whatever was loaded and is written back unchanged. */
+	* A control shows the value GlobalData held as the menu opened, and that can be something
+	* Options.ini does not say: the launcher's -language, a -lighting switch, or ClassicGraphics
+	* forcing the light to Classic.  So only a row whose control now says something else is written;
+	* every other key stays as the launcher or the last Accept left it on disk. */
 //-------------------------------------------------------------------------------------------------
-static void readCatalogWidgets( void )
+static void readCatalogWidgets( OptionPreferences &out )
 {
 	for( Int i = 0; i < TheOptionCatalogCount; ++i )
 	{
@@ -1097,10 +1099,11 @@ static void readCatalogWidgets( void )
 		if( widget == NULL )
 			continue;
 
+		Int value;
 		switch( def.kind )
 		{
 			case OPTION_BOOL:
-				def.set( GadgetCheckBoxIsChecked( widget ) ? 1 : 0 );
+				value = GadgetCheckBoxIsChecked( widget ) ? 1 : 0;
 				break;
 
 			case OPTION_ENUM:
@@ -1108,21 +1111,25 @@ static void readCatalogWidgets( void )
 				Int selected = -1;
 				GadgetComboBoxGetSelectedPos( widget, &selected );
 				// -1 is a combo box with nothing picked, which is not a value to write anywhere
-				if( selected >= 0 )
-				{
-					const Int value = clampOptionValue( def, def.lo + selected );
-					// a layout read as the menus were built shows only once they are built again
-					if( def.apply == APPLY_SHELL_REBUILD && value != def.get() )
-						pendingShellRebuild = TRUE;
-					def.set( value );
-				}
+				if( selected < 0 )
+					continue;
+				value = clampOptionValue( def, def.lo + selected );
 				break;
 			}
 
-			case OPTION_INT:
-				def.set( clampOptionValue( def, GadgetSliderGetPosition( widget ) ) );
+			default:
+				value = clampOptionValue( def, GadgetSliderGetPosition( widget ) );
 				break;
 		}
+
+		if( value == def.get() )
+			continue;
+
+		// a layout read as the menus were built shows only once they are built again
+		if( def.apply == APPLY_SHELL_REBUILD )
+			pendingShellRebuild = TRUE;
+		def.set( value );
+		out[ AsciiString( def.iniKey ) ] = formatOptionValue( def, value );
 	}
 }
 
@@ -1311,37 +1318,6 @@ static void saveVolumeOptions( OptionPreferences &out )
 	}
 }
 
-#if defined(_WIN32)
-//-------------------------------------------------------------------------------------------------
-// The volume view.  On Windows the launcher owns every setting but the four volumes, so the main
-// menu's and the quit menu's Options buttons open the Audio page alone (OpenVolumeOptions), and its Accept writes those
-// four onto Options.ini as it is on disk right now.  Nothing the menu loaded for the other pages is
-// written back, so a resolution or a detail preset the launcher saved stays what the launcher said.
-// -optionsmenu and -resdrill still open the whole menu; they are how a script reaches it.
-//-------------------------------------------------------------------------------------------------
-static Bool volumeOnly = FALSE;
-
-static void saveVolumeOnly( void )
-{
-	delete pref;
-	pref = NEW OptionPreferences;
-	saveVolumeOptions( *pref );
-
-	// ambience is a catalog row; its setter applies it to the audio manager as well
-	const OptionDef *ambient = findOptionDef( "AmbientVolume" );
-	ambient->set( clampOptionValue( *ambient, GadgetSliderGetPosition( findOptionWidget( *ambient ) ) ) );
-	(*pref)[ "AmbientVolume" ] = formatOptionValue( *ambient, ambient->get() );
-}
-
-void OpenVolumeOptions( void )
-{
-	WindowLayout *optLayout = TheShell->getOptionsLayout( TRUE );
-	optLayout->runInit( &volumeOnly );
-	optLayout->hide( FALSE );
-	optLayout->bringForward();
-}
-#endif
-
 static void saveOptions( void )
 {
 	Int index;
@@ -1354,9 +1330,9 @@ static void saveOptions( void )
 	const MonitorEntry oldMonitor = findMonitor( TheGlobalData->m_monitor.str() );
 
 	//-------------------------------------------------------------------------------------------------
-	// The catalog's controls, read back into GlobalData before the pass below writes GlobalData out.
-	// The monitor goes in with them, because a borderless window takes its size from it.
-	readCatalogWidgets();
+	// The catalog's controls, read back into GlobalData and onto Options.ini where the player changed
+	// them.  The monitor goes in with them, because a borderless window takes its size from it.
+	readCatalogWidgets( *pref );
 	const MonitorEntry monitor = selectedMonitor();
 	TheWritableGlobalData->m_monitor = monitor.device;
 
@@ -1367,13 +1343,6 @@ static void saveOptions( void )
 	// resolution block further down then hands all of it to the display in one change.
 	//
 	applyWindowMode();
-
-	//-------------------------------------------------------------------------------------------------
-	// Everything in TheOptionCatalog, written back from GlobalData in one pass.  A catalog setting
-	// with a widget has put its value into GlobalData by the time Accept runs; one without a widget
-	// writes back what it loaded, which normalizes the spelling and the range of a hand-edited key
-	// without changing what it means.
-	saveOptionsToPreferences( *pref );
 
 	//-------------------------------------------------------------------------------------------------
 //	// provider type
@@ -2127,6 +2096,7 @@ static const SliderReadout TheSliderReadouts[] =
 	{ "OptionsMenu.wnd:SliderScrollSpeed",	"OptionsMenu.wnd:ValueScrollSpeed",				READOUT_NUMBER },
 	{ "OptionsMenu.wnd:SliderZoomSpeed",		"OptionsMenu.wnd:ValueZoomSpeed",					READOUT_PERCENT },
 	{ "OptionsMenu.wnd:SliderDragTolerance",	"OptionsMenu.wnd:ValueDragTolerance",			READOUT_NUMBER },
+	{ "OptionsMenu.wnd:SliderMenuTransitionSpeed",	"OptionsMenu.wnd:ValueMenuTransitionSpeed",	READOUT_PERCENT },
 };
 
 static const char *const TheTextureResolutionCaptions[] = { "GUI:Low", "GUI:Medium", "GUI:High" };
@@ -2702,17 +2672,6 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	updateDetailNote();
 	showOptionsPage( 0 );
 
-#if defined(_WIN32)
-	// the volume view: the Audio page and no tabs to leave it by
-	volumeOnly = ( userData == &volumeOnly );
-	if( volumeOnly )
-	{
-		showOptionsPage( 3 );
-		for( Int page = 0; page < OPTIONS_PAGE_COUNT; ++page )
-			optionsTab[ page ]->winHide( TRUE );
-	}
-#endif
-
 	// show menu
 	layout->hide( FALSE );
 
@@ -2981,11 +2940,6 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}  // end if
 			else if (controlID == buttonAccept )
 			{
-#if defined(_WIN32)
-				if( volumeOnly )
-					saveVolumeOnly();
-				else
-#endif
 				saveOptions();
 
 				// the command bar rebuilds its grid letters on its next update

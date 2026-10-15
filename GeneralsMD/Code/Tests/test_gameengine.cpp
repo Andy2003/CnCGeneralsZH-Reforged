@@ -5444,15 +5444,15 @@ TEST(particlesys_debris_trails_option_destroys_only_marked_systems)
 	TheWritableGlobalData = savedData;
 }
 
-/* BuildWithoutWorker, on by default, is a live bool row with no control in the game's menu (the
-	 launcher writes it), and it round-trips through Options.ini. */
+/* BuildWithoutWorker, on by default, is a live bool row with a check box on Options > Controls,
+	 and it round-trips through Options.ini. */
 TEST(options_build_without_worker_row_defaults_on_and_round_trips)
 {
 	const OptionDef *def = findOptionDef( "BuildWithoutWorker" );
 	CHECK( def != NULL );
 	CHECK_EQ( (Int)def->kind, (Int)OPTION_BOOL );
 	CHECK_EQ( (Int)def->apply, (Int)APPLY_LIVE );
-	CHECK( def->widgetName == NULL || def->widgetName[ 0 ] == '\0' );
+	CHECK_STR( def->widgetName, "OptionsMenu.wnd:CheckBuildWithoutWorker" );
 
 	GlobalData *savedData = TheWritableGlobalData;
 	TheWritableGlobalData = NEW GlobalData;
@@ -13952,17 +13952,17 @@ TEST(gameplay_conveniences_are_forced_on_and_left_the_catalog)
 	CHECK( bars != NULL );
 	CHECK( bars->widgetName != NULL && bars->widgetName[ 0 ] != '\0' );
 
-	/* The camera and mouse habits went the other way: no control, but the row stays, so an
-		 Options.ini that names one still wins over the default.  ZoomToCursor came back to the menu. */
-	static const char *const hidden[] =
+	/* The two mouse habits are Controls check boxes again, on by default. */
+	static const char *const habits[] =
 	{
 		"FormationDrag", "EdgeScrollInWindowedMode", NULL
 	};
-	for( Int i = 0; hidden[ i ] != NULL; ++i )
+	for( Int i = 0; habits[ i ] != NULL; ++i )
 	{
-		const OptionDef *def = findOptionDef( hidden[ i ] );
+		const OptionDef *def = findOptionDef( habits[ i ] );
 		CHECK( def != NULL );
-		CHECK( def->widgetName == NULL || def->widgetName[ 0 ] == '\0' );
+		CHECK( def->widgetName != NULL && def->widgetName[ 0 ] != '\0' );
+		CHECK_EQ( def->get(), 1 );
 	}
 
 	/* The snaps, grid placement and the opening zoom are Controls check boxes, off by default, under

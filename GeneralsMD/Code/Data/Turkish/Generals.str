@@ -1426,11 +1426,11 @@ GUI:QMAborted
 END
 
 GUI:DrawScrollAnchor
-"Kaydırma çapasını çiz"
+"Kaydırma Çapasını Çiz"
 END
 
 GUI:MoveScrollAnchor
-"Kaydırma çapasını taşı"
+"Kaydırma Çapasını Taşı"
 END
 
 GUI:GroupRoom1
@@ -3378,11 +3378,11 @@ GUI:RemoteIPDesc
 END
 
 GUI:SaveCamera
-"Kamerayı tekrarlara kaydet"
+"Kameramı Kaydet"
 END
 
 GUI:UseCamera
-"Tekrarlarda kayıtlı kamerayı kullan"
+"Kayıtlı Kamerayı İzle"
 END
 
 Mouse:Windows
@@ -14850,7 +14850,7 @@ GUI:OptionsGroupLighting
 END
 
 GUI:OptionsGroupOrders
-"Emirler"
+"Fare ve Emirler"
 END
 
 GUI:OptionsGroupBattlefield
@@ -15623,4 +15623,128 @@ END
 
 GUI:KickVoteNone
 "Açık bir oylama yok. Başlatmak için /kick ve oyuncunun adını yazın."
+END
+
+GUI:ShadowQuality
+"Gölge Kalitesi"
+END
+
+GUI:ShadowQuality0
+"Düşük"
+END
+
+GUI:ShadowQuality1
+"Orta"
+END
+
+GUI:ShadowQuality2
+"Yüksek"
+END
+
+TOOLTIP:ShadowQuality
+"Birim ve bina gölgelerinin keskinliği. Yüksek yaklaşık 64 MB video belleği kullanır, Düşük zayıf kartta bellek açar. Yalnızca Direct3D 11'de ve Klasik Grafikler kapalıyken. Kabul Et'e basınca uygulanır."
+END
+
+GUI:VolumetricSmoke
+"Hacimli Duman"
+END
+
+TOOLTIP:VolumetricSmoke
+"Duman ve toz, arkalarındaki zemini, birimleri ve dumanı kalınlıklarına göre gölgeler. Yalnızca Direct3D 11, büyük çatışmalarda küçük bir yük getirir. Kabul Et'e basınca uygulanır."
+END
+
+GUI:LightingStyle
+"Aydınlatma"
+END
+
+GUI:LightingStyle0
+"Klasik"
+END
+
+GUI:LightingStyle1
+"Reforged"
+END
+
+TOOLTIP:LightingStyle
+"Reforged her haritaya günün saatini bozmadan daha güçlü ve sıcak bir güneş, daha koyu gölgeli yüzler ve daha derin gölgeler verir. Klasik 2003'ün düz ışığıdır ve Klasik Grafikler hep onu kullanır. Bir sonraki haritada geçerli olur."
+END
+
+GUI:SmokeFireLighting
+"Ateşin Aydınlattığı Duman"
+END
+
+TOOLTIP:SmokeFireLighting
+"Ateşin yanındaki duman onun turuncu ışığını alır. Kabul Et'e basınca uygulanır."
+END
+
+GUI:DebrisTrails
+"Patlama Parça İzleri"
+END
+
+TOOLTIP:DebrisTrails
+"Patlamalar arkasında duman bırakan parçalar savurur, enkazdan yanan şarapnel saçılır. Kapalıyken patlamalar orijinal haliyle kalır. Kabul Et'e basınca uygulanır."
+END
+
+GUI:FormationDrag
+"Sürükleyerek Düzen Kur"
+END
+
+TOOLTIP:FormationDrag
+"Hareket, saldırarak ilerleme ya da koruma emri hazırken sürüklemek birimleri çizdiğiniz çizgi boyunca dizer."
+END
+
+GUI:BuildWithoutWorker
+"İşçi Seçmeden İnşa"
+END
+
+TOOLTIP:BuildWithoutWorker
+"Hiçbir şey seçili değilken komut çubuğu işçilerinizin binalarını gösterir ve yere en yakın boştaki işçi gidip inşa eder. Kapalıyken çubuk, 2003'teki gibi bir işçi seçene kadar boş kalır."
+END
+
+GUI:HealthBarColors
+"Can Çubuğu Rengi"
+END
+
+GUI:HealthBarColors0
+"Yeşilden Kırmızıya"
+END
+
+GUI:HealthBarColors1
+"Oyuncu Rengi"
+END
+
+TOOLTIP:HealthBarColors
+"Tam canda yeşil, sarıdan geçip kırmızıya, ya da kimin olduğu görünsün diye her çubuk sahibinin renginde. Devre dışı birimler mavi kalır."
+END
+
+GUI:MenuTransitionSpeed
+"Menü Geçiş Hızı"
+END
+
+TOOLTIP:MenuTransitionSpeed
+"Menülerin kayma ve solma hızı. 100 özgün hızdır."
+END
+
+GUI:OptionsGroupMenus
+"Menüler"
+END
+
+GUI:OptionsGroupReplays
+"Tekrarlar"
+END
+
+TOOLTIP:SaveCamera
+"Tek oyunculu ve çatışma oyunlarında kamera hareketleriniz tekrarlarınıza kaydedilir."
+END
+
+TOOLTIP:UseCamera
+"Tekrar, size serbest kamera bırakmak yerine oyuncusunun kaydettiği kamerayı izler."
+END
+
+TOOLTIP:DrawScrollAnchor
+"Sağ tuşla sürükleyerek kaydırmanın başladığı yere bir işaret koyar."
+END
+
+TOOLTIP:MoveScrollAnchor
+"Kaydırma işareti imleci en fazla yarım ekran geriden izler, böylece uzun bir sürükleme durmadan hızlanmaz."
 END

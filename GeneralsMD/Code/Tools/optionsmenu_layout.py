@@ -46,8 +46,9 @@ from wndlayout import clone
 # The panel and everything on it, in the layout's own 800x600 creation resolution.  One inner edge,
 # 16 pixels in from the panel on both sides, is where the title, the tabs, the pages, the buttons
 # and the version line all start and stop.  The frame is as tall as the tallest group column needs -
-# Graphics' Effects column ends 308 pixels below its heading, its Image column 304 - plus the title,
-# the tabs and the buttons, and it is centred on the 600 line: 58 above it, 58 below.  Seven tabs
+# Effects' Shadows column and Graphics' Quality column both end 312 pixels below their heading, on the
+# page's last pixel - plus the title, the tabs and the buttons, and it is centred on the 600 line: 58
+# above it, 58 below.  A column that runs past the page is refused when the layout is built.  Seven tabs
 # still fit the inner width at 100 pixels each.
 PANEL = (20, 58, 760, 484)          # left, top, width, height
 INNER_LEFT, INNER_WIDTH = 36, 728
@@ -175,6 +176,31 @@ NEW_CONTROLS = [
     (SLIDER, "SliderAmbientVolume",    None),
     (LABEL,  "LabelZoomSpeed",         "GUI:ZoomSpeed"),
     (SLIDER, "SliderZoomSpeed",        None),
+    (LABEL,  "LabelShadowQuality",     "GUI:ShadowQuality"),
+    (COMBO,  "ComboBoxShadowQuality",  None),
+    (CHECK,  "CheckVolumetricSmoke",   "GUI:VolumetricSmoke"),
+    (LABEL,  "LabelLightingStyle",     "GUI:LightingStyle"),
+    (COMBO,  "ComboBoxLightingStyle",  None),
+    (CHECK,  "CheckSmokeFireLighting", "GUI:SmokeFireLighting"),
+    (CHECK,  "CheckDebrisTrails",      "GUI:DebrisTrails"),
+    (CHECK,  "CheckEdgeScrollWindowed", "GUI:EdgeScrollWindowed"),
+    (CHECK,  "CheckFormationDrag",     "GUI:FormationDrag"),
+    (CHECK,  "CheckBuildWithoutWorker", "GUI:BuildWithoutWorker"),
+    (LABEL,  "LabelHealthBarColors",   "GUI:HealthBarColors"),
+    (COMBO,  "ComboBoxHealthBarColors", None),
+    (LABEL,  "LabelMenuTransitionSpeed", "GUI:MenuTransitionSpeed"),
+    (SLIDER, "SliderMenuTransitionSpeed", None),
+]
+
+# EA's check boxes that shipped HIDDEN off the panel's right edge with working code behind them in
+# OptionsMenu.cpp, which saves each one the moment it is clicked.  They come onto the pages with a
+# tooltip each; their captions are EA's labels, retitled in Patch.str.
+#   (name, tooltip key)
+EA_PARKED = [
+    ("CheckBoxDrawAnchor", "TOOLTIP:DrawScrollAnchor"),
+    ("CheckBoxMoveAnchor", "TOOLTIP:MoveScrollAnchor"),
+    ("CheckBoxSaveCamera", "TOOLTIP:SaveCamera"),
+    ("CheckBoxUseCamera",  "TOOLTIP:UseCamera"),
 ]
 
 # A slider on its own says nothing about where it stands, so each one has a readout beside it that
@@ -182,7 +208,7 @@ NEW_CONTROLS = [
 READOUTS = [
     "ValueGamma", "ValueTextureResolution", "ValueParticleCap", "ValueAnisotropy",
     "ValueMusicVolume", "ValueSFXVolume", "ValueVoiceVolume", "ValueScrollSpeed",
-    "ValueDragTolerance", "ValueAmbientVolume", "ValueZoomSpeed",
+    "ValueDragTolerance", "ValueAmbientVolume", "ValueZoomSpeed", "ValueMenuTransitionSpeed",
 ]
 
 # Lines of small grey text under a control that say what its current choice does, written by
@@ -205,7 +231,8 @@ NOTE_COLOR = ("ENABLED:  192 192 192 255, ENABLEDBORDER:  0 0 0 255, "
 # a cloned slider keeps its template's range unless it is given one; selfcheck holds these to the
 # catalog row's own bounds
 SLIDER_RANGES = [("SliderAnisotropy", 0, 16), ("SliderDragTolerance", 2, 50),
-                 ("SliderAmbientVolume", 0, 100), ("SliderZoomSpeed", 25, 300)]
+                 ("SliderAmbientVolume", 0, 100), ("SliderZoomSpeed", 25, 300),
+                 ("SliderMenuTransitionSpeed", 25, 400)]
 
 # EA's captions that do not fit the page: two popup headings written in capitals, and a check box
 # caption that ran 20 pixels past the panel's right edge once it stood in a 268 pixel column.
@@ -277,12 +304,16 @@ GROUP_LAYOUT = [
             setting("LabelTextureFilter", "ComboBoxTextureFilter"),
             setting("LabelAnisotropy", "SliderAnisotropy", "ValueAnisotropy")]),
         ("GUI:OptionsGroupLighting", [
+            setting("LabelLightingStyle", "ComboBoxLightingStyle"),
             setting("LabelBloom", "ComboBoxBloom"),
             ("check", "CheckGroundLighting"),
             ("check", "CheckHeatEffects")])]),
 
     ("PageEffects", [
-        ("GUI:OptionsGroupShadows", [("check", name) for name in SHADOW_CHECKS]),
+        ("GUI:OptionsGroupShadows",
+            [setting("LabelShadowQuality", "ComboBoxShadowQuality")]
+            + [("check", name) for name in SHADOW_CHECKS]
+            + [("check", "CheckVolumetricSmoke")]),
         ("GUI:OptionsGroupExtras", [
             ("check", "CheckShowProps"),
             ("check", "CheckSmoothWater"),
@@ -291,7 +322,9 @@ GROUP_LAYOUT = [
             ("check", "CheckBehindBuilding")]),
         ("GUI:OptionsGroupParticles", [
             setting("LabelSmoke", "ComboBoxSmoke"),
-            ("check", "CheckParticleBounce")])]),
+            ("check", "CheckParticleBounce"),
+            ("check", "CheckSmokeFireLighting"),
+            ("check", "CheckDebrisTrails")])]),
 
     ("PageAudio", [
         ("GUI:OptionsGroupVolume", [
@@ -307,30 +340,41 @@ GROUP_LAYOUT = [
             ("check", "CheckIsometricCamera"),
             ("check", "CheckZoomToCursor"),
             ("check", "CheckStartAtMaxZoom"),
-            ("check", "CheckSnapCamera45")]),
+            ("check", "CheckSnapCamera45"),
+            ("check", "CheckEdgeScrollWindowed")]),
         ("GUI:OptionsGroupOrders", [
+            setting("LabelDragTolerance", "SliderDragTolerance", "ValueDragTolerance"),
             ("check", "CheckAlternateMouse"),
             ("check", "Retaliation"),
-            ("check", "CheckDoubleClickAttackMove")]),
+            ("check", "CheckDoubleClickAttackMove"),
+            ("check", "CheckFormationDrag"),
+            ("check", "CheckBoxDrawAnchor"),
+            ("check", "CheckBoxMoveAnchor")]),
         ("GUI:OptionsGroupPlacement", [
             ("check", "CheckGridBuild"),
             ("check", "CheckSnapBuild45"),
             ("check", "CheckSnapBuildNeighbour"),
-            ("check", "CheckNudgeBuild")]),
+            ("check", "CheckNudgeBuild"),
+            ("check", "CheckBuildWithoutWorker")]),
         ("GUI:OptionsGroupInput", [
-            setting("LabelDragTolerance", "SliderDragTolerance", "ValueDragTolerance"),
             ("check", "CheckChromaLighting")])]),
 
     ("PageInterface", [
         ("GUI:OptionsGroupHud", [
             ("check", "CheckNetBox")]),
+        ("GUI:OptionsGroupMenus", [
+            setting("LabelMenuTransitionSpeed", "SliderMenuTransitionSpeed", "ValueMenuTransitionSpeed")]),
         ("GUI:OptionsGroupBattlefield", [
             setting("LabelHealthBars", "ComboBoxHealthBars"),
+            setting("LabelHealthBarColors", "ComboBoxHealthBarColors"),
             setting("LabelPlayerColors", "ComboBoxPlayerColors"),
             ("check", "CheckOrderLines"),
             ("check", "CheckEmptyBuildingPips")]),
         ("GUI:OptionsGroupLanguage", [
-            setting("LabelLanguage", "ComboBoxLanguage")])]),
+            setting("LabelLanguage", "ComboBoxLanguage")]),
+        ("GUI:OptionsGroupReplays", [
+            ("check", "CheckBoxSaveCamera"),
+            ("check", "CheckBoxUseCamera")])]),
 
     ("PageNetwork", [
         ("GUI:OptionsGroupAddresses", [
@@ -532,6 +576,11 @@ def build(layout):
             waiting[short(child)] = child
     for name in LOOSE:
         waiting[name] = detach(old, name)
+    for name, tooltip in EA_PARKED:
+        control = detach(old, name)
+        control.set_prop("STATUS", "ENABLED+IMAGE+BORDER")   # the page's own check boxes', not HIDDEN
+        control.put_prop("TOOLTIPTEXT", '"%s"' % tooltip)
+        waiting[name] = control
     for node in detach(old, ADVANCED).walk():
         if short(node) in ADVANCED_KEEP:
             waiting[short(node)] = node
@@ -755,7 +804,11 @@ def selfcheck():
         if key not in keys:
             problems.append("caption %s is not in Patch.str" % key)
 
-    for name in READOUTS + GRAPHICS_CHECKS + MENU_CHECKS + MENU_COMBOS + [n for n, _k, _c in NOTES]:
+    for name, tooltip in EA_PARKED:
+        if tooltip not in keys:
+            problems.append("%s tooltip %s is not in Patch.str" % (name, tooltip))
+    for name in (READOUTS + GRAPHICS_CHECKS + MENU_CHECKS + MENU_COMBOS + [n for n, _k, _c in NOTES]
+                 + [n for n, _t in EA_PARKED]):
         if name not in controls:
             problems.append("%s has no %s, which OptionsMenu.cpp fills in" % (os.path.basename(LAYOUT), name))
     for group in [g for _page, groups in GROUP_LAYOUT for g in groups]:

@@ -14222,7 +14222,7 @@ GUI:OptionsGroupLighting
 END
 
 GUI:OptionsGroupOrders
-"Befehle"
+"Maus und Befehle"
 END
 
 GUI:OptionsGroupBattlefield
