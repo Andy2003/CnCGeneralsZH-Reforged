@@ -4174,6 +4174,16 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 		GUI_COMMAND_FORCE_ATTACK ), 0 );
 }
 
+TEST(metamap_format_chord_names_the_hold)
+{
+	CHECK( MetaMap_formatChord( MK_NONE, CTRL, COMMANDUSABLE_GAME ) == UnicodeString( u"Ctrl" ) );
+	CHECK( MetaMap_formatChord( MK_F, NONE, COMMANDUSABLE_GAME ) == UnicodeString( u"F" ) );
+	CHECK( MetaMap_formatChord( MK_F, CTRL, COMMANDUSABLE_GAME ) == UnicodeString( u"Ctrl + F" ) );
+	CHECK( MetaMap_formatChord( MK_NONE, ALT, COMMANDUSABLE_GAME ) == UnicodeString( u"Alt" ) );
+	CHECK( MetaMap_formatChord( MK_NONE, CTRL, COMMANDUSABLE_NONE ).isEmpty() );
+	CHECK( MetaMap_chordLabel( GameMessage::MSG_META_BEGIN_FORCEATTACK ) == UnicodeString( u"Ctrl" ) );
+}
+
 /* Grid keys leave windows 11 and 13 keyless.  The USA War Factory's TOW upgrade in 11 moves to the
    first free keyed window, leftmost first; attack move in 11 has its own A and is never unkeyed */
 TEST(controlbar_grid_packs_keyless_buttons_into_keyed_windows)

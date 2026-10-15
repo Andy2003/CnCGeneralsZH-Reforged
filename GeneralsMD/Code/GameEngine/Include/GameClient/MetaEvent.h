@@ -388,4 +388,11 @@ public:
 
 extern MetaMap *TheMetaMap;
 
+/** The words a command bar button wears for this meta command's key plus modifiers, English, the
+	* same shape as the launcher's chord ("Ctrl", "Alt", "F", "Ctrl + F"). Empty when the command is
+	* off the keyboard (UseableIn NONE). "Ctrl" when the map is missing, so Force Attack still names
+	* its shipped hold. */
+UnicodeString MetaMap_formatChord( MappableKeyType key, MappableKeyModState mods, CommandUsableInType usable );
+UnicodeString MetaMap_chordLabel( GameMessage::Type meta );
+
 #endif

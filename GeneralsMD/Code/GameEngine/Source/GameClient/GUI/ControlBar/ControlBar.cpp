@@ -4616,17 +4616,22 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		for( Int slot = 0; slot < MAX_COMMANDS_PER_SET; slot++ )
 			if( m_commandWindows[ slot ] == button )
 				barSlot = slot;
-		// Force Attack is Ctrl, the hold that force-fires.  Showing H or F on the cameo would
-		// steal that letter and lie about the key.  Do not addHotKey it: Ctrl is already
-		// MSG_META_BEGIN_FORCEATTACK, and binding the button to Ctrl would toggle on every press.
+		// Force Attack wears the BEGIN_FORCEATTACK hold from MetaMap (Ctrl until the player
+		// rebinds it on the launcher's Command bar tab).  Showing H or F on the cameo would
+		// steal that letter and lie about the key.  Do not addHotKey it: the hold is already
+		// MSG_META_BEGIN_FORCEATTACK, and binding the button to that key would toggle on every press.
 		const Bool forceAttack = commandButton->getCommandType() == GUI_COMMAND_FORCE_ATTACK;
 		const WideChar letter = forceAttack ? 0 : HotKeyManager::playerButtonKey( commandButton->getName(),
 			TheGameText ? TheGameText->fetchEnglishHotKey( commandButton->getTextLabel() ) : 0, barSlot,
 			commandButton->getCommandType() );
 		if( forceAttack )
 		{
-			GadgetButtonSetText( button, UnicodeString( u"Ctrl" ) );
-			button->winSetStatus( WIN_STATUS_SHORTCUT_BUTTON );
+			const UnicodeString chord = MetaMap_chordLabel( GameMessage::MSG_META_BEGIN_FORCEATTACK );
+			GadgetButtonSetText( button, chord );
+			if( chord.isEmpty() )
+				button->winClearStatus( WIN_STATUS_SHORTCUT_BUTTON );
+			else
+				button->winSetStatus( WIN_STATUS_SHORTCUT_BUTTON );
 		}
 		else if( letter != 0 )
 		{
