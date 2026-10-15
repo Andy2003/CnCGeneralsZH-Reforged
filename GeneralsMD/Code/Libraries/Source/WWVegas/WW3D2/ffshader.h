@@ -565,14 +565,15 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"   Each face leans the scene behind it the way its normal leans on the screen, so faces turned\n" \
 	"   different ways show the ground shifted by different amounts and the body's shape reads even\n" \
 	"   over plain sand; a slow, broad ripple swims over that and bends a flat wall across its face.\n" \
-	"   The reach is two and a half world units in pixels at the pixel's depth, never under 4 pixels\n" \
-	"   at 1080 so a unit at play zoom still visibly distorts, never over 4% of the screen.  The\n" \
-	"   ripple is low frequency in the world and slow, so nothing fizzes in motion.  The bend alone\n" \
-	"   was lost at play zoom, so the glass also leans a little toward a cool mid grey, 7% face on\n" \
-	"   and about half at the outline, where a soldier's round body has most of its faces and a\n" \
-	"   building's flat walls have few: a haze rather than a white edge, darkening bright ground as much\n" \
-	"   as it lifts dark ground.  A hint of the unit's own paint stays in it, breathing with the\n" \
-	"   game's own stealth opacity as it did in 2003.  Detected (the strength is never below 0.6\n" \
+	"   The reach is three world units in pixels at the pixel's depth, never under 5 pixels at 1080\n" \
+	"   so a unit at play zoom still visibly distorts, never over 4% of the screen.  The ripple is\n" \
+	"   low frequency in the world and slow, so nothing fizzes in motion.  In play the bend alone\n" \
+	"   left a squad barely there, so the glass also leans toward a cool mid grey, 12% face on and\n" \
+	"   about three quarters at the outline, where a soldier's round body has most of its faces and\n" \
+	"   a building's flat walls have few: a haze rather than a white edge, darkening bright ground as\n" \
+	"   much as it lifts dark ground.  Three eighths to a half of the unit's own paint stays in it,\n" \
+	"   breathing with the game's own stealth opacity as it did in 2003, which is what makes a group\n" \
+	"   read at a glance while it still looks like glass.  Detected (the strength is never below 0.6\n" \
 	"   then), the whole body beats amber as well as its edge: a big flat building has almost no\n" \
 	"   edge facing away from the eye, and with the beat on the rim alone it only turned tan.  The\n" \
 	"   alpha goes back up to the texel's own, because the shade already holds the mix. */\n" \
@@ -594,14 +595,14 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float3 up = above.xyz / above.w - world;\n" \
 	"    float world_per_pixel = max(length(up), 1e-4);\n" \
 	"    float2 lean = float2(dot(surface, right), -dot(surface, up)) / world_per_pixel;\n" \
-	"    float reach = clamp(2.5 / world_per_pixel, 0.0037 * screen.y, 0.04 * screen.y);\n" \
+	"    float reach = clamp(3.0 / world_per_pixel, 0.005 * screen.y, 0.04 * screen.y);\n" \
 	"    float2 bend = (lean * 0.8 + float2(swim_x, swim_y) * 1.2) * reach;\n" \
 	"    int2 at = int2(clamp(position.xy + bend, float2(0.0, 0.0), screen - 1.0));\n" \
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
 	"    float3 own = lerp(grey.xxx, current.rgb, 0.7);\n" \
-	"    float3 glass = lerp(behind, own, 0.1 + 0.15 * opacity);\n" \
-	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), 0.07 + 0.45 * rim);\n" \
+	"    float3 glass = lerp(behind, own, 0.25 + 0.25 * opacity);\n" \
+	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), 0.12 + 0.65 * rim);\n" \
 	"    float found = step(0.01, detected);\n" \
 	"    float beat = 0.55 + 0.45 * sin(t * 6.0);\n" \
 	"    float3 amber = float3(1.0, 0.55, 0.15);\n" \
