@@ -5382,6 +5382,37 @@ TEST(particlesys_debris_trails_option_destroys_only_marked_systems)
 	TheWritableGlobalData = savedData;
 }
 
+/* BuildWithoutWorker, on by default, is a live bool row with no control in the game's menu (the
+	 launcher writes it), and it round-trips through Options.ini. */
+TEST(options_build_without_worker_row_defaults_on_and_round_trips)
+{
+	const OptionDef *def = findOptionDef( "BuildWithoutWorker" );
+	CHECK( def != NULL );
+	CHECK_EQ( (Int)def->kind, (Int)OPTION_BOOL );
+	CHECK_EQ( (Int)def->apply, (Int)APPLY_LIVE );
+	CHECK( def->widgetName == NULL || def->widgetName[ 0 ] == '\0' );
+
+	GlobalData *savedData = TheWritableGlobalData;
+	TheWritableGlobalData = NEW GlobalData;
+	CHECK( TheGlobalData->m_buildWithoutWorker );
+	CHECK_EQ( def->get(), 1 );
+
+	UserPreferences pref;
+	TheWritableGlobalData->m_buildWithoutWorker = FALSE;
+	saveOptionsToPreferences( pref );
+	CHECK_STR( pref[ AsciiString( "BuildWithoutWorker" ) ].str(), "no" );
+	TheWritableGlobalData->m_buildWithoutWorker = TRUE;
+	loadOptionsFromPreferences( pref );
+	CHECK( !TheGlobalData->m_buildWithoutWorker );
+
+	pref[ AsciiString( "BuildWithoutWorker" ) ] = AsciiString( "yes" );
+	loadOptionsFromPreferences( pref );
+	CHECK( TheGlobalData->m_buildWithoutWorker );
+
+	delete TheWritableGlobalData;
+	TheWritableGlobalData = savedData;
+}
+
 /* Loading a save has to put each system back under the id it was saved with.  It used to build the
 	 system through createParticleSystem, which hands out the next id in sequence and files the system
 	 under it, and only then read the saved id over the top - so the manager's index pointed at the

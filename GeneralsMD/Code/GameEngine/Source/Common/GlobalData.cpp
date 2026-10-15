@@ -1175,6 +1175,7 @@ GlobalData::GlobalData()
 	m_dragTolerance = 25;		// what Mouse.ini in INIZH.big says, so nothing moves until the slider does
 	// a left drag with the move, attack move or guard key armed draws a formation line
 	m_formationDrag = TRUE;
+	m_buildWithoutWorker = TRUE;
 	m_chromaLighting = TRUE;	//costs nothing on a machine with no Razer server: the handshake fails once
 	m_menuTransitionSpeed = 100;
 	m_textureFilterMode = 2;	// anisotropic; retail shipped bilinear on a 2003 fill-rate budget

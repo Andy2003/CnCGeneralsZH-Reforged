@@ -446,6 +446,7 @@ public:
 	Bool m_isometricCamera;				///< the tactical view from far off down a narrow cone, near enough orthographic
 	Int m_dragTolerance;				///< pixels the pointer may travel with a button held before the press is a drag; replaces Mouse.ini's DragTolerance
 	Bool m_formationDrag;				///< with the move, attack move or guard key armed, a left drag spreads the selection along the line drawn
+	Bool m_buildWithoutWorker;			///< with nothing selected the command bar shows a builder's buildings; off, an empty bar as 1.04 had it
 	Bool m_chromaLighting;				///< put the state of the match on Razer hardware
 	Int m_menuTransitionSpeed;			///< percent of the authored speed the menus slide and fade at; 100 = as drawn
 	Int m_textureFilterMode;			///< 0 bilinear, 1 trilinear, 2 anisotropic

@@ -86,6 +86,7 @@ static void set_m_ambientVolume( Int value )
 		TheAudio->setVolume( value / 100.0f, (AudioAffect)(AudioAffect_Ambient | AudioAffect_SystemSetting) );
 }
 OPTION_BOOL_ACCESSORS( m_formationDrag )
+OPTION_BOOL_ACCESSORS( m_buildWithoutWorker )
 OPTION_BOOL_ACCESSORS( m_chromaLighting )
 OPTION_INT_ACCESSORS( m_bloomIntensity )
 OPTION_INT_ACCESSORS( m_menuTransitionSpeed )
@@ -308,6 +309,14 @@ const OptionDef TheOptionCatalog[] =
 	{ "FormationDrag",						"", "",
 		OPTION_BOOL, APPLY_LIVE, 0, 1,
 		get_m_formationDrag, set_m_formationDrag },
+
+	// With nothing selected the command bar shows one of your builders' buildings, and a structure put
+	// down from it goes to the idle builder nearest the site.  Client only: the logic already hands a
+	// placement with no qualifying selected builder to one (MSG_DOZER_CONSTRUCT), so off only takes
+	// the bar away, as 1.04 had it.  The bar picks it up on its next evaluation.
+	{ "BuildWithoutWorker",				"", "",
+		OPTION_BOOL, APPLY_LIVE, 0, 1,
+		get_m_buildWithoutWorker, set_m_buildWithoutWorker },
 
 	// The match on Razer hardware: the command bar on the letter keys, power on the digits,
 	// superweapons on the numpad, money on the mousepad.  Only during a match; off, and in every

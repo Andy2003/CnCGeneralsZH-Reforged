@@ -1208,6 +1208,8 @@ public:
 	// get method for list of commandbuttons
 	const CommandButton *getCommandButtons( void ) { return m_commandButtons; }
 
+	Drawable *findStandInBuilder( Bool freeOnly );				///< with BuildWithoutWorker on, the local player's free builder (or, unless freeOnly, any builder) to stand in for an empty selection
+
 protected:
 
 	ICoord2D m_defaultControlBarPosition;				///< Stored the original position of the control bar on the screen
@@ -1226,7 +1228,8 @@ protected:
 	Drawable *m_currentSelectedDrawable;					///< currently selected drawable for the context sensitive interface
 	ControlBarContext m_currContext;							///< our current displayed context
 
-	DrawableID m_rallyPointDrawableID;						///< rally point drawable for visual rally point 
+	DrawableID m_rallyPointDrawableID;						///< rally point drawable for visual rally point
+	DrawableID m_standInBuilderID;								///< with nothing selected, the builder whose command bar is shown (INVALID_DRAWABLE_ID otherwise)
 
 	Real m_displayedConstructPercent;							///< construct percent last displayed to user
 	UnsignedInt m_displayedOCLTimerSeconds;				///< OCL Timer seconds remaining last displayed to user

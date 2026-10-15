@@ -433,6 +433,16 @@ void ControlBar::populateCommand( Object *obj )
 			slot[ i ] = shown[ i ] >= 0 ? set[ shown[ i ] ] : NULL;
 	}
 
+	// a builder standing in for an empty selection offers its buildings, not its orders: nobody
+	// asked that dozer to go and clear mines
+	if( m_standInBuilderID != INVALID_DRAWABLE_ID && obj->getDrawable()
+			&& obj->getDrawable()->getID() == m_standInBuilderID )
+	{
+		for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+			if( slot[ i ] && ControlBar_namedCommandPlace( slot[ i ]->getName().str() ) == COMMAND_PLACE_CLEAR_MINES )
+				slot[ i ] = NULL;
+	}
+
 	// populate the button with commands defined
 	const CommandButton *commandButton;
 	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
