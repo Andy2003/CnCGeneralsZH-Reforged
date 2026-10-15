@@ -6109,6 +6109,7 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 			case GUI_COMMAND_CANCEL_UNIT_BUILD:
 			case GUI_COMMAND_CANCEL_UPGRADE:
 			case GUI_COMMAND_ATTACK_MOVE:
+			case GUI_COMMAND_FORCE_ATTACK:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
 			case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
@@ -6224,6 +6225,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 			case GUI_COMMAND_OBJECT_UPGRADE:
 			case GUI_COMMAND_CANCEL_UPGRADE:
 			case GUI_COMMAND_ATTACK_MOVE:
+			case GUI_COMMAND_FORCE_ATTACK:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
 			case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
@@ -6318,6 +6320,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 			case GUI_COMMAND_PLAYER_UPGRADE:
 			case GUI_COMMAND_OBJECT_UPGRADE:
 			case GUI_COMMAND_CANCEL_UPGRADE:
+			case GUI_COMMAND_FORCE_ATTACK:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
 			case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
@@ -6376,6 +6379,7 @@ void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, 
 				break;
 			}
 			case GUI_COMMAND_ATTACK_MOVE:
+			case GUI_COMMAND_FORCE_ATTACK:
 			case GUI_COMMAND_STOP:
 			case GUI_COMMAND_DOZER_CONSTRUCT:
 			case GUI_COMMAND_DOZER_CONSTRUCT_CANCEL:

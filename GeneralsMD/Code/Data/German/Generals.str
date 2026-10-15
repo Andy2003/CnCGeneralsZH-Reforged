@@ -3581,6 +3581,10 @@ CONTROLBAR:AttackMove
 "Angriffs&marsch"
 END
 
+CONTROLBAR:ForceAttack
+"Zwangangri&ff"
+END
+
 CONTROLBAR:Stop
 "&Stopp"
 END
@@ -6515,6 +6519,10 @@ END
 
 CONTROLBAR:ToolTipAttackMove
 "Einheit zieht zum Zielgebiet und stoppt, um unterwegs Feinde zu bekämpfen"
+END
+
+CONTROLBAR:ToolTipForceAttack
+"Der nächste Klick greift alles unter dem Zeiger an, auch den Boden und deine eigene Seite. Klicke die Schaltfläche erneut, um abzubrechen."
 END
 
 CONTROLBAR:ToolTipCommandStop

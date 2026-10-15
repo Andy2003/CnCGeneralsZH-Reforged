@@ -221,6 +221,7 @@ enum GUICommandType : Int
 	GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT, ///< do a shortcut special power using the construct building interface
 	
 	GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE,
+	GUI_COMMAND_FORCE_ATTACK,							///< arm force-fire; the next click attacks whatever is under the pointer
 
 	// add more commands here, don't forget to update the string command list below too ...
 
@@ -271,6 +272,7 @@ static const char *TheGuiCommandNames[] =
 	"SPECIAL_POWER_CONSTRUCT",					
 	"SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT", 
 	"SELECT_ALL_UNITS_OF_TYPE",
+	"FORCE_ATTACK",
 
 	NULL
 };
@@ -506,6 +508,10 @@ Bool ControlBar_commandPlaces( const Int *types, const Int *groups, const Int *p
 	* for; such a button moves to an empty window, the three orders to Zero Hour's own 11, 13 and 14
 	* when free, anything else to the first empty one. */
 void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int count, Int *shown );
+
+/** Slot 12 (0-based 11) when the set already has Attack Move and that hole is empty: left of Stop,
+	* under Attack Move. -1 when the set has no Attack Move, or already uses 12 (China CC mines). */
+Int ControlBar_forceAttackSlot( const Int *types, Int count );
 
 /** Grid keys' second pass over ControlBar_fitCommandSlots' `shown`: a button in window w with no key
 	* there (`unkeyed[ w ]`) moves to the first empty window, leftmost first, whose place has a key

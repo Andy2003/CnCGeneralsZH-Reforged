@@ -416,6 +416,18 @@ void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int cou
 }
 
 //-------------------------------------------------------------------------------------------------
+Int ControlBar_forceAttackSlot( const Int *types, Int count )
+{
+	enum { SLOT = 11 };
+	if( count <= SLOT || types[ SLOT ] != GUI_COMMAND_NONE )
+		return -1;
+	for( Int slot = 0; slot < count; slot++ )
+		if( types[ slot ] == GUI_COMMAND_ATTACK_MOVE )
+			return SLOT;
+	return -1;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ControlBar_packKeyedSlots( const Bool *keyed, const Bool *unkeyed, Int count, Int *shown )
 {
 	for( Int from = 0; from < count; from++ )

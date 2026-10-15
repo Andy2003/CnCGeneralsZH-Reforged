@@ -4134,6 +4134,42 @@ TEST(controlbar_mod_slots_past_the_bar_fit_its_windows)
 		CHECK_EQ( shown[ slot ], humvee[ slot ] != N && slot < WINDOWS ? slot : -1 );
 }
 
+TEST(controlbar_force_attack_slot_is_under_attack_move)
+{
+	enum { SLOTS = MAX_COMMANDS_PER_SET, WINDOWS = 14 };
+	const Int N = GUI_COMMAND_NONE, U = GUI_COMMAND_OBJECT_UPGRADE, W = GUI_COMMAND_SWITCH_WEAPON;
+	Int types[ SLOTS ];
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		types[ slot ] = N;
+	types[ 10 ] = GUI_COMMAND_ATTACK_MOVE;
+	types[ 12 ] = GUI_COMMAND_GUARD;
+	types[ 13 ] = GUI_COMMAND_STOP;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), 11 );
+
+	types[ 11 ] = GUI_COMMAND_OBJECT_UPGRADE;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), -1 );
+
+	types[ 11 ] = N;
+	types[ 10 ] = N;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), -1 );
+
+	/* Contra ranger: Attack Move in 15, slot 12 empty. Inject then fit keeps Force Attack in 12
+	   and still maps Attack Move, Guard and Stop to 11, 13 and 14 */
+	Bool windowed[ SLOTS ];
+	Int shown[ SLOTS ];
+	for( Int slot = 0; slot < SLOTS; slot++ )
+		windowed[ slot ] = slot < WINDOWS;
+	Int ranger[ SLOTS ] = { U, U, U, U, U, N, GUI_COMMAND_SPECIAL_POWER, W, N, W, N, N, N, N,
+		GUI_COMMAND_ATTACK_MOVE, N, GUI_COMMAND_GUARD, GUI_COMMAND_STOP };
+	CHECK_EQ( ControlBar_forceAttackSlot( ranger, SLOTS ), 11 );
+	ranger[ 11 ] = GUI_COMMAND_FORCE_ATTACK;
+	ControlBar_fitCommandSlots( ranger, windowed, SLOTS, shown );
+	CHECK_EQ( shown[ 10 ], 14 );
+	CHECK_EQ( shown[ 11 ], 11 );
+	CHECK_EQ( shown[ 12 ], 16 );
+	CHECK_EQ( shown[ 13 ], 17 );
+}
+
 /* Grid keys leave windows 11 and 13 keyless.  The USA War Factory's TOW upgrade in 11 moves to the
    first free keyed window, leftmost first; attack move in 11 has its own A and is never unkeyed */
 TEST(controlbar_grid_packs_keyless_buttons_into_keyed_windows)

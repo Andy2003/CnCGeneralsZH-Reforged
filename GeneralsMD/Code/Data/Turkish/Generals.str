@@ -3701,6 +3701,10 @@ CONTROLBAR:AttackMove
 "&Saldırarak İlerle"
 END
 
+CONTROLBAR:ForceAttack
+"&Zorla Saldır"
+END
+
 CONTROLBAR:Stop
 "&Dur"
 END
@@ -6839,6 +6843,10 @@ END
 
 CONTROLBAR:ToolTipAttackMove
 "Birliğe hedef bölgeye ilerleme ve yolda karşılaştığı düşmanlarla çatışmak için durma emri verin"
+END
+
+CONTROLBAR:ToolTipForceAttack
+"Bir sonraki tıklama imlecin altındaki her şeye saldırır, zemin ve kendi tarafınız da buna dahil. Vazgeçmek için düğmeye yeniden tıklayın."
 END
 
 CONTROLBAR:ToolTipCommandStop

@@ -30,6 +30,14 @@ GUI:OrderForceAttackDescription
 "The next click attacks whatever is under the pointer, the ground and your own side included. Click the key again to call it off."
 END
 
+CONTROLBAR:ForceAttack
+"&Force Attack"
+END
+
+CONTROLBAR:ToolTipForceAttack
+"The next click attacks whatever is under the pointer, the ground and your own side included. Click the button again to call it off."
+END
+
 GUI:OrderHoldPositionDescription
 "The selected units guard the spot they stand on and fight whatever comes near, without chasing it out of the area."
 END

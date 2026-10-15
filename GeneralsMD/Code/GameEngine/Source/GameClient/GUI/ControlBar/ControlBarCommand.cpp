@@ -390,6 +390,15 @@ void ControlBar::populateCommand( Object *obj )
 			names[ i ] = shows ? button->getName() : AsciiString::TheEmptyString;
 			types[ i ] = shows ? button->getCommandType() : GUI_COMMAND_NONE;
 		}
+		{
+			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET );
+			const CommandButton *force = forceSlot >= 0 ? findCommandButton( AsciiString( "Command_ForceAttack" ) ) : NULL;
+			if( force )
+			{
+				names[ forceSlot ] = force->getName();
+				types[ forceSlot ] = force->getCommandType();
+			}
+		}
 		HotKeyManager::lendFixedKeys( names, types, MAX_COMMANDS_PER_SET );
 	}
 
@@ -410,6 +419,15 @@ void ControlBar::populateCommand( Object *obj )
 			set[ i ] = commandSet->getCommandButton( i );
 			types[ i ] = ( set[ i ] && !BitTest( set[ i ]->getOptions(), SCRIPT_ONLY ) ) ? set[ i ]->getCommandType() : GUI_COMMAND_NONE;
 			windowed[ i ] = m_commandWindows[ i ] != NULL;
+		}
+		{
+			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET );
+			const CommandButton *force = forceSlot >= 0 ? findCommandButton( AsciiString( "Command_ForceAttack" ) ) : NULL;
+			if( force )
+			{
+				set[ forceSlot ] = force;
+				types[ forceSlot ] = force->getCommandType();
+			}
 		}
 		ControlBar_fitCommandSlots( types, windowed, MAX_COMMANDS_PER_SET, shown );
 
