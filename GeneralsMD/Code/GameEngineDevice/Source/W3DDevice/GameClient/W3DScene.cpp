@@ -105,7 +105,12 @@ static Bool wearsCloak( const Drawable *draw )
 	const StealthLookType look = draw->getStealthDrawnLook();
 	const Real fade = draw->getStealthFade();
 	if( look == STEALTHLOOK_VISIBLE_FRIENDLY || look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED )
-		return fade > 0.001f;
+	{
+		// mines force opacity 0 and must not become a lens on the ground
+		if( draw->isKindOf( KINDOF_MINE ) )
+			return FALSE;
+		return TRUE;
+	}
 	// revealed fades in the translucent pass so the heat can come up from nothing
 	if( look == STEALTHLOOK_VISIBLE_DETECTED && fade < 0.99f )
 		return TRUE;
@@ -670,11 +675,7 @@ static unsigned chooseDrawEffect( const Drawable *draw, const Object *obj, Bool 
 	const StealthLookType look = draw->getStealthDrawnLook();
 	const Real pulse = draw->getSecondMaterialPassOpacity();
 	const Real fade = draw->getStealthFade();
-	Real opacity = draw->getEffectiveOpacity();
-	if( draw->getStealthLook() == STEALTHLOOK_NONE )
-		opacity = opacity + ( 1.0f - opacity ) * ( 1.0f - fade );
-	else
-		opacity *= fade;
+	Real opacity = draw->getStealthSolid();
 	Real strength = 1.0f;
 
 	if ( look == STEALTHLOOK_VISIBLE_DETECTED && !draw->isKindOf( KINDOF_MINE )
