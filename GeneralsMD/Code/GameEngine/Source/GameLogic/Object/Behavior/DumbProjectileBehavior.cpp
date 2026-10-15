@@ -491,6 +491,10 @@ Bool DumbProjectileBehavior::calcFlightPath(Bool recalcNumSegments)
 	{
 		Real flightDistance = flightCurve.getApproximateLength();
 		retailSegments = floatToIntAsMsvc( (float)ceil( flightDistance / (m_flightPathSpeed * LOGICFRAMES_PER_RETAIL_FRAME) ) );
+		// One sample is no path: the iterator hands back its zeroed point, not the muzzle, and EA's
+		// point-blank shell flew to the map's corner and went off there. Two are the muzzle and the target.
+		if (retailSegments == 1)
+			retailSegments = 2;
 	}
 	else
 	{
