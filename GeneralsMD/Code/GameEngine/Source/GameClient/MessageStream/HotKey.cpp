@@ -105,12 +105,14 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		{
 			newModState |= ALT;
 		}
+		// Ctrl+Alt and a build button's key puts its unit on repeat or takes it off
+		const Bool repeatChord = newModState == ( CTRL | ALT );
 		// shift is allowed through: a shift-click on a build button queues a batch of units, and
 		// the label hotkey is meant to be that click's equal. Ctrl and alt still block the hotkey.
-		if( ( newModState & ~SHIFT ) != 0 )
+		if( !repeatChord && ( newModState & ~SHIFT ) != 0 )
 			return disp;
 		// Ctrl+F let go of Ctrl first ends on a bare F release; it is still Ctrl+F
-		if( keyState & KEY_STATE_PRESSED_WITH_CTRL_ALT )
+		if( !repeatChord && ( keyState & KEY_STATE_PRESSED_WITH_CTRL_ALT ) )
 			return disp;
 		const UnsignedByte scanCode = (UnsignedByte)msg->getArgument(0)->integer;
 		WideChar typed = TheKeyboard->getPrintableKey(scanCode, 0);
@@ -127,6 +129,24 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 				typed = (WideChar)out[0];
 		}
 #endif
+		if( repeatChord )
+		{
+			// straight to the bar rather than as a click: a repeated unit the bank cannot pay for
+			// right now has a greyed button, and that is when the repeat most wants stopping
+			Bool pressable = FALSE;
+			GameWindow *win = TheHotKeyManager ? TheHotKeyManager->findHotKey( HotKeyManager::nameOf( typed ), &pressable ) : NULL;
+			const CommandButton *command = win ? (const CommandButton *)GadgetButtonGetData( win ) : NULL;
+			if( command && command->getCommandType() == GUI_COMMAND_UNIT_BUILD &&
+					!BitTest( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
+			{
+				TheControlBar->toggleRepeatUnit( command->getThingTemplate() );
+				AudioEventRTS buttonClick( "GUIClick" );
+				if( TheAudio )
+					TheAudio->addAudioEvent( &buttonClick );
+				disp = DESTROY_MESSAGE;
+			}
+			return disp;
+		}
 		if(TheHotKeyManager && TheHotKeyManager->executeHotKey(HotKeyManager::nameOf(typed)))
 			disp = DESTROY_MESSAGE;
 	}

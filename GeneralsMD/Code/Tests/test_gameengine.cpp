@@ -12927,6 +12927,65 @@ TEST(a_door_stays_open_while_another_unit_is_still_coming)
 	CHECK( !Production_shouldCloseDoorNow( 31, 30, true, true ) );
 }
 
+/* ProductionUpdate.h: production repeat.  A factory keeps a list of units on repeat in the order
+	 they were turned on, and every time its queue runs empty it queues the one whose turn it is and
+	 passes the turn on.  Turning one off must leave the turn with the unit it was on. */
+TEST(production_repeat_turns_round_the_units_in_the_order_they_were_turned_on)
+{
+	static const char a = 0, b = 0, c = 0;
+	const ThingTemplate *tank = (const ThingTemplate *)&a;
+	const ThingTemplate *apc = (const ThingTemplate *)&b;
+	const ThingTemplate *jeep = (const ThingTemplate *)&c;
+
+	ProductionRepeat repeat;
+	CHECK( repeat.turn() == NULL );
+	repeat.advance();		// nothing on repeat: no turn to pass, and no division by zero
+	CHECK( repeat.turn() == NULL );
+
+	repeat.set( tank, TRUE );
+	repeat.set( apc, TRUE );
+	repeat.set( tank, TRUE );		// already on: not a second entry
+	CHECK_EQ( 2, (Int)repeat.m_units.size() );
+	CHECK( repeat.has( tank ) && repeat.has( apc ) && !repeat.has( jeep ) );
+
+	CHECK( repeat.turn() == tank );
+	repeat.advance();
+	CHECK( repeat.turn() == apc );
+	repeat.advance();
+	CHECK( repeat.turn() == tank );
+
+	/* the turn is on the third of three; taking the first off keeps it on the third */
+	repeat.set( jeep, TRUE );
+	repeat.advance();
+	repeat.advance();
+	CHECK( repeat.turn() == jeep );
+	repeat.set( tank, FALSE );
+	CHECK( repeat.turn() == jeep );
+
+	/* taking off the one whose turn it is, when it is the last, wraps to the first */
+	repeat.set( jeep, FALSE );
+	CHECK( repeat.turn() == apc );
+	repeat.set( jeep, FALSE );		// already off: nothing happens
+	CHECK_EQ( 1, (Int)repeat.m_units.size() );
+
+	repeat.clear();
+	CHECK( repeat.turn() == NULL );
+	CHECK( !repeat.has( apc ) );
+}
+
+/* What a factory on repeat does when canMakeUnit answers: money, a full queue or parking, the unit
+	 cap and a factory out of action wait, a unit the factory can no longer make leaves the repeat. */
+TEST(production_repeat_waits_for_money_and_drops_a_unit_it_can_no_longer_make)
+{
+	CHECK_EQ( (Int)REPEAT_QUEUE, (Int)Production_repeatAction( CANMAKE_OK ) );
+	CHECK_EQ( (Int)REPEAT_WAIT, (Int)Production_repeatAction( CANMAKE_NO_MONEY ) );
+	CHECK_EQ( (Int)REPEAT_WAIT, (Int)Production_repeatAction( CANMAKE_QUEUE_FULL ) );
+	CHECK_EQ( (Int)REPEAT_WAIT, (Int)Production_repeatAction( CANMAKE_PARKING_PLACES_FULL ) );
+	CHECK_EQ( (Int)REPEAT_WAIT, (Int)Production_repeatAction( CANMAKE_MAXED_OUT_FOR_PLAYER ) );
+	CHECK_EQ( (Int)REPEAT_WAIT, (Int)Production_repeatAction( CANMAKE_FACTORY_IS_DISABLED ) );
+	CHECK_EQ( (Int)REPEAT_DROP, (Int)Production_repeatAction( CANMAKE_NO_PREREQ ) );
+}
+
 TEST(borderless_asks_for_a_windowed_device_the_size_of_the_desktop)
 {
 	/* -borderless is borderless fullscreen.  Half of it is the window itself, which WinMain creates

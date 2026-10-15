@@ -524,6 +524,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			DEBUG_ASSERTCRASH( whatToBuild, ("Undefined BUILD command for object '%s'\n",
 												 commandButton->getThingTemplate()->getName().str()) );
 
+			// Ctrl+Alt, on the button's key or a click, puts the unit on repeat or takes it off.
+			// The right button already takes units back out of the queue, so it stays that
+			if( TheKeyboard->isCtrl() && TheKeyboard->isAlt() )
+			{
+				toggleRepeatUnit( whatToBuild );
+				break;
+			}
+
 			// shift, control or both queue a whole batch with one click
 			Int wanted = getBuildBatchCount();
 
@@ -1162,4 +1170,49 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	return CBC_COMMAND_USED;
 
 }  // end processCommandUI
+
+//-------------------------------------------------------------------------------------------------
+/** The button's repeat mark: some selected factory of ours builds 'thing' on repeat. */
+//-------------------------------------------------------------------------------------------------
+Bool ControlBar::selectionRepeatsUnit( const ThingTemplate *thing )
+{
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *candidate = (*it)->getObject();
+		if( candidate == NULL || candidate->getControllingPlayer() != ThePlayerList->getLocalPlayer() )
+			continue;
+		ProductionUpdateInterface *pu = candidate->getProductionUpdateInterface();
+		if( pu && pu->isRepeatUnit( thing ) )
+			return TRUE;
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Ctrl+Alt on a build button: every selected factory of ours that can make the unit builds it on
+	* repeat, or, when any of them already does, every one of them stops.  One message per factory
+	* with the state named outright, so a mixed selection comes out all on or all off. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::toggleRepeatUnit( const ThingTemplate *thing )
+{
+	const Bool on = !selectionRepeatsUnit( thing );
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *candidate = (*it)->getObject();
+		if( candidate == NULL || candidate->getControllingPlayer() != ThePlayerList->getLocalPlayer() )
+			continue;
+		if( candidate->getProductionUpdateInterface() == NULL )
+			continue;
+		if( on && !TheBuildAssistant->isPossibleToMakeUnit( candidate, thing ) )
+			continue;
+
+		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_SET_REPEAT_UNIT );
+		msg->appendIntegerArgument( thing->getTemplateID() );
+		msg->appendObjectIDArgument( candidate->getID() );
+		msg->appendBooleanArgument( on );
+	}
+	markUIDirty();
+}
 

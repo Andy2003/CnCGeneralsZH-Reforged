@@ -894,6 +894,11 @@ void ControlBar::updateContextCommand( void )
 		GadgetButtonClearClock( win );
 		win->winClearStatus( WIN_STATUS_CANCEL_WHEN_DISABLED );
 
+		// the spinning repeat mark: some selected factory builds this unit on repeat
+		const Bool repeating = command->getCommandType() == GUI_COMMAND_UNIT_BUILD &&
+													 selectionRepeatsUnit( command->getThingTemplate() );
+		GadgetButtonSetRepeat( win, repeating );
+
 		//
 		// a unit build button wears a radial fill over the cameo while its unit is the one being
 		// built, and right-click cancels the last one queued
@@ -1002,6 +1007,11 @@ void ControlBar::updateContextCommand( void )
 			win->winEnable( TRUE );
 			win->winSetStatus( WIN_STATUS_ALWAYS_COLOR );
 		}
+
+		// the same for a unit on repeat the bank cannot pay for right now: Ctrl+Alt click has to
+		// reach the button to stop it, and a plain click only says there is not enough money
+		if( repeating && availability == COMMAND_CANT_AFFORD )
+			win->winEnable( TRUE );
 
 		//Determine by the production type of this button, whether or not the created object
 		//will have a veterancy rank

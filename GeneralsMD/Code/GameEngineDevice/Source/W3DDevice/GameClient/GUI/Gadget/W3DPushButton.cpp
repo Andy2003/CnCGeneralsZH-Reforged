@@ -60,6 +60,7 @@
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/InGameUI.h"		// HudReadout_draw, the plate every corner marking stands on
 #include "Common/GlobalData.h"
+#include "Lib/Clock.h"
 #include "W3DDevice/GameClient/W3DGameWindow.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DGadget.h"
@@ -325,6 +326,60 @@ static void drawClassicKeyBadge( GameWindow *window, const UnicodeString &text, 
 
 }  // end drawClassicKeyBadge
 
+// drawRepeatMark =============================================================
+/** The unit on this button is built on repeat: two arrows chasing each other round a ring, on the
+	* key letter's square plate in the top right corner, turning once every REPEAT_TURN_MS.  Drawn in
+	* lines rather than from art so it stays sharp at every HUD size, and turned by the wall clock,
+	* which only the picture reads. */
+//=============================================================================
+static const UnsignedInt REPEAT_TURN_MS = 1200;
+
+static void drawRepeatMark( GameWindow *window )
+{
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+
+	const Int side = max( 11, REAL_TO_INT( min( size.x, size.y ) * 0.4f ) );
+	const Int left = origin.x + size.x - 1 - side;
+	const Int top = origin.y + 1;
+	TheDisplay->drawFillRect( left, top, side, side, GameMakeColor( 2, 4, 5, 230 ) );
+	TheDisplay->drawOpenRect( left, top, side, side, 1, GameMakeColor( 90, 90, 90, 255 ) );
+
+	const Color green = GameMakeColor( 110, 235, 90, 255 );
+	const Real cx = left + side * 0.5f;
+	const Real cy = top + side * 0.5f;
+	const Real radius = side * 0.3f;
+	const Real width = max( 1.5f, side * 0.1f );
+	const Real head = side * 0.16f;
+	const Real spin = ( Clock_Milliseconds() % REPEAT_TURN_MS ) * ( 2.0f * PI / REPEAT_TURN_MS );
+
+	// two arcs of 130 degrees, half a turn apart, each with its head on the leading end
+	const Int SEGMENTS = 6;
+	const Real ARC = 130.0f * PI / 180.0f;
+	for( Int arrow = 0; arrow < 2; ++arrow )
+	{
+		const Real start = spin + arrow * PI;
+		for( Int s = 0; s < SEGMENTS; ++s )
+		{
+			const Real a0 = start + ARC * s / SEGMENTS;
+			const Real a1 = start + ARC * ( s + 1 ) / SEGMENTS;
+			TheDisplay->drawLine( REAL_TO_INT( cx + radius * cosf( a0 ) ), REAL_TO_INT( cy + radius * sinf( a0 ) ),
+														REAL_TO_INT( cx + radius * cosf( a1 ) ), REAL_TO_INT( cy + radius * sinf( a1 ) ), width, green );
+		}
+
+		// the head: a point a little ahead along the ring, its barbs either side of the arc's end
+		const Real end = start + ARC;
+		const Real ex = cx + radius * cosf( end ), ey = cy + radius * sinf( end );
+		const Real tx = -sinf( end ), ty = cosf( end );		// the way the ring turns
+		const Real nx = cosf( end ), ny = sinf( end );		// out from the centre
+		const Int px = REAL_TO_INT( ex + tx * head ), py = REAL_TO_INT( ey + ty * head );
+		TheDisplay->drawLine( px, py, REAL_TO_INT( ex + nx * head ), REAL_TO_INT( ey + ny * head ), width, green );
+		TheDisplay->drawLine( px, py, REAL_TO_INT( ex - nx * head ), REAL_TO_INT( ey - ny * head ), width, green );
+	}
+
+}  // end drawRepeatMark
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
@@ -457,6 +512,9 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 
 		if( pData->drawCount > 0 )
 			drawCountBadge( window, pData->drawCount );
+
+		if( pData->drawRepeat )
+			drawRepeatMark( window );
 	}
 
 	// the text goes on last: the cooldown clock sweeps across the whole button and used to
@@ -633,6 +691,9 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 
 		if( pData->drawCount > 0 )
 			drawCountBadge( window, pData->drawCount );
+
+		if( pData->drawRepeat )
+			drawRepeatMark( window );
 	}
 
 	//Now render overlays that pertain to the correct state.
@@ -896,6 +957,9 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 
 		if( pData->drawCount > 0 )
 			drawCountBadge( window, pData->drawCount );
+
+		if( pData->drawRepeat )
+			drawRepeatMark( window );
 	}
 
 	// the text goes on last: the cooldown clock sweeps across the whole button and used to

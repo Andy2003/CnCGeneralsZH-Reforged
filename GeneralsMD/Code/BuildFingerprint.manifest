@@ -252,6 +252,7 @@ Data/Scenarios/mobclose.txt
 Data/Scenarios/mobopen.txt
 Data/Scenarios/mobstress.txt
 Data/Scenarios/mobwin.txt
+Data/Scenarios/netrepeat.txt
 Data/Scenarios/netstance.txt
 Data/Scenarios/nukefade.txt
 Data/Scenarios/obeyorders.txt
@@ -261,6 +262,7 @@ Data/Scenarios/overlordrush.txt
 Data/Scenarios/parade.txt
 Data/Scenarios/particles100k.txt
 Data/Scenarios/reachshot.txt
+Data/Scenarios/repeatbuild.txt
 Data/Scenarios/rf_mass840.txt
 Data/Scenarios/rf_night.txt
 Data/Scenarios/rf_nightday.txt

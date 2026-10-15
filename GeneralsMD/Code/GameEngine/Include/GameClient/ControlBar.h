@@ -804,6 +804,8 @@ public:
 
 	/// mark the UI as dirty so the context of everything is re-evaluated
 	void markUIDirty( void );
+	Bool selectionRepeatsUnit( const ThingTemplate *thing );	///< a selected factory of ours builds it on repeat
+	void toggleRepeatUnit( const ThingTemplate *thing );		///< Ctrl+Alt on a build button: repeat on or off
 
 	/// a drawable has just become selected
 	void onDrawableSelected( Drawable *draw );
