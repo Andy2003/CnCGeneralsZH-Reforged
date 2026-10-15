@@ -4153,8 +4153,9 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 	types[ 10 ] = N;
 	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, FALSE ), -1 );
 
-	/* A base defence that shoots has no Attack Move. Patriot (Stop 13, Sell 14) takes 12; Gattling
-	   Cannon (mines 12) takes 11 above them; GLA Tunnel Network fills 1 to 14 and gets none */
+	/* A base defence that shoots, or a Combat Chinook, has no Attack Move. Patriot (Stop 13, Sell 14)
+	   and the Chinook take 12; Gattling Cannon and Bunker (mines 12) take 11 above them; GLA Tunnel
+	   Network and the Infantry General's Bunker fill 1 to 14 and get none */
 	types[ 12 ] = GUI_COMMAND_STOP;
 	types[ 13 ] = GUI_COMMAND_SELL;
 	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, TRUE ), 11 );

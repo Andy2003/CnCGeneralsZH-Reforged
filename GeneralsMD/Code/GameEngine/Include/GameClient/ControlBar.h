@@ -510,15 +510,18 @@ Bool ControlBar_commandPlaces( const Int *types, const Int *groups, const Int *p
 void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int count, Int *shown );
 
 /** Slot 12 (0-based 11) when the set already has Attack Move and that hole is empty: left of Stop,
-	* under Attack Move. A base defence that shoots (`firingDefense`) takes 12 too, or 11 above it when
-	* 12 is taken (Gattling Cannon's mines, Stinger Site's camo net, Fire Base's Sell). -1 when neither
+	* under Attack Move. An object ControlBar_forceFires names takes 12 too, or 11 above it when 12 is
+	* taken (Gattling Cannon's mines, Stinger Site's camo net, Fire Base's Sell). -1 when neither
 	* applies, or the place is used (China CC mines, a Tunnel Network's full bar). */
-Int ControlBar_forceAttackSlot( const Int *types, Int count, Bool firingDefense );
+Int ControlBar_forceAttackSlot( const Int *types, Int count, Bool forceFires );
 
-/** A base defence that shoots: FS_BASE_DEFENSE with its own gun (CAN_ATTACK: Patriot, Gattling
-	* Cannon, Fire Base, Tunnel Network) or soldiers for a gun (SPAWNS_ARE_THE_WEAPONS: Stinger Site).
-	* A Bunker or Speaker Tower is neither. The launcher's Hotkeys page reads KindOf the same way. */
-Bool ControlBar_isFiringDefense( const Object *obj );
+/** Whether Force Attack belongs on a bar without Attack Move. A base defence (FS_BASE_DEFENSE) with its
+	* own gun (CAN_ATTACK: Patriot, Gattling Cannon, Fire Base, Tunnel Network), soldiers for a gun
+	* (SPAWNS_ARE_THE_WEAPONS: Stinger Site) or a garrison that shoots out (GARRISONABLE_UNTIL_DESTROYED:
+	* Bunker), and a transport whose riders shoot (TRANSPORT with CAN_ATTACK: Combat Chinook; the
+	* plain Chinook lacks CAN_ATTACK). A Speaker Tower is none of them. The launcher's Hotkeys page
+	* reads KindOf the same way. */
+Bool ControlBar_forceFires( const Object *obj );
 
 /** Grid keys' second pass over ControlBar_fitCommandSlots' `shown`: a button in window w with no key
 	* there (`unkeyed[ w ]`) moves to the first empty window, leftmost first, whose place has a key
