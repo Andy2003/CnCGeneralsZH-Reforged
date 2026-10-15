@@ -736,8 +736,11 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 				 between a selection and the right selection.  Shift already adds, so what was missing
 				 was a way to take things back out and a way to leave the base staff behind: Alt keeps
 				 only what can shoot, Ctrl removes the box from the selection instead of replacing it.
-				 Both are drag-only.  A point click has to stay exactly what it was - a filter that eats
-				 single clicks reads as a broken mouse.  Classic has neither: its Ctrl is force fire. */
+				 Ctrl+Shift selects the box: both meta modes drop when the second modifier goes
+				 down, the fire circle never starts, and this Ctrl-remove used to eat the click.
+				 Both filters are drag-only.  A point click has to stay exactly what it was - a filter
+				 that eats single clicks reads as a broken mouse.  Classic has neither: its Ctrl is
+				 force fire. */
 			if (!isPoint && !TheGlobalData->isClassicMouse())
 			{
 				if (TheKeyboard->isAlt())
@@ -762,7 +765,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 					}
 				}
 
-				if (TheKeyboard->isCtrl())
+				if (TheKeyboard->isCtrl() && !TheKeyboard->isShift())
 				{
 					GameMessage *removeMsg = NULL;
 					DrawableListIt rit;
@@ -1101,9 +1104,12 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 
 			// with the attack key armed or Ctrl held the left button draws a circle instead of a
 			// selection box, and everything hostile inside it becomes a target list.  An armed line key
-			// (move, attack move, guard) keeps its line under Ctrl
+			// (move, attack move, guard) keeps its line under Ctrl.  Ctrl+Shift is the box: you can
+			// pick units without dropping force-fire.  Shift with the attack key armed still queues a
+			// circle.
 			if( TheInGameUI->isForceFireOn() && !TheInGameUI->isLineOrderArmed() && TheInGameUI->getSelectCount() > 0
-					&& TheInGameUI->getGUICommand() == NULL && TheInGameUI->getPendingPlaceType() == NULL )
+					&& TheInGameUI->getGUICommand() == NULL && TheInGameUI->getPendingPlaceType() == NULL
+					&& !( TheKeyboard->isCtrl() && TheKeyboard->isShift() ) )
 				TheInGameUI->beginAttackCircle( m_selectFeedbackAnchor );
 			break;
 		}

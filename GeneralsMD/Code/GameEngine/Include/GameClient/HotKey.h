@@ -113,7 +113,8 @@ public:
 		* Hotkeys page writes it, INI::parseCommandButtonHotKeyDefinition reads it), 0 where the player
 		* took the key away, and labelKey, the letter after the label's '&', where the player left the
 		* button alone; upper case.  Attack move, stop, guard, rally point, evacuate and sell have their
-		* fixed letters and no other button gets one.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
+		* fixed letters and no other button gets one.  Force Attack is 0: it is Ctrl, painted on the
+		* cameo, never a letter.  With grid keys on (INI::parseCommandBarGridDefinition) a button on the command bar,
 		* barSlot its ButtonCommand number less one, gets its place's key instead, except attack move, stop, guard, rally point, evacuate and combat drop, and any other button
 		* (barSlot -1) loses a letter the grid uses. */
 	static WideChar playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,

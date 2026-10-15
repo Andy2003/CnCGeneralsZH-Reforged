@@ -4168,6 +4168,10 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 	CHECK_EQ( shown[ 11 ], 11 );
 	CHECK_EQ( shown[ 12 ], 16 );
 	CHECK_EQ( shown[ 13 ], 17 );
+
+	/* Force Attack is Ctrl: slot 12's grid H and the English label's F both stay off the button */
+	CHECK_EQ( HotKeyManager::playerButtonKey( AsciiString( "Command_ForceAttack" ), 'F', 11,
+		GUI_COMMAND_FORCE_ATTACK ), 0 );
 }
 
 /* Grid keys leave windows 11 and 13 keyless.  The USA War Factory's TOW upgrade in 11 moves to the

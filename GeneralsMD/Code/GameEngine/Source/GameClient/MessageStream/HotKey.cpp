@@ -446,6 +446,10 @@ static Bool isOneOf( WideChar letter, const WideChar *letters, Int count )
 WideChar HotKeyManager::playerButtonKey( const AsciiString& button, WideChar labelKey, Int barSlot,
 																				 Int commandType )
 {
+	// Force Attack is Ctrl.  Slot 12's grid letter is H, the English label's is F; neither is
+	// the key, and neither may bind the button.
+	if( commandType == GUI_COMMAND_FORCE_ATTACK )
+		return 0;
 	AsciiString lower = button;
 	lower.toLower();
 	Int ownMod = -1;
