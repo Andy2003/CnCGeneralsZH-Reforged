@@ -391,7 +391,7 @@ void ControlBar::populateCommand( Object *obj )
 			types[ i ] = shows ? button->getCommandType() : GUI_COMMAND_NONE;
 		}
 		{
-			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET );
+			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET, ControlBar_isFiringDefense( obj ) );
 			const CommandButton *force = forceSlot >= 0 ? findCommandButton( AsciiString( "Command_ForceAttack" ) ) : NULL;
 			if( force )
 			{
@@ -421,7 +421,7 @@ void ControlBar::populateCommand( Object *obj )
 			windowed[ i ] = m_commandWindows[ i ] != NULL;
 		}
 		{
-			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET );
+			const Int forceSlot = ControlBar_forceAttackSlot( types, MAX_COMMANDS_PER_SET, ControlBar_isFiringDefense( obj ) );
 			const CommandButton *force = forceSlot >= 0 ? findCommandButton( AsciiString( "Command_ForceAttack" ) ) : NULL;
 			if( force )
 			{

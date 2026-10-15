@@ -416,15 +416,26 @@ void ControlBar_fitCommandSlots( const Int *types, const Bool *windowed, Int cou
 }
 
 //-------------------------------------------------------------------------------------------------
-Int ControlBar_forceAttackSlot( const Int *types, Int count )
+Int ControlBar_forceAttackSlot( const Int *types, Int count, Bool firingDefense )
 {
-	enum { SLOT = 11 };
-	if( count <= SLOT || types[ SLOT ] != GUI_COMMAND_NONE )
+	enum { SLOT = 11, ABOVE = 10 };
+	if( count <= SLOT )
 		return -1;
-	for( Int slot = 0; slot < count; slot++ )
-		if( types[ slot ] == GUI_COMMAND_ATTACK_MOVE )
-			return SLOT;
+	Bool fights = firingDefense;
+	for( Int slot = 0; slot < count && !fights; slot++ )
+		fights = types[ slot ] == GUI_COMMAND_ATTACK_MOVE;
+	if( fights && types[ SLOT ] == GUI_COMMAND_NONE )
+		return SLOT;
+	if( firingDefense && types[ ABOVE ] == GUI_COMMAND_NONE )
+		return ABOVE;
 	return -1;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool ControlBar_isFiringDefense( const Object *obj )
+{
+	return obj->isKindOf( KINDOF_FS_BASE_DEFENSE )
+		&& ( obj->isKindOf( KINDOF_CAN_ATTACK ) || obj->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS ) );
 }
 
 //-------------------------------------------------------------------------------------------------

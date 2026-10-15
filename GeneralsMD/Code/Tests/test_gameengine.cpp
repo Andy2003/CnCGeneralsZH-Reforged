@@ -4144,14 +4144,25 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 	types[ 10 ] = GUI_COMMAND_ATTACK_MOVE;
 	types[ 12 ] = GUI_COMMAND_GUARD;
 	types[ 13 ] = GUI_COMMAND_STOP;
-	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), 11 );
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, FALSE ), 11 );
 
 	types[ 11 ] = GUI_COMMAND_OBJECT_UPGRADE;
-	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), -1 );
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, FALSE ), -1 );
 
 	types[ 11 ] = N;
 	types[ 10 ] = N;
-	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS ), -1 );
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, FALSE ), -1 );
+
+	/* A base defence that shoots has no Attack Move. Patriot (Stop 13, Sell 14) takes 12; Gattling
+	   Cannon (mines 12) takes 11 above them; GLA Tunnel Network fills 1 to 14 and gets none */
+	types[ 12 ] = GUI_COMMAND_STOP;
+	types[ 13 ] = GUI_COMMAND_SELL;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, TRUE ), 11 );
+	types[ 11 ] = GUI_COMMAND_PLAYER_UPGRADE;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, TRUE ), 10 );
+	for( Int slot = 0; slot < 14; slot++ )
+		types[ slot ] = GUI_COMMAND_EXIT_CONTAINER;
+	CHECK_EQ( ControlBar_forceAttackSlot( types, SLOTS, TRUE ), -1 );
 
 	/* Contra ranger: Attack Move in 15, slot 12 empty. Inject then fit keeps Force Attack in 12
 	   and still maps Attack Move, Guard and Stop to 11, 13 and 14 */
@@ -4161,7 +4172,7 @@ TEST(controlbar_force_attack_slot_is_under_attack_move)
 		windowed[ slot ] = slot < WINDOWS;
 	Int ranger[ SLOTS ] = { U, U, U, U, U, N, GUI_COMMAND_SPECIAL_POWER, W, N, W, N, N, N, N,
 		GUI_COMMAND_ATTACK_MOVE, N, GUI_COMMAND_GUARD, GUI_COMMAND_STOP };
-	CHECK_EQ( ControlBar_forceAttackSlot( ranger, SLOTS ), 11 );
+	CHECK_EQ( ControlBar_forceAttackSlot( ranger, SLOTS, FALSE ), 11 );
 	ranger[ 11 ] = GUI_COMMAND_FORCE_ATTACK;
 	ControlBar_fitCommandSlots( ranger, windowed, SLOTS, shown );
 	CHECK_EQ( shown[ 10 ], 14 );
