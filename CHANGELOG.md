@@ -366,6 +366,7 @@ found and fixed â€” EA's own, not port damage.**
 - Ordering a very large army works. A selection of more than 254 units reaches the game whole, and Ctrl+number groups keep all their units.
 - Hold Alt and drag with the middle mouse button, or hold Alt and turn the wheel, to tilt the camera between 20 and 60 degrees. Home resets heading, tilt and zoom, the way Numpad 5 does.
 - The side buttons on your mouse tilt the camera five degrees a press, forward flatter and back steeper, on Windows, Mac and Linux. The game used to ignore them.
+- The screen edges scroll the map again in a borderless or ordinary window. Since 3.0.0 every player runs the Classic mouse, and the Classic mouse kept the 2003 rule of no edge scrolling in a window, whatever the "Edge Scroll In A Window" option said. Only fullscreen still scrolled. The option decides it now, and borderless always scrolls, since there is no desktop around it to move the pointer onto.
 
 ## Aircraft, guards, and orders that used to be ignored
 
