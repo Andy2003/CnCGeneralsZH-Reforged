@@ -397,6 +397,8 @@ public:
 
 	void setStealthLook(StealthLookType look);
 	StealthLookType getStealthLook() const { return m_stealthLook; }
+	StealthLookType getStealthDrawnLook() const { return m_stealthDrawnLook; }
+	Real getStealthFade() const { return m_stealthFade; }
 
 	void updateDrawableClipStatus( UnsignedInt shotsRemaining, UnsignedInt maxShots, WeaponSlotType slot ); ///< This will do the show/hide work if ProjectileBoneFeedbackEnabled is set.
 	void updateDrawableSupplyStatus( Int maxSupply, Int currentSupply ); ///< This will do visual feedback on Supplies carried
@@ -758,6 +760,8 @@ private:
 	Module** m_modules[NUM_DRAWABLE_MODULE_TYPES];
 
 	StealthLookType m_stealthLook;
+	StealthLookType m_stealthDrawnLook;	///< look the shader is fading, while m_stealthLook is the target
+	Real m_stealthFade;									///< 0 invisible / 1 fully the drawn look
 
 	Int m_flashCount;           ///< number of times to flash the drawable
 	Color m_flashColor;					///< color to flash the drawable

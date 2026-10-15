@@ -108,8 +108,8 @@ ProductionUpdateModuleData::ProductionUpdateModuleData( void )
 	m_doorClosingTime = 0;
 	m_constructionCompleteDuration = 0;
 	m_quantityModifiers.clear();
-	// deep queues; objects that must build one at a time still say MaxQueueEntries = 1 in INI
-	m_maxQueueEntries = 100;
+	// nine, matching the queue strip; objects that must build one at a time still say MaxQueueEntries = 1 in INI
+	m_maxQueueEntries = 9;
 	m_disabledTypesToProcess = MAKE_DISABLED_MASK(DISABLED_HELD);
 }
 

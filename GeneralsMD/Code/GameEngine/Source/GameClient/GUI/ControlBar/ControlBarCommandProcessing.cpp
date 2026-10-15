@@ -537,7 +537,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			// gather the "factory" objects that could make the thing. With several factories
 			// selected (multi-select context) every one that can make it is a candidate, and each
-			// unit of the batch goes to the least loaded one, so the work spreads over all of them
+			// unit of the batch goes to the least loaded one, so the work spreads over all of them.
+			// A factory already at the nine-deep strip is left out, and with none able to take it
+			// the click does nothing: the button is already grey.
 			std::vector<Object *> factories;
 			std::vector<UnsignedInt> queued;		// real production count plus what this click already gave it
 			if( obj )
@@ -555,14 +557,10 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					ProductionUpdateInterface *cpu = candidate ? candidate->getProductionUpdateInterface() : NULL;
 					if( cpu == NULL || TheBuildAssistant->canMakeUnit( candidate, whatToBuild ) != CANMAKE_OK )
 						continue;
+					if( cpu->getProductionCount() >= getQueueCap( cpu ) )
+						continue;
 					factories.push_back( candidate );
 					queued.push_back( cpu->getProductionCount() );
-				}
-				// nothing can take it: fall back to the first factory so the usual messages fire
-				if( factories.empty() && !selected->empty() && selected->front()->getObject() )
-				{
-					factories.push_back( selected->front()->getObject() );
-					queued.push_back( 0 );
 				}
 			}
 			if( factories.empty() )
@@ -570,11 +568,23 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			for( Int built = 0; built < wanted; built++ )
 			{
-				// least loaded factory takes this one
-				Int best = 0;
-				for( Int i = 1; i < (Int)factories.size(); i++ )
-					if( queued[ i ] < queued[ best ] )
+				// least loaded factory that still has a free queue slot takes this one
+				Int best = -1;
+				for( Int i = 0; i < (Int)factories.size(); i++ )
+				{
+					ProductionUpdateInterface *fpu = factories[ i ]->getProductionUpdateInterface();
+					const UnsignedInt cap = fpu ? getQueueCap( fpu ) : 0;
+					if( queued[ i ] >= cap )
+						continue;
+					if( best < 0 || queued[ i ] < queued[ best ] )
 						best = i;
+				}
+				if( best < 0 )
+				{
+					if( built == 0 )
+						TheInGameUI->message( "GUI:ProductionQueueFull" );
+					break;
+				}
 				Object *factory = factories[ best ];
 
 				CanMakeType cmt = TheBuildAssistant->canMakeUnit(factory, whatToBuild);

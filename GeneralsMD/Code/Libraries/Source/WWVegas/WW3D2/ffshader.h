@@ -571,9 +571,8 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"   left a squad barely there, so the glass also leans toward a cool mid grey, 12% face on and\n" \
 	"   about three quarters at the outline, where a soldier's round body has most of its faces and\n" \
 	"   a building's flat walls have few: a haze rather than a white edge, darkening bright ground as\n" \
-	"   much as it lifts dark ground.  Three eighths to a half of the unit's own paint stays in it,\n" \
-	"   breathing with the game's own stealth opacity as it did in 2003, which is what makes a group\n" \
-	"   read at a glance while it still looks like glass.  Detected (the strength is never below 0.6\n" \
+	"   much as it lifts dark ground.  The unit's own paint is mixed in by the game's stealth opacity,\n" \
+	"   so the 2003 breath goes solid at the top of the pulse and back to glass at the bottom.  Detected (the strength is never below 0.6\n" \
 	"   then), the whole body beats amber as well as its edge: a big flat building has almost no\n" \
 	"   edge facing away from the eye, and with the beat on the rim alone it only turned tan.  The\n" \
 	"   alpha goes back up to the texel's own, because the shade already holds the mix. */\n" \
@@ -583,7 +582,7 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    effect_surface(position, world, surface, facing);\n" \
 	"    float t = DrawEffectParameters.x;\n" \
 	"    float detected = DrawEffectParameters.y;\n" \
-	"    float opacity = max(DrawEffectParameters.w, 0.05);\n" \
+	"    float opacity = saturate(DrawEffectParameters.w);\n" \
 	"    float rim = pow(1.0 - facing, 2.0);\n" \
 	"    float swim_x = effect_noise(world * 0.09 + float3(t * 0.35, t * 0.2, t * 0.45)) - 0.5;\n" \
 	"    float swim_y = effect_noise(world * 0.09 + float3(7.3 - t * 0.3, 2.1, t * 0.4)) - 0.5;\n" \
@@ -601,15 +600,15 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float3 behind = SceneColour.Load(int3(at, 0)).rgb;\n" \
 	"    float grey = dot(current.rgb, float3(0.299, 0.587, 0.114));\n" \
 	"    float3 own = lerp(grey.xxx, current.rgb, 0.7);\n" \
-	"    float3 glass = lerp(behind, own, 0.25 + 0.25 * opacity);\n" \
-	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), 0.12 + 0.65 * rim);\n" \
+	"    float3 glass = lerp(behind, own, opacity);\n" \
+	"    glass = lerp(glass, float3(0.52, 0.55, 0.59), (1.0 - opacity) * (0.12 + 0.65 * rim));\n" \
 	"    float found = step(0.01, detected);\n" \
 	"    float beat = 0.55 + 0.45 * sin(t * 6.0);\n" \
 	"    float3 amber = float3(1.0, 0.55, 0.15);\n" \
 	"    float lum = dot(glass, float3(0.299, 0.587, 0.114));\n" \
 	"    glass = lerp(glass, amber * (0.3 + lum), found * (0.25 + 0.3 * beat)) + found * (rim * 1.2 + 0.18) * beat * amber;\n" \
 	"    current.rgb = glass;\n" \
-	"    current.a = saturate(current.a / opacity);\n" \
+	"    current.a = (opacity < 0.02) ? 0.0 : saturate(current.a / max(opacity, 0.05));\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \
@@ -631,7 +630,11 @@ const unsigned NORMAL_MAPPED_LIGHTS = 4;
 	"    float rim = pow(1.0 - facing, 2.0);\n" \
 	"    float sweep = smoothstep(0.9, 1.0, sin(world.z * 0.06 - t * 1.8));\n" \
 	"    float gain = 0.6 + 0.35 * pulse;\n" \
-	"    current.rgb = ramp * gain + float3(1.0, 0.40, 0.12) * (rim * 0.9 + sweep * 0.35) * gain;\n" \
+	"    float mix = saturate(DrawEffectParameters.w);\n" \
+	"    float3 heatRgb = ramp * gain + float3(1.0, 0.40, 0.12) * (rim * 0.9 + sweep * 0.35) * gain;\n" \
+	"    current.rgb = heatRgb;\n" \
+	"    if (mix < 0.999)\n" \
+	"        current.a *= mix;\n" \
 	"    return current;\n" \
 	"}\n" \
 	"\n" \

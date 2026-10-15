@@ -100,9 +100,16 @@ static Bool theTranslucentPass = FALSE;
 
 static Bool wearsCloak( const Drawable *draw )
 {
-	const StealthLookType look = draw->getStealthLook();
-	return ( look == STEALTHLOOK_VISIBLE_FRIENDLY || look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED )
-		&& Direct3D11_Draw_Effects();
+	if( !Direct3D11_Draw_Effects() )
+		return FALSE;
+	const StealthLookType look = draw->getStealthDrawnLook();
+	const Real fade = draw->getStealthFade();
+	if( look == STEALTHLOOK_VISIBLE_FRIENDLY || look == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED )
+		return fade > 0.001f;
+	// revealed fades in the translucent pass so the heat can come up from nothing
+	if( look == STEALTHLOOK_VISIBLE_DETECTED && fade < 0.99f )
+		return TRUE;
+	return FALSE;
 }
 
 // No texturing, no zbuffer reading/writing, primary gradient, no
@@ -660,17 +667,25 @@ static unsigned chooseDrawEffect( const Drawable *draw, const Object *obj, Bool 
 		return DRAW_EFFECT_NONE;
 
 	unsigned effect = DRAW_EFFECT_NONE;
-	const StealthLookType look = draw->getStealthLook();
+	const StealthLookType look = draw->getStealthDrawnLook();
 	const Real pulse = draw->getSecondMaterialPassOpacity();
-	const Real opacity = draw->getEffectiveOpacity();
+	const Real fade = draw->getStealthFade();
+	Real opacity = draw->getEffectiveOpacity();
+	if( draw->getStealthLook() == STEALTHLOOK_NONE )
+		opacity = opacity + ( 1.0f - opacity ) * ( 1.0f - fade );
+	else
+		opacity *= fade;
 	Real strength = 1.0f;
 
-	if ( look == STEALTHLOOK_VISIBLE_DETECTED && !draw->isKindOf( KINDOF_MINE ) )
+	if ( look == STEALTHLOOK_VISIBLE_DETECTED && !draw->isKindOf( KINDOF_MINE )
+		&& ( translucentPass || fade >= 0.99f ) )
 	{
 		effect = DRAW_EFFECT_REVEALED;
 		strength = pulse;
+		opacity = fade;
 	}
-	else if ( translucentPass && wearsCloak( draw ) )
+	else if ( translucentPass && wearsCloak( draw )
+		&& look != STEALTHLOOK_VISIBLE_DETECTED )
 	{
 		// Detected, the amber stays on and the detector's sweep brightens it; on the pulse alone it
 		// showed for a few frames a sweep and was never seen.

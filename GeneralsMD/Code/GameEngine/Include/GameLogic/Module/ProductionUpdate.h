@@ -145,15 +145,15 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/** The units a factory builds on repeat (fork).  The player turns one on and off with Ctrl+Alt and
+/** The unit a factory builds on repeat (fork).  The player turns one on and off with Ctrl+Alt and
 	* the button's key, or a Ctrl+Alt click on it.  Whenever the factory's queue is empty it queues
-	* the unit whose turn it is, and the turn passes to the next in the order they were turned on.
+	* that unit.  Only one unit at a time: turning a second on takes the first off.
 	* Logic state, set only by MSG_SET_REPEAT_UNIT; kept apart from the module so the test binary can
 	* drive it with no object behind it. */
 //-------------------------------------------------------------------------------------------------
 struct ProductionRepeat
 {
-	std::vector<const ThingTemplate *> m_units;	///< in the order they were turned on
+	std::vector<const ThingTemplate *> m_units;	///< the unit on repeat, or empty
 	UnsignedInt m_next;													///< index into m_units of the one whose turn it is
 
 	ProductionRepeat() : m_next( 0 ) {}
@@ -166,25 +166,29 @@ struct ProductionRepeat
 		return FALSE;
 	}
 
-	/// on appends it at the end of the turn order, off takes it out; either is a no-op when it already is
+	/// on replaces whatever was on repeat with this unit; off takes it out
 	void set( const ThingTemplate *unit, Bool on )
 	{
+		if( on )
+		{
+			if( m_units.size() == 1 && m_units[ 0 ] == unit )
+				return;
+			m_units.clear();
+			m_units.push_back( unit );
+			m_next = 0;
+			return;
+		}
 		for( size_t i = 0; i < m_units.size(); ++i )
 		{
 			if( m_units[ i ] != unit )
 				continue;
-			if( on )
-				return;
 			m_units.erase( m_units.begin() + i );
-			// the turn stays with the unit it was on, or wraps to the first when that was the last
 			if( i < m_next )
 				--m_next;
 			if( m_next >= m_units.size() )
 				m_next = 0;
 			return;
 		}
-		if( on )
-			m_units.push_back( unit );
 	}
 
 	const ThingTemplate *turn() const { return m_units.empty() ? NULL : m_units[ m_next ]; }

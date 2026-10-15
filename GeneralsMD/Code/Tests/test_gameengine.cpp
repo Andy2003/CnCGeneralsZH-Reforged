@@ -11072,16 +11072,13 @@ TEST(replay_crc_queue_aligns_to_either_kind_of_network_recording)
 }
 
 
-/** The build queue strip has nine buttons, and that number had become the production cap: every
-	 build button greyed out at nine units even though the queue itself is a hundred deep.  The two
-	 numbers are unrelated - one is how many entries fit on screen, the other is how many the factory
-	 will take (INI MaxQueueEntries). */
-TEST(a_factorys_queue_is_as_deep_as_its_ini_says_not_as_wide_as_the_button_strip)
+/** The build queue strip has nine buttons, and that is the production cap: a shift-click that
+	 would overshoot stops at nine, and so does the factory itself (INI MaxQueueEntries, default 9). */
+TEST(a_factorys_queue_is_as_deep_as_the_button_strip)
 {
 	ProductionUpdateModuleData data;
 
-	CHECK_EQ( 100, data.m_maxQueueEntries );
-	CHECK( data.m_maxQueueEntries > MAX_BUILD_QUEUE_BUTTONS );
+	CHECK_EQ( MAX_BUILD_QUEUE_BUTTONS, data.m_maxQueueEntries );
 }
 
 /** A docking ends on the frame the last box changes hands, not one action delay later.  Both ends
@@ -12958,10 +12955,9 @@ TEST(a_door_stays_open_while_another_unit_is_still_coming)
 	CHECK( !Production_shouldCloseDoorNow( 31, 30, true, true ) );
 }
 
-/* ProductionUpdate.h: production repeat.  A factory keeps a list of units on repeat in the order
-	 they were turned on, and every time its queue runs empty it queues the one whose turn it is and
-	 passes the turn on.  Turning one off must leave the turn with the unit it was on. */
-TEST(production_repeat_turns_round_the_units_in_the_order_they_were_turned_on)
+/* ProductionUpdate.h: production repeat.  A factory keeps one unit on repeat.  Turning a second
+	 on takes the first off.  Turning the same one on again is a no-op, and off takes it out. */
+TEST(production_repeat_is_one_unit_at_a_time)
 {
 	static const char a = 0, b = 0, c = 0;
 	const ThingTemplate *tank = (const ThingTemplate *)&a;
@@ -12974,34 +12970,29 @@ TEST(production_repeat_turns_round_the_units_in_the_order_they_were_turned_on)
 	CHECK( repeat.turn() == NULL );
 
 	repeat.set( tank, TRUE );
-	repeat.set( apc, TRUE );
-	repeat.set( tank, TRUE );		// already on: not a second entry
-	CHECK_EQ( 2, (Int)repeat.m_units.size() );
-	CHECK( repeat.has( tank ) && repeat.has( apc ) && !repeat.has( jeep ) );
-
-	CHECK( repeat.turn() == tank );
-	repeat.advance();
-	CHECK( repeat.turn() == apc );
-	repeat.advance();
-	CHECK( repeat.turn() == tank );
-
-	/* the turn is on the third of three; taking the first off keeps it on the third */
-	repeat.set( jeep, TRUE );
-	repeat.advance();
-	repeat.advance();
-	CHECK( repeat.turn() == jeep );
-	repeat.set( tank, FALSE );
-	CHECK( repeat.turn() == jeep );
-
-	/* taking off the one whose turn it is, when it is the last, wraps to the first */
-	repeat.set( jeep, FALSE );
-	CHECK( repeat.turn() == apc );
-	repeat.set( jeep, FALSE );		// already off: nothing happens
+	repeat.set( tank, TRUE );		// already on: still one
 	CHECK_EQ( 1, (Int)repeat.m_units.size() );
+	CHECK( repeat.has( tank ) && !repeat.has( apc ) && !repeat.has( jeep ) );
+	CHECK( repeat.turn() == tank );
 
+	repeat.set( apc, TRUE );		// a second unit replaces the first
+	CHECK_EQ( 1, (Int)repeat.m_units.size() );
+	CHECK( repeat.has( apc ) && !repeat.has( tank ) );
+	CHECK( repeat.turn() == apc );
+	repeat.advance();
+	CHECK( repeat.turn() == apc );
+
+	repeat.set( jeep, TRUE );
+	CHECK( repeat.turn() == jeep );
+	repeat.set( jeep, FALSE );
+	CHECK( repeat.turn() == NULL );
+	repeat.set( jeep, FALSE );		// already off: nothing happens
+	CHECK_EQ( 0, (Int)repeat.m_units.size() );
+
+	repeat.set( tank, TRUE );
 	repeat.clear();
 	CHECK( repeat.turn() == NULL );
-	CHECK( !repeat.has( apc ) );
+	CHECK( !repeat.has( tank ) );
 }
 
 /* What a factory on repeat does when canMakeUnit answers: money, a full queue or parking, the unit

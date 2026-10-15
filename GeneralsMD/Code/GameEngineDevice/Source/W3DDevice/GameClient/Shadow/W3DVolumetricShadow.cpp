@@ -4416,11 +4416,12 @@ void W3DVolumetricShadowManager::renderShadowMap( CameraClass &sceneCamera )
 		const DrawableInfo *casterInfo = (const DrawableInfo *)robj->Get_User_Data();
 		const Drawable *caster = casterInfo ? casterInfo->m_drawable : NULL;
 		if (caster && Direct3D11_Draw_Effects()
-			&& (caster->getStealthLook() == STEALTHLOOK_VISIBLE_FRIENDLY
-				|| caster->getStealthLook() == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED))
+			&& (caster->getStealthDrawnLook() == STEALTHLOOK_VISIBLE_FRIENDLY
+				|| caster->getStealthDrawnLook() == STEALTHLOOK_VISIBLE_FRIENDLY_DETECTED)
+			&& caster->getStealthFade() > 0.001f)
 		{
 			sunInfo.drawEffect = DRAW_EFFECT_CLOAK_SHADOW;
-			sunInfo.drawEffectParameters[3] = caster->getEffectiveOpacity();
+			sunInfo.drawEffectParameters[3] = caster->getEffectiveOpacity() * caster->getStealthFade();
 		}
 
 		robj->Render( sunInfo );
